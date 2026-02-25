@@ -2,17 +2,22 @@ import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, db
 
-# 1. 檢查是否已經初始化過，避免重複連線
+# 設定網頁標題（增加這個，你才不會看到空白）
+st.title("工時紀錄系統")
+
+# 1. 檢查是否已經初始化過
 if not firebase_admin._apps:
-    # 請確保 key.json 與 app.py 都在 Desktop/factory_app 資料夾內
     try:
         cred = credentials.Certificate("key.json")
         firebase_admin.initialize_app(cred, {
-            # 修正點：網址兩端必須加上引號 ""
             'databaseURL': "https://my-factory-system-default-rtdb.firebaseio.com/" 
         })
-        st.success("☁️ 雲端資料庫連線成功！")
     except Exception as e:
-        st.error(f"❌ 連線失敗，請檢查 key.json 檔案是否存在：{e}")
+        st.error(f"❌ 連線失敗：{e}")
 
-# 這裡之後接著你原本的介面程式碼...
+# 將成功訊息放在外面，這樣每次重新整理都會顯示
+if firebase_admin._apps:
+    st.success("☁️ 雲端資料庫狀態：連線中")
+    
+# 測試區：隨便打個字，確認網頁不是死的
+st.write("系統目前運作正常，請開始輸入資料。")
