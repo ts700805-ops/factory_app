@@ -6,12 +6,17 @@ import datetime
 st.set_page_config(page_title="工時紀錄系統", layout="centered")
 st.title("🏗️ 工時紀錄系統")
 
-# --- Firebase 連線 (讀取 Secrets) ---
+# --- Firebase 連線 (增加自動修正邏輯) ---
 if not firebase_admin._apps:
     try:
-        # 讀取剛才設定的 [firebase_config] 區段
-        cred_info = st.secrets["firebase_config"]
-        cred = credentials.Certificate(dict(cred_info))
+        # 取得 secrets 內容
+        info = dict(st.secrets["firebase_config"])
+        
+        # 自動修正：確保 private_key 裡的換行符號是正確的 \n
+        if "private_key" in info:
+            info["private_key"] = info["private_key"].replace("\\n", "\n")
+        
+        cred = credentials.Certificate(info)
         firebase_admin.initialize_app(cred, {
             'databaseURL': "https://my-factory-system-default-rtdb.firebaseio.com/" 
         })
@@ -37,7 +42,7 @@ if st.button("點我存檔到雲端", use_container_width=True):
         except Exception as e:
             st.error(f"❌ 存檔失敗：{e}")
 
-# --- 顯示紀錄 ---
+# --- 顯示最近 5 筆紀錄 ---
 st.divider()
 st.subheader("📋 最近的存檔紀錄")
 try:
@@ -45,5 +50,7 @@ try:
     if logs:
         for key, value in reversed(logs.items()):
             st.write(f"🕒 {value['time']} - **{value['name']}**: {value['hours']} 小時")
+    else:
+        st.write("目前尚無紀錄")
 except:
     pass
