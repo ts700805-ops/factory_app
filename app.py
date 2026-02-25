@@ -6,15 +6,18 @@ import datetime
 st.set_page_config(page_title="工時紀錄系統", layout="centered")
 st.title("🏗️ 工時紀錄系統")
 
-# --- Firebase 連線 (增加自動修正邏輯) ---
+# --- Firebase 連線 (具備自動校正功能) ---
 if not firebase_admin._apps:
     try:
-        # 取得 secrets 內容
+        # 1. 取得 Secret 內容
         info = dict(st.secrets["firebase_config"])
         
-        # 自動修正：確保 private_key 裡的換行符號是正確的 \n
+        # 2. 強制校正金鑰格式 (解決 PEM 錯誤的關鍵)
         if "private_key" in info:
-            info["private_key"] = info["private_key"].replace("\\n", "\n")
+            # 將可能貼錯的雙斜線校正回正確的換行符號
+            fixed_key = info["private_key"].replace("\\n", "\n")
+            # 確保開頭和結尾沒有多餘空格
+            info["private_key"] = fixed_key.strip()
         
         cred = credentials.Certificate(info)
         firebase_admin.initialize_app(cred, {
@@ -41,8 +44,10 @@ if st.button("點我存檔到雲端", use_container_width=True):
             st.balloons()
         except Exception as e:
             st.error(f"❌ 存檔失敗：{e}")
+    else:
+        st.warning("⚠️ 請輸入姓名")
 
-# --- 顯示最近 5 筆紀錄 ---
+# --- 顯示最近紀錄 ---
 st.divider()
 st.subheader("📋 最近的存檔紀錄")
 try:
@@ -50,7 +55,5 @@ try:
     if logs:
         for key, value in reversed(logs.items()):
             st.write(f"🕒 {value['time']} - **{value['name']}**: {value['hours']} 小時")
-    else:
-        st.write("目前尚無紀錄")
 except:
     pass
