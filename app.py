@@ -7,31 +7,18 @@ import datetime
 st.set_page_config(page_title="工時紀錄系統", layout="centered")
 st.title("🏗️ 工時紀錄系統")
 
-# --- 1. Firebase 連線設定 (直接寫入法) ---
+# --- 1. Firebase 連線設定 (修正讀取邏輯) ---
 if not firebase_admin._apps:
     try:
-        # 請從你的 key.json 檔案中，把內容複製並貼在下面的大括號 {} 裡面
-        # 注意：這只是範例結構，請務必把下載的 key.json 內容整個貼過來取代 {}
-        firebase_key = {
-          "type": "service_account",
-          "project_id": "my-factory-system",
-          "private_key_id": "這裡會有一長串代碼",
-          "private_key": "-----BEGIN PRIVATE KEY-----\n這裡會有一長串金鑰\n-----END PRIVATE KEY-----\n",
-          "client_email": "firebase-adminsdk-xxx@xxx.iam.gserviceaccount.com",
-          "client_id": "123456789",
-          "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-          "token_uri": "https://oauth2.googleapis.com/token",
-          "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-          "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/..."
-        }
-        
-        cred = credentials.Certificate(firebase_key)
+        # 讀取剛剛下載並上傳的 key.json 檔案
+        cred = credentials.Certificate("key.json")
         firebase_admin.initialize_app(cred, {
             'databaseURL': "https://my-factory-system-default-rtdb.firebaseio.com/" 
         })
         st.toast("雲端連線成功！", icon="☁️")
     except Exception as e:
         st.error(f"❌ 初始化失敗：{e}")
+        st.info("💡 提示：請確保 GitHub 上的 key.json 檔案內容完整，且檔案名稱正確。")
 
 # --- 2. 製作輸入介面 ---
 st.subheader("新增工時紀錄")
