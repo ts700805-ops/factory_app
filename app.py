@@ -6,18 +6,22 @@ import datetime
 st.set_page_config(page_title="工時紀錄系統", layout="centered")
 st.title("🏗️ 工時紀錄系統")
 
-# --- Firebase 連線 (具備自動校正功能) ---
+# --- Firebase 連線 (超級強力修復版) ---
 if not firebase_admin._apps:
     try:
-        # 1. 取得 Secret 內容
+        # 1. 抓取 Secrets
         info = dict(st.secrets["firebase_config"])
         
-        # 2. 強制校正金鑰格式 (解決 PEM 錯誤的關鍵)
-        if "private_key" in info:
-            # 將可能貼錯的雙斜線校正回正確的換行符號
-            fixed_key = info["private_key"].replace("\\n", "\n")
-            # 確保開頭和結尾沒有多餘空格
-            info["private_key"] = fixed_key.strip()
+        # 2. 強制修復 private_key 格式
+        # 這一行會把所有的手動換行和轉義字元統統修好
+        raw_key = info["private_key"]
+        fixed_key = raw_key.replace("\\n", "\n").strip()
+        
+        # 如果你貼上的時候沒有手動加 \n，這行會確保每段之間都有換行
+        if "-----BEGIN PRIVATE KEY-----" in fixed_key and "\n" not in fixed_key[30:-30]:
+             fixed_key = fixed_key.replace(" ", "\n") # 嘗試自動補回換行
+        
+        info["private_key"] = fixed_key
         
         cred = credentials.Certificate(info)
         firebase_admin.initialize_app(cred, {
@@ -26,6 +30,7 @@ if not firebase_admin._apps:
         st.toast("雲端連線成功！", icon="☁️")
     except Exception as e:
         st.error(f"❌ 連線失敗：{e}")
+        st.info("💡 提示：這通常是金鑰內容不完整。請確保 BEGIN 和 END 之間的所有文字都貼進去了。")
 
 # --- 輸入介面 ---
 st.subheader("新增工時紀錄")
@@ -44,10 +49,8 @@ if st.button("點我存檔到雲端", use_container_width=True):
             st.balloons()
         except Exception as e:
             st.error(f"❌ 存檔失敗：{e}")
-    else:
-        st.warning("⚠️ 請輸入姓名")
 
-# --- 顯示最近紀錄 ---
+# --- 顯示最近 5 筆紀錄 ---
 st.divider()
 st.subheader("📋 最近的存檔紀錄")
 try:
