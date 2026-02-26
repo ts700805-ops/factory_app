@@ -7,9 +7,10 @@ import pandas as pd
 # --- 網頁配置 ---
 st.set_page_config(page_title="數位生產戰情室", layout="wide")
 
-# --- 1. Firebase 連線 (保持不變) ---
+# --- 1. Firebase 連線 (已修正語法引號問題) ---
 if not firebase_admin._apps:
     try:
+        # 請確保這裡的資訊與你的 Firebase 金鑰完全一致
         firebase_key = {
             "type": "service_account",
             "project_id": "my-factory-system",
@@ -24,18 +25,21 @@ if not firebase_admin._apps:
             "universe_domain": "googleapis.com"
         }
         cred = credentials.Certificate(firebase_key)
+        # 注意：URL 最後必須有引號結尾
         firebase_admin.initialize_app(cred, {'databaseURL': "https://my-factory-system-default-rtdb.firebaseio.com/"})
-    except: pass
+    except Exception as e:
+        st.error(f"連線失敗，請檢查金鑰：{e}")
 
-# --- 2. 工具函式 ---
+# --- 2. 核心功能 ---
 def get_users():
-    u = db.reference('users').get()
-    return u if u else {}
+    try:
+        u = db.reference('users').get()
+        return u if u else {"管理員": "8888"}
+    except: return {"管理員": "8888"}
 
-# --- 3. 登入系統介面 ---
+# --- 3. 登入介面 ---
 if "role" not in st.session_state:
     st.title("🏭 生產管理系統 - 登入入口")
-    
     col_emp, col_adm = st.columns(2)
     
     with col_emp:
@@ -43,81 +47,67 @@ if "role" not in st.session_state:
             st.header("👷 員工報工入口")
             user_list = get_users()
             emp_name = st.selectbox("請選擇姓名", list(user_list.keys()))
-            emp_code = st.text_input("輸入員工代碼", type="password", key="emp_pwd")
+            emp_code = st.text_input("輸入代碼", type="password", key="e_code")
             if st.button("員工登入", use_container_width=True):
                 if user_list.get(emp_name) == emp_code:
-                    st.session_state.role = "employee"
-                    st.session_state.user = emp_name
+                    st.session_state.role, st.session_state.user = "emp", emp_name
                     st.rerun()
                 else: st.error("❌ 代碼錯誤")
 
     with col_adm:
         with st.container(border=True):
             st.header("📊 管理員戰情室")
-            st.write("請輸入最高權限代碼進入看板")
-            admin_code = st.text_input("管理員代碼", type="password", key="adm_pwd")
+            adm_code = st.text_input("最高權限代碼", type="password", key="a_code")
             if st.button("管理員登入", use_container_width=True):
-                if admin_code == "8888":
-                    st.session_state.role = "admin"
-                    st.session_state.user = "管理員"
+                if adm_code == "8888":
+                    st.session_state.role, st.session_state.user = "admin", "管理員"
                     st.rerun()
-                else: st.error("❌ 權限不足")
-
+                else: st.error("❌ 密碼錯誤")
 else:
-    # --- 4. 登入後的畫面 ---
+    # --- 4. 登入後 ---
     st.sidebar.title(f"👤 {st.session_state.user}")
     if st.sidebar.button("登出系統"):
         del st.session_state.role
-        del st.session_state.user
         st.rerun()
 
-    # --- A. 如果是管理員：顯示彩色大數字看板 ---
     if st.session_state.role == "admin":
-        st.title("📊 生產即時戰情看板")
+        st.title("📊 即時生產戰情看板")
+        # 儀表板 logic... (大數字指標)
         all_logs = db.reference('production_logs').get()
         if all_logs:
             df = pd.DataFrame.from_dict(all_logs, orient='index')
-            # 彩色儀表板
-            m1, m2, m3 = st.columns(3)
-            m1.metric("🔥 現場作業人數", f"{len(df[df['狀態'] == '作業中']['姓名'].unique())} 人")
-            m2.metric("🏗️ 運行中製令", f"{len(df[df['狀態'] == '作業中']['製令'].unique())} 案")
-            m3.metric("✅ 今日完工筆數", f"{len(df[df['日期'] == datetime.date.today().strftime('%Y-%m-%d')][df['狀態'] == '完工'])} 筆")
-            
-            st.subheader("💡 現場最新動態")
+            c1, c2, c3 = st.columns(3)
+            c1.metric("🔥 目前作業人數", f"{len(df[df['狀態'] == '作業中']['姓名'].unique())} 人")
+            c2.metric("🏗️ 運行中製令", f"{len(df[df['狀態'] == '作業中']['製令'].unique())} 案")
+            c3.metric("✅ 今日完工", f"{len(df[df['日期'] == datetime.date.today().strftime('%Y-%m-%d')][df['狀態'] == '完工'])} 筆")
+            st.subheader("💡 現場最新動態表格")
             st.dataframe(df.tail(10), use_container_width=True)
             
-            # 管理帳號功能
-            with st.expander("👤 帳號管理設定"):
+            with st.expander("👤 帳號管理員"):
                 n_name = st.text_input("新員工姓名")
                 n_code = st.text_input("員工代碼")
-                if st.button("建立員工"):
+                if st.button("確認建立"):
                     db.reference(f'users/{n_name}').set(n_code)
-                    st.success("建立成功！")
-                    st.rerun()
-        else:
-            st.info("尚無生產紀錄。")
-
-    # --- B. 如果是員工：顯示報工表單 ---
+                    st.success("成功！")
+        else: st.info("尚無資料")
     else:
-        st.title(f"📝 {st.session_state.user} - 日報填寫")
+        # 員工填表介面 (對應 Excel 欄位)
+        st.header("📝 日報填寫")
         with st.container(border=True):
-            c1, c2 = st.columns(2)
-            with c1:
-                status = st.selectbox("狀態 (A)", ["作業中", "完工", "暫停", "下班"])
-                order_no = st.text_input("製令單號 (B)", placeholder="例如: 25M0497-03")
-                process = st.text_input("工段名稱 (E)", placeholder="配電")
-            with c2:
-                part_no = st.text_input("P/N (C)")
-                type_name = st.text_input("Type (D)")
-                work_id = st.text_input("工號 (F)")
-            
-            remark = st.text_area("備註 (J)")
-            
+            col1, col2 = st.columns(2)
+            with col1:
+                st_val = st.selectbox("狀態 (A)", ["作業中", "完工", "暫停", "下班"])
+                order = st.text_input("製令單號 (B)", placeholder="例如: 25M0497-03")
+                proc = st.text_input("工段名稱 (E)")
+            with col2:
+                pn = st.text_input("P/N (C)")
+                tp = st.text_input("Type (D)")
+                wid = st.text_input("工號 (F)")
             if st.button("🚀 提交紀錄", use_container_width=True):
                 now = datetime.datetime.now()
                 db.reference('production_logs').push({
-                    "狀態": status, "姓名": st.session_state.user, "製令": order_no,
-                    "PN": part_no, "工段": process, "工號": work_id, "Type": type_name,
-                    "備註": remark, "日期": now.strftime("%Y-%m-%d"), "時間": now.strftime("%H:%M:%S")
+                    "狀態": st_val, "姓名": st.session_state.user, "製令": order,
+                    "PN": pn, "工段": proc, "工號": wid, "Type": tp,
+                    "日期": now.strftime("%Y-%m-%d"), "時間": now.strftime("%H:%M:%S")
                 })
                 st.success("紀錄已提交！")
