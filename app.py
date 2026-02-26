@@ -3,7 +3,7 @@ import pandas as pd
 import datetime
 import requests
 
-# --- 1. 設定區 ---
+# --- 1. 設定區 (維持無授權模式) ---
 DB_URL = "https://my-factory-system-default-rtdb.firebaseio.com/"
 
 # --- 2. 核心功能：Firebase 讀寫 ---
@@ -20,90 +20,98 @@ def save_db(path, data, method="post"):
     except: pass
 
 # --- 3. 頁面配置 ---
-st.set_page_config(page_title="生產管理系統", layout="wide") # 改為寬版方便看報表
+st.set_page_config(page_title="數位戰情室", layout="wide")
 
-# 讀取員工清單並確保管理員 8888 永遠存在
+# 獲取員工清單，確保 8888 管理員永遠存在
 raw_users = get_db("users")
-STAFF_DATA = {"管理員": "8888"} 
+STAFF_DATA = {"管理員": "8888"}
 if raw_users:
     STAFF_DATA.update(raw_users)
 
 # --- 4. 登入系統 ---
 if "user" not in st.session_state:
     st.title("🔐 員工系統登入")
-    with st.form("login_form"):
-        input_name = st.selectbox("請選擇您的姓名", list(STAFF_DATA.keys()))
-        input_code = st.text_input("請輸入員工代碼", type="password")
-        if st.form_submit_button("登入系統", use_container_width=True):
+    with st.form("login"):
+        input_name = st.selectbox("請選擇姓名", list(STAFF_DATA.keys()))
+        input_code = st.text_input("輸入代碼", type="password")
+        if st.form_submit_button("進入系統", use_container_width=True):
             if str(STAFF_DATA.get(input_name)) == input_code:
                 st.session_state.user = input_name
                 st.session_state.start_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 st.rerun()
             else: st.error("❌ 代碼錯誤")
 else:
-    # --- 5. 左側選單選模式 ---
+    # --- 5. 左側選單 ---
     st.sidebar.title(f"👤 {st.session_state.user}")
     
-    # 根據權限顯示選單
+    options = ["🏗️ 工時回報"]
     if st.session_state.user == "管理員":
-        menu = st.sidebar.radio(
-            "功能選單",
-            ["🏗️ 工時回報", "👤 員工帳號管理", "📊 完整工時報表"]
-        )
-    else:
-        menu = st.sidebar.radio(
-            "功能選單",
-            ["🏗️ 工時回報"]
-        )
-
+        options += ["⚙️ 系統帳號管理", "📊 完整工時報表"]
+    
+    menu = st.sidebar.radio("功能選單", options)
     st.sidebar.divider()
     if st.sidebar.button("🚪 登出系統", use_container_width=True):
         del st.session_state.user
         st.rerun()
 
-    # --- 6. 各頁面內容 (確保功能不被移除) ---
+    # --- 6. 頁面內容 ---
 
-    # 頁面 A：工時回報
+    # A. 工時回報頁面 (10個欄位)
     if menu == "🏗️ 工時回報":
-        st.title(f"🏗️ {st.session_state.user} - 工時回報")
-        with st.container(border=True):
-            st.info(f"本次作業開始時間：{st.session_state.get('start_time', 'N/A')}")
-            hours = st.number_input("今日累計工時 (hr)", min_value=0.5, max_value=24.0, step=0.5, value=8.0)
-            if st.button("🚀 提交紀錄", use_container_width=True):
+        st.header("🏗️ 生產日報回報")
+        with st.form("work_form"):
+            user_code = STAFF_DATA.get(st.session_state.user, "N/A")
+            c1, c2, c3 = st.columns(3)
+            status = c1.selectbox("狀態", ["作業中", "暫停", "下班", "完工"])
+            order_no = c2.text_input("製令")
+            pn = c3.text_input("P/N")
+            
+            c4, c5, c6 = st.columns(3)
+            prod_type = c4.text_input("Type")
+            stage = c5.text_input("工段名稱")
+            hours = c6.number_input("累計工時", min_value=0.0, step=0.5)
+
+            st.write(f"📌 **工號：** {user_code} | **姓名：** {st.session_state.user}")
+            st.write(f"⏰ **開始時間：** {st.session_state.start_time}")
+            
+            if st.form_submit_button("🚀 提交紀錄", use_container_width=True):
                 now_end = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                user_code = STAFF_DATA.get(st.session_state.user, "N/A")
                 log_data = {
+                    "狀態": status,
+                    "製令": order_no,
+                    "P/N": pn,
+                    "Type": prod_type,
+                    "工段名稱": stage,
                     "工號": user_code,
                     "姓名": st.session_state.user,
-                    "開始時間": st.session_state.get('start_time', now_end),
+                    "開始時間": st.session_state.start_time,
                     "結束時間": now_end,
                     "累計工時": hours
                 }
                 save_db("work_logs", log_data)
                 st.success("✅ 紀錄已成功提交！")
-                st.balloons()
 
-    # 頁面 B：員工帳號管理 (管理員專屬)
-    elif menu == "👤 員工帳號管理":
-        st.title("👤 系統帳號管理 (新增人員)")
+    # B. 帳號管理頁面 (管理員專屬)
+    elif menu == "⚙️ 系統帳號管理":
+        st.header("👤 系統帳號管理 (新增人員)")
         with st.container(border=True):
-            c1, c2 = st.columns(2)
-            new_n = c1.text_input("新員工姓名")
-            new_c = c2.text_input("設定員工工號")
-            if st.button("➕ 建立新帳號", use_container_width=True):
+            new_n = st.text_input("新員工姓名")
+            new_c = st.text_input("設定員工工號")
+            if st.button("➕ 建立帳號並同步", use_container_width=True):
                 if new_n and new_c:
                     save_db(f"users/{new_n}", new_c, method="put")
                     st.success(f"✅ 員工「{new_n}」帳號已建立！")
                     st.rerun()
 
-    # 頁面 C：完整工時報表 (管理員專屬)
+    # C. 報表頁面 (管理員專屬)
     elif menu == "📊 完整工時報表":
-        st.title("📊 完整工時報表 (格式校對完畢)")
+        st.header("📊 完整工時報表 (格式校對完畢)")
         raw_logs = get_db("work_logs")
         if raw_logs:
             df = pd.DataFrame.from_dict(raw_logs, orient='index')
-            order = ["工號", "姓名", "開始時間", "結束時間", "累計工時"]
-            existing = [c for c in order if c in df.columns]
+            # 依指示排列 10 個欄位
+            cols = ["狀態", "製令", "P/N", "Type", "工段名稱", "工號", "姓名", "開始時間", "結束時間", "累計工時"]
+            existing = [c for c in cols if c in df.columns]
             df_display = df[existing]
             if "結束時間" in df_display.columns:
                 df_display = df_display.sort_values(by="結束時間", ascending=False)
