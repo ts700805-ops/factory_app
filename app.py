@@ -7,11 +7,11 @@ import pandas as pd
 # --- 1. 網頁基礎配置 ---
 st.set_page_config(page_title="數位生產戰情室", layout="wide")
 
-# --- 2. Firebase 連線 (使用 3bae875 新金鑰) ---
+# --- 2. Firebase 連線 (使用 3bae875 新金鑰並修正語法) ---
 @st.cache_resource
 def init_firebase():
     if not firebase_admin._apps:
-        # 使用新提供的正確金鑰，確保連線授權通過
+        # 直接使用新金鑰 JSON 格式，解決 JWT Signature 錯誤
         firebase_key = {
             "type": "service_account",
             "project_id": "my-factory-system",
@@ -21,19 +21,19 @@ def init_firebase():
             "token_uri": "https://oauth2.googleapis.com/token",
         }
         cred = credentials.Certificate(firebase_key)
-        # 修正 databaseURL 的引號封閉，解決 SyntaxError
+        # 修正 databaseURL 語法錯誤
         firebase_admin.initialize_app(cred, {'databaseURL': "https://my-factory-system-default-rtdb.firebaseio.com/"})
 
 init_firebase()
 
-# --- 3. 核心功能函式 ---
+# --- 3. 安全讀取函式 ---
 def get_safe_users():
     try:
         u = db.reference('users').get()
         return u if u else {"管理員": "8888"}
     except: return {"管理員": "8888"}
 
-# --- 4. 登入系統 ---
+# --- 4. 登入介面 ---
 user_list = get_safe_users()
 
 if "user" not in st.session_state:
@@ -48,27 +48,28 @@ if "user" not in st.session_state:
                 st.rerun()
             else: st.error("❌ 代碼錯誤")
 else:
-    # --- 5. 主功能介面 ---
+    # --- 5. 系統主畫面 ---
     st.sidebar.write(f"當前使用者: **{st.session_state.user}**")
-    if st.sidebar.button("登出"):
+    if st.sidebar.button("登出系統"):
         del st.session_state.user
         st.rerun()
 
-    # --- 管理員看板 (對應 Excel 需求) ---
+    # --- 管理員戰情看板 (保留 Excel 統計邏輯) ---
     if st.session_state.user == "管理員":
         st.header("📊 數位戰情室儀表板")
         logs = db.reference('production_logs').get()
         if logs:
             df = pd.DataFrame.from_dict(logs, orient='index')
             m1, m2, m3 = st.columns(3)
-            # 顯示 Excel 中的統計指標
+            # 彩色統計看板
             m1.metric("🔥 現場作業中", f"{len(df[df['狀態'] == '作業中']['姓名'].unique())} 人")
             m2.metric("🏗️ 進行中製令", f"{len(df[df['狀態'] == '作業中']['製令'].unique())} 案")
-            m3.metric("✅ 今日完工", f"{len(df[(df['日期'] == datetime.date.today().strftime('%Y-%m-%d')) & (df['狀態'] == '完工')])} 筆")
+            today = datetime.date.today().strftime("%Y-%m-%d")
+            m3.metric("✅ 今日完工", f"{len(df[(df['日期'] == today) & (df['狀態'] == '完工')])} 筆")
             st.dataframe(df.tail(10), use_container_width=True)
         
         st.divider()
-        st.subheader("👤 帳號管理員 (新增人員)")
+        st.subheader("👤 系統帳號管理 (新增人員)")
         with st.container(border=True):
             col_a, col_b = st.columns(2)
             n_name = col_a.text_input("新員工姓名")
@@ -78,10 +79,10 @@ else:
                     try:
                         db.reference(f'users/{n_name}').set(n_code)
                         st.success(f"✅ 「{n_name}」建立成功！")
-                    except Exception as e: st.error(f"寫入失敗：{e}")
+                    except Exception as e: st.error(f"連線失敗：{e}")
         st.divider()
 
-    # --- 報工填寫區 ---
+    # --- 報工填寫表單 (不變動) ---
     st.header("📝 生產日報回報")
     with st.container(border=True):
         c1, c2 = st.columns(2)
