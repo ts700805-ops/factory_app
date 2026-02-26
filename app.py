@@ -7,7 +7,6 @@ import requests
 DB_URL = "https://my-factory-system-default-rtdb.firebaseio.com/work_logs"
 
 def get_now_str():
-    # 格式化時間：移除微秒，只留到秒
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
     return now.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -15,31 +14,26 @@ def get_now_str():
 st.set_page_config(page_title="超慧科技工時登錄系統", layout="wide")
 
 if "user" not in st.session_state:
-    # 僅修改此處標題字樣
     st.title("🔐 超慧科技工時登錄系統")
-    # ✅ 嚴格修正名字為：黃沂澂
+    # ✅ 嚴格核對姓名：黃沂澂
     u = st.selectbox("選擇姓名", ["管理員", "李小龍", "賴智文", "黃沂澂"])
     p = st.text_input("輸入員工代碼", type="password")
     if st.button("登入", use_container_width=True):
-        # ✅ 嚴格修正字典中的名字為：黃沂澂
         codes = {"管理員": "8888", "李小龍": "1234", "賴智文": "098057", "黃沂澂": "000000"}
         if u in codes and p == codes[u]:
             st.session_state.user = u
             st.rerun()
         else: st.error("❌ 代碼錯誤")
 else:
-    # 側邊欄顯示當前人員
     st.sidebar.markdown(f"## 👤 當前登錄者\n# {st.session_state.user}")
-    
     menu = st.sidebar.radio("功能選單", ["🏗️ 工時回報", "📋 歷史紀錄查詢"])
     if st.sidebar.button("登出系統"):
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 工時回報 (維持成功版邏輯) ---
+    # --- 3. 工時回報 (維持成功版邏輯，未更動) ---
     if menu == "🏗️ 工時回報":
         st.header(f"🏗️ {st.session_state.user} 的工時回報")
-        
         with st.expander("⏱️ 計時器工具", expanded=True):
             c1, c2, c3 = st.columns(3)
             if c1.button("⏱️ 開始計時"):
@@ -78,16 +72,16 @@ else:
                 requests.post(f"{DB_URL}.json", json=log)
                 st.success("✅ 紀錄已成功提交！")
 
-    # --- 4. 歷史紀錄查詢 (維持成功版去重與資料合併邏輯) ---
+    # --- 4. 歷史紀錄查詢 (新增刪除與匯出功能) ---
     elif menu == "📋 歷史紀錄查詢":
         st.header("📋 系統提交紀錄清單")
         try:
             r = requests.get(f"{DB_URL}.json")
             data = r.json()
             if data:
-                df = pd.DataFrame(list(data.values()))
+                # 為了刪除功能，需保留 Firebase 的 ID (key)
+                df = pd.DataFrame([{"id": k, **v} for k, v in data.items()])
                 
-                # 完整的翻譯與合併邏輯
                 rename_map = {
                     "name": "姓名", "hours": "累計工時", "order_no": "製令", "製令:": "製令",
                     "pn": "PN", "PN:": "PN", "stage": "工段名稱", "工段名稱:": "工段名稱",
@@ -97,15 +91,33 @@ else:
                     "累計工時:": "累計工時", "姓名:": "姓名"
                 }
                 df = df.rename(columns=rename_map)
-                
-                # 解決 None 與重複欄位問題
                 df = df.stack().unstack()
                 df = df.loc[:, ~df.columns.duplicated()]
-                
                 if "提交時間" in df.columns:
                     df = df.sort_values(by="提交時間", ascending=False)
+
+                # --- 新增：功能按鈕區 ---
+                col_btn1, col_btn2 = st.columns([1, 5])
                 
-                st.dataframe(df, use_container_width=True)
+                # 1. 匯出 CSV 按鈕
+                csv = df.drop(columns=['id'], errors='ignore').to_csv(index=False).encode('utf-8-sig')
+                col_btn1.download_button("📥 匯出 CSV", data=csv, file_name=f"工時紀錄_{get_now_str()}.csv", mime="text/csv")
+
+                st.write("---")
+                
+                # 2. 刪除功能 (顯示表格供選擇)
+                st.dataframe(df.drop(columns=['id'], errors='ignore'), use_container_width=True)
+                
+                with st.expander("🗑️ 刪除紀錄管理"):
+                    delete_id = st.selectbox("選擇要刪除的提交時間", options=df["提交時間"].tolist() if "提交時間" in df.columns else [])
+                    if st.button("確認刪除此筆紀錄", type="primary"):
+                        target_key = df[df["提交時間"] == delete_id]["id"].values[0]
+                        del_r = requests.delete(f"{DB_URL}/{target_key}.json")
+                        if del_r.status_code == 200:
+                            st.success(f"已刪除時間為 {delete_id} 的紀錄")
+                            st.rerun()
+                        else:
+                            st.error("刪除失敗，請檢查網路連接")
             else:
                 st.info("目前尚無資料。")
         except Exception as e:
