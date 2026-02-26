@@ -2,13 +2,13 @@ import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, db
 import datetime
-import pandas as pd  # 新增：用來處理表格數據
+import pandas as pd
 
-# 設定網頁標題
-st.set_page_config(page_title="工時紀錄系統", layout="wide") # 改成寬版比較好收納表格
-st.title("🏗️ 工時紀錄系統")
+# 設定網頁標題與寬版佈局
+st.set_page_config(page_title="專業版工時管理系統", layout="wide")
+st.title("🏗️ 專業版工時管理系統")
 
-# --- 1. Firebase 連線設定 (使用你昨天的正確金鑰) ---
+# --- 1. Firebase 連線 (內含你提供的正確金鑰) ---
 if not firebase_admin._apps:
     try:
         firebase_key = {
@@ -28,60 +28,63 @@ if not firebase_admin._apps:
         firebase_admin.initialize_app(cred, {
             'databaseURL': "https://my-factory-system-default-rtdb.firebaseio.com/" 
         })
-    except Exception as e:
-        st.error(f"連線失敗：{e}")
+    except Exception:
+        pass
 
-# --- 2. 輸入介面 (維持原功能) ---
-st.subheader("📝 新增工時紀錄")
-with st.container(border=True): # 加個框框比較好看
-    col1, col2 = st.columns(2)
-    with col1:
-        name = st.text_input("員工姓名", placeholder="例如：賴智文")
-    with col2:
-        hours = st.number_input("工時 (小時)", min_value=0.5, max_value=24.0, step=0.5, value=8.0)
-
-    if st.button("🚀 點我存檔到雲端", use_container_width=True):
-        if name:
-            new_data = {
-                "name": name,
-                "hours": hours,
-                "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            }
-            db.reference('work_logs').push(new_data)
-            st.success(f"✅ 成功存入：{name}")
-            st.balloons()
-        else:
-            st.warning("⚠️ 請輸入姓名")
-
-# --- 3. 數據管理區 (新增功能) ---
-st.divider()
-st.subheader("📊 完整工時報表")
-
+# --- 2. 頂部看板 (今日統計) ---
 try:
-    # 從 Firebase 抓取所有資料
     all_logs = db.reference('work_logs').get()
-    
     if all_logs:
-        # 將 JSON 轉成表格格式 (DataFrame)
-        df = pd.DataFrame.from_dict(all_logs, orient='index')
-        # 整理表格欄位名稱
-        df = df[['time', 'name', 'hours']]
-        df.columns = ['紀錄時間', '姓名', '工時(hr)']
-        # 按時間排序 (最新在上面)
-        df = df.sort_values(by='紀錄時間', ascending=False)
+        df_all = pd.DataFrame.from_dict(all_logs, orient='index')
+        today_str = datetime.date.today().strftime("%Y-%m-%d")
+        # 篩選今天的資料
+        df_today = df_all[df_all['time'].str.contains(today_str)]
+        
+        m1, m2, m3 = st.columns(3)
+        m1.metric("今日累積總工時", f"{df_today['hours'].sum()} 小時")
+        m2.metric("今日出勤人數", len(df_today['name'].unique()))
+        m3.metric("總歷史筆數", len(df_all))
+except:
+    pass
 
-        # 顯示表格
-        st.dataframe(df, use_container_width=True, hide_index=True)
+# --- 3. 輸入區 ---
+st.divider()
+with st.expander("➕ 新增今日工時", expanded=True):
+    c1, c2 = st.columns(2)
+    with c1:
+        name = st.text_input("員工姓名")
+    with c2:
+        hours = st.number_input("工時", min_value=0.5, step=0.5, value=8.0)
+    
+    if st.button("確認存檔", use_container_width=True):
+        if name:
+            db.reference('work_logs').push({
+                "name": name, "hours": hours,
+                "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            })
+            st.success(f"已記錄 {name} 的工時")
+            st.balloons()
+            st.rerun() # 自動重新整理畫面
 
-        # 下載 Excel 按鈕
-        csv = df.to_csv(index=False).encode('utf-8-sig') # 加上 sig 解決中文亂碼
-        st.download_button(
-            label="📥 下載完整紀錄 (Excel檔)",
-            data=csv,
-            file_name=f"工時紀錄_{datetime.date.today()}.csv",
-            mime="text/csv",
-        )
-    else:
-        st.info("目前雲端資料庫還沒有紀錄喔。")
-except Exception as e:
-    st.write("讀取報表時發生錯誤。")
+# --- 4. 管理區 (刪除功能) ---
+st.divider()
+st.subheader("📋 紀錄管理與刪除")
+
+if all_logs:
+    # 這裡顯示一個帶有「刪除」按鈕的清單
+    for key, val in reversed(all_logs.items()):
+        col_t, col_n, col_h, col_b = st.columns([3, 2, 2, 2])
+        col_t.write(f"🕒 {val['time']}")
+        col_n.write(f"👤 {val['name']}")
+        col_h.write(f"⏳ {val['hours']} hr")
+        if col_b.button("🗑️ 刪除", key=key):
+            db.reference(f'work_logs/{key}').delete()
+            st.warning(f"已刪除 {val['name']} 的紀錄")
+            st.rerun()
+
+    # 下載按鈕 (放在最後面)
+    df_final = pd.DataFrame.from_dict(all_logs, orient='index')[['time', 'name', 'hours']]
+    csv = df_final.to_csv(index=False).encode('utf-8-sig')
+    st.download_button("📥 下載完整 Excel", data=csv, file_name="工時紀錄.csv", mime="text/csv")
+else:
+    st.info("尚無紀錄")
