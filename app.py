@@ -3,106 +3,129 @@ import firebase_admin
 from firebase_admin import credentials, db
 import datetime
 import pandas as pd
+import requests
 
-# --- 1. 初始化網頁配置 ---
-st.set_page_config(page_title="數位生產戰情室", layout="wide")
+# 設定網頁
+st.set_page_config(page_title="2.0 自動化工時系統", layout="wide")
 
-# --- 2. Firebase 連線 (核心修復：解決第 28 行語法錯誤與金鑰驗證失敗) ---
-@st.cache_resource
-def init_firebase():
-    if not firebase_admin._apps:
-        # 使用你提供的新金鑰，解決 Invalid JWT Signature 錯誤
+# --- 1. Firebase 連線 (沿用你的正確金鑰) ---
+if not firebase_admin._apps:
+    try:
         firebase_key = {
             "type": "service_account",
             "project_id": "my-factory-system",
-            "private_key_id": "3bae8750275ed86061094ed09cfb12dcb500802f",
-            "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDE28hhl2Z0HJui\nvYImARy3BxkSmLXWyuJWSiyAKUJTHGqWKf4n0O+QQFOtboqD4Tm4jPH1I6eSVV8q\nCmXfk8XMXCKlmWr5rVfu6FMjj/V4wBBR61NA4xoMIGVwuXxTsdp/mW9JWrvFOFJ1\nKCGx1DhoEdfog1uh647wryh5UTMs2vxMFxswfz4QNSayz5Y4jD9pKFST1gcjPfzi\nzE0gqP5/mYZ6RbhFWKL2DRnqJ43xXmdeiz+uARG2MRjLNacb7PIwhPZB31auMFM/\n2kXqHJxDyMh1MPA7mO+6MVPvbKVI48T+oH1kUGoffB0itYjCJX9pmZf8gJoE97CN\nu6a/vK+9AgMBAAECggEADZUDDfCt30RQsflp7wipRtt/gwVJmSiQVdcc8OQShmdx\n1ysjNPNjw/Zxj4gOmIDD7xQSZuZvMQJ2OWaplrO8Xu2FxRqBA075aoCu/nIimT0v\nIxJzFl6qNRH7IxGOdBEo+8rF9IVaaoYInRAIGxvYSciJYVUcJQolPOfo3qNCk6KS\nhePekkbOpkW6uveYTqfdOItoKhvcyCINghqK2arPwAZckwn3BOH5QaSmOK2KEaSu\na6K/2Gx7ALliBNLMazgkAnBrft8MhpEL/nqpgrJEJq+7jRNrLp0XKZuz4oQY9bMw\nLJil0Rx/tW6LVLS3pXvAQwPp464Cn5xmFQ7o9dJqpQKBgQDx8d0HC6KW0DHKs9YD\QL8n1nztfQmwU4pumYCNikDLzEUAZD1R+EGAIsNwvDPwyxqjdsAlmClRd16d9cuf\n3kV3AQjpn6vHwmN+2CjS0dhV7h/79twpjAXkhlscq0lrrMKAlmAofD664OqiY7U7\nkdaxkIibCTubRN29hXsgLAb+1wKBgQDQS2ivfacPjTde5o4LUeyw4rVTt0j1L6zl\nOKED37AKFAFvChgPZ1xZ2/STAVBT9ADqq25H0kzKWWj2K4Tem7MwFFdPH1SP3hqz\ntSnpKD7A/K8bhZRqxuKG3plhz3PR1/verhG7YHSHJSbw6LSuERIlDNw++BGW19wt\n8aTKxu0XiwKBgCX917pKfm52JMtyr9F08k9cI+Pa9ZGFnMA/RGt1YTVfTxp/ow1j\nEU4Ap3XlZ7aQ/g7bD9MXcK2FNAtT1HS3H2tPc0nUM9I7WQpLASYRo4niyYz0N6Ai\nh65Z1qbK0s2gpC4y7siMsgEAXne/dm7zOKZLTtghfAWmq7cd5baokzSjAoGAZ8II\npdKL051exbFHdLAcnYhxFwCoISrcj1qEKq/Uu1B33l5C2fl88W42CLyQzSExC7TV\nvIUvp2SeenH3QASDYCHh1BIhR4E1/+rws6pOiEfW2njSE9Z6pQBhm22BnjheyPAg\n+Rv1MBT7runchxEN3tLnK57a9C8XCPPkSPaKyD0CgYEAu24+aG2kyix8EfOxqbGu\nwXQXiPC5wYgE3v2fY40mkjxCBk0SOZ3ZvTFLAYCQpHgQIQsv/8S2SrJk+DEE6RfA\nF+zDnCSdtpZ02bHRJGNtBUOIfTpc4wdv7gZZ+puzHY6pQc+Am/9yTzxR9UhnVRST\nWzwfe2GCmiwKKXP15szlgFE=\n-----END PRIVATE KEY-----\n",
+            "private_key_id": "c57de9a722e669103746d6fe9c185a9682227944",
+            "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEuwIBADANBgkqhkiG9w0BAQEFAASCBKUwggShAgEAAoIBAQC+TW76EuAmGqxR\n9hUmQ7dWvUSJx8qOlLsm47FM6VrzMNreaBnCKaK7VySL8iXLfiuvcfCu/9doXsG0\nuz95UN3EyK6Wh1O9DQvIHUIPC7v0P7hmdjTYBISbmcqmttbgJX62v3LLgsbEP+sN\nQcetmhpzGG+OkvDQlsE+cB1BMLRGqT9PhqrIV4zQw4Iz/ITyljfzumXfwpei9YFJ\nGw3Ndeu7WJHV3qg6UiwPCTpG0nu3t80KdaeKaZfpGD5iMd3WyoEhkvTitD83mx+s\nxjGilGygZX5+SdfKwRyi1baOmtS6A8T2lLRTxfsncoNffrH//zoQOuwXYCJyMN8F\nCVMnOWp1AgMBAAECgf9cc8LXJvimglu8h5V0vE9inbxJABfAr5yGvB4TNDm66pCF\nwA1a5kGWWxg8ZC3OjQFz1WfVDB9IQALACc3stmMnbDQwXE+fnccINDazSN5Maphy\nTWvcZ+TMVHCIKhHMwDcEdIvf6/FV+pKPn22OOgJ8IgWWEWlHJX9AenLdy243K/0C\nGM1CENv11SOT3465GHd7048A9pZn0WDFQQeiXYvqnniW1aHjOfcSiwcNE0sjmRUA\nMhBn8xor965wUPDer+qnyOQPBvgZiShJ3PQrq+FOJ8V6eGqQn/9LAHIeheGtmuVP\nUqMVGlYzQa6K8etTZ6bG0YUxxSDjsoxGe6NxEc0CgYEA5KouCwffJBjLnyU668FA\nCtnfcKJY2nvXUlMCPYAzP2KbECIsRnz3Z5DFr9bNhx8GHGD/+vT3nURnTLGbJ7zT\n3nDsPT86hSB+J/5ti5H/UPVD2rfPq339c6woY5IWGyq4+bwORFxGlRVHrx04DYbs\n1Ojut+C8CZyC1b9rIIBzKcMCgYEA1Q1A9lBMBeO80Z3y2aoYeZu+dIjPDR9sGH5R\nR31AgGylfAfFa/65EafLxOGMRBgsTycfBmRhAnwKbcq+b9Mw/mdfTFFf5RSPKZk9\n2Cjm7HpRbroiYqngAYZ3YvvyzMwXz4vdqGrIez9egUax3YK8PKX8xEw+xGETBKDz\nVmuHH2cCgYBi5DKLdLkNTGfriNdllCsVRkp61Mtmmf5yTRH/9Qy00flLzeumBG+e\n656DQHucf09OQKkUKJNaAXZHVdxLID/kyKNyjYDKiFXnCALqRJbNtXTGB46ZlSBi\nwUaqYUiMMTrUTn9BE0M3QH/C/Pj76KlOHvr2rQvFgFmZBXLYGJU1rwKBgCR82JtW\ntS5tCnF785ODph1tpvieVZeRwhmPyKvNr7ZO5SiQzCbqwRdc/XECj9s5qJ0FvjKC\nDns2czLKfkL4kHOBkLipVxsMolglfon+t03YxQmJ0nufgbE2L2DGNoqOgm5koS9\nhQhWmgDZ8qxVL5fTda7IwBcx6OfqCMLMN6ARAoGBAI/cljGsbWos3vpljC58T/PW\nEcLHY13XEDqZyRJIAFH/BFjhe7R1Npj/5YKr+u+or1TCE4oit7JqXuTQG/UF1wGW\nEdwli7ADexZRA03ufrQm9SiLrfLiSsjNyDFgVPIoICAvccc1g9ST/NiduXuTpLG/\n2mkFDS9X6cKbVT2HwU04\n-----END PRIVATE KEY-----\n",
             "client_email": "firebase-adminsdk-fbsvc@my-factory-system.iam.gserviceaccount.com",
+            "client_id": "101286242423091218106",
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40my-factory-system.iam.gserviceaccount.com",
+            "universe_domain": "googleapis.com"
         }
         cred = credentials.Certificate(firebase_key)
-        # 修正第 28 行：確保引號完整閉合以消除 SyntaxError
         firebase_admin.initialize_app(cred, {'databaseURL': "https://my-factory-system-default-rtdb.firebaseio.com/"})
+    except: pass
 
-init_firebase()
+# --- 2. 核心功能 ---
+def get_users():
+    u = db.reference('users').get()
+    return u if u else {"管理員": "8888"}
 
-# --- 3. 穩定讀取帳號 ---
-def get_user_list():
-    try:
-        u = db.reference('users').get()
-        return u if u else {"管理員": "8888"}
-    except: return {"管理員": "8888"}
+def get_recent_orders():
+    # 抓取最近 50 筆紀錄，用來提供製令單號自動建議
+    logs = db.reference('production_logs').order_by_key().limit_to_last(50).get()
+    if logs:
+        return sorted(list(set([v['製令'] for v in logs.values() if '製令' in v])))
+    return []
 
-# --- 4. 登入介面 ---
-user_list = get_user_list()
-
+# --- 3. 登入系統 ---
 if "user" not in st.session_state:
-    st.title("🏭 生產管理系統 - 登入入口")
-    with st.container(border=True):
-        st.subheader("👤 員工報工入口")
-        # 整合帳號清單
-        name = st.selectbox("請選擇姓名", list(user_list.keys()))
-        code = st.text_input("輸入代碼", type="password")
-        if st.button("員工登入", use_container_width=True):
-            if user_list.get(name) == code:
-                st.session_state.user = name
-                st.rerun()
-            else: st.error("❌ 代碼錯誤")
+    st.title("🏭 自動化生產日報系統")
+    user_list = get_users()
+    name = st.selectbox("請選擇姓名", list(user_list.keys()))
+    code = st.text_input("輸入員工代碼", type="password")
+    if st.button("登入系統", use_container_width=True):
+        if user_list[name] == code:
+            st.session_state.user = name
+            st.rerun()
+        else: st.error("代碼錯誤")
 else:
-    # --- 5. 系統主畫面 ---
-    st.sidebar.write(f"當前使用者: **{st.session_state.user}**")
-    if st.sidebar.button("登出系統"):
+    st.sidebar.subheader(f"👤 當前員工：{st.session_state.user}")
+    if st.sidebar.button("登出"):
         del st.session_state.user
         st.rerun()
 
-    # --- 管理員戰情看板 (保留截圖中的統計功能) ---
-    if st.session_state.user == "管理員":
-        st.header("📊 數位戰情室儀表板")
-        logs = db.reference('production_logs').get()
-        if logs:
-            df = pd.DataFrame.from_dict(logs, orient='index')
-            m1, m2, m3 = st.columns(3)
-            # 統計彩色大數字看板
-            m1.metric("🔥 現場作業中", f"{len(df[df['狀態'] == '作業中']['姓名'].unique())} 人")
-            m2.metric("🏗️ 進行中製令", f"{len(df[df['狀態'] == '作業中']['製令'].unique())} 案")
-            today_str = datetime.date.today().strftime("%Y-%m-%d")
-            m3.metric("✅ 今日完工", f"{len(df[(df['日期'] == today_str) & (df['狀態'] == '完工')])} 筆")
-            st.dataframe(df.tail(10), use_container_width=True)
-        
-        st.divider()
-        st.subheader("👤 帳號管理 (新增人員)")
-        with st.container(border=True):
-            ca, cb = st.columns(2)
-            new_n = ca.text_input("新員工姓名")
-            new_c = cb.text_input("設定員工代碼")
-            if st.button("✨ 建立新帳號並同步"):
-                if new_n and new_c:
-                    try:
-                        db.reference(f'users/{new_n}').set(new_c)
-                        st.success(f"✅ 「{new_n}」帳號同步成功！")
-                    except Exception as e: st.error(f"寫入失敗：{e}")
-        st.divider()
-
-    # --- 報工填寫區 (修復第 111 行語法錯誤) ---
-    st.header("📝 生產日報回報")
+    # --- 功能 A：生產回報區 ---
+    st.header("🕒 即時生產報工")
+    
+    # 建立一個簡單的「開始/結束」紀錄邏輯
     with st.container(border=True):
-        c1, c2 = st.columns(2)
-        with c1:
-            st_val = st.selectbox("狀態 (A)", ["作業中", "完工", "暫停", "下班"])
-            order = st.text_input("製令單號 (B)", placeholder="例如: 25M0497-03")
-            proc = st.text_input("工段名稱 (E)")
-        with c2:
-            pn = st.text_input("P/N (C)")
-            tp = st.text_input("Type (D)")
-            wid = st.text_input("工號 (F)")
+        col_s1, col_s2, col_s3 = st.columns(3)
+        with col_s1:
+            status = st.selectbox("目前狀態", ["作業中", "暫停", "完工", "下班"])
+        with col_s2:
+            # 自動建議功能：從歷史紀錄抓取製令單號
+            recent_orders = get_recent_orders()
+            order_no = st.selectbox("製令單號 (選取或手動輸入)", ["手動輸入"] + recent_orders)
+            if order_no == "手動輸入":
+                order_no = st.text_input("請輸入新製令單號", placeholder="例如: 25M0497-03")
+        with col_s3:
+            process_name = st.text_input("工段名稱 (E)", placeholder="例如: 配電")
+
+        col_s4, col_s5, col_s6 = st.columns(3)
+        with col_s4:
+            work_id = st.text_input("工號 (F)", placeholder="例如: B126")
+        with col_s5:
+            part_no = st.text_input("P/N (C)")
+        with col_s6:
+            type_name = st.text_input("Type (D)")
+
+        remark = st.text_area("備註 (J)")
+
+        if st.button("🚀 提交生產紀錄", use_container_width=True):
+            now = datetime.datetime.now()
+            db.reference('production_logs').push({
+                "狀態": status, "姓名": st.session_state.user, "製令": order_no,
+                "PN": part_no, "工段": process_name, "工號": work_id, "Type": type_name,
+                "備註": remark, "日期": now.strftime("%Y-%m-%d"), "時間": now.strftime("%H:%M:%S")
+            })
+            st.success(f"已紀錄：{order_no} ({status})")
+            st.balloons()
+
+    # --- 功能 B：管理員後台 ---
+    if st.session_state.user == "管理員":
+        st.divider()
+        st.header("📊 生產數據看板")
         
-        if st.button("🚀 提交紀錄", use_container_width=True):
-            try:
-                now = datetime.datetime.now()
-                db.reference('production_logs').push({
-                    "狀態": st_val, "姓名": st.session_state.user, "製令": order,
-                    "PN": pn, "工段": proc, "工號": wid, "Type": tp,
-                    "日期": now.strftime("%Y-%m-%d"), "時間": now.strftime("%H:%M:%S")
-                })
-                st.success("✅ 提交紀錄成功！")
-            except Exception as e: st.error(f"連線異常：{e}")
+        # 即時看板：顯示現在誰在「作業中」
+        all_logs = db.reference('production_logs').get()
+        if all_logs:
+            df = pd.DataFrame.from_dict(all_logs, orient='index')
+            
+            # 看板 1：當前現場狀態
+            st.subheader("💡 現場即時動態")
+            working_df = df[df['狀態'] == '作業中'].tail(10)
+            if not working_df.empty:
+                st.table(working_df[['姓名', '製令', '工段', '時間']])
+            else:
+                st.write("目前現場無人作業中。")
+
+            # 看板 2：完整報表
+            st.subheader("📋 歷史日報表")
+            st.dataframe(df, use_container_width=True)
+            
+            # 匯出 Excel
+            csv = df.to_csv(index=False).encode('utf-8-sig')
+            st.download_button("📥 下載 Excel 生產月報", data=csv, file_name=f"生產日報_{datetime.date.today()}.csv")
+            
+        # 帳號管理
+        with st.expander("👤 帳號密碼管理系統"):
+            n_name = st.text_input("新員工姓名")
+            n_code = st.text_input("設定代碼")
+            if st.button("確認建立帳號"):
+                if n_name and n_code:
+                    db.reference(f'users/{n_name}').set(n_code)
+                    st.success("建立成功！")
+                    st.rerun()
