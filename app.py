@@ -3,15 +3,15 @@ import pandas as pd
 import datetime
 import requests
 
-# =====================================
-# 基本設定
-# =====================================
+# ==============================
+# 設定
+# ==============================
 DB_URL = "https://my-factory-system-default-rtdb.firebaseio.com/"
 
 
-# =====================================
+# ==============================
 # Firebase
-# =====================================
+# ==============================
 def get_db(path):
     try:
         r = requests.get(f"{DB_URL}{path}.json")
@@ -20,155 +20,159 @@ def get_db(path):
         return None
 
 
-def save_db(path, data):
+def save_db(path, data, method="post"):
     try:
-        requests.post(f"{DB_URL}{path}.json", json=data)
+        if method == "post":
+            requests.post(f"{DB_URL}{path}.json", json=data)
+        else:
+            requests.put(f"{DB_URL}{path}.json", json=data)
     except:
         pass
 
 
-# =====================================
-# ⭐ 時間格式轉換（小時 → 小時+分鐘）
-# =====================================
-def format_hours_to_hm(hours):
-    total_min = int(hours * 60)
-    h = total_min // 60
-    m = total_min % 60
+# ==============================
+# ⭐ 工時格式轉換 (新增)
+# ==============================
+def format_hours_to_hm(hours_float):
+    total_minutes = int(hours_float * 60)
+    h = total_minutes // 60
+    m = total_minutes % 60
     return f"{h}小時 {m}分鐘"
 
 
-# =====================================
-# 頁面設定
-# =====================================
-st.set_page_config(page_title="工時系統", layout="wide")
+# ==============================
+# 頁面
+# ==============================
+st.set_page_config(page_title="數位戰情室", layout="wide")
 
 raw_users = get_db("users")
 STAFF_DATA = {"管理員": "8888"}
-
 if raw_users:
     STAFF_DATA.update(raw_users)
 
 
-# =====================================
+# ==============================
 # 登入
-# =====================================
+# ==============================
 if "user" not in st.session_state:
 
-    st.title("🔐 員工登入")
+    st.title("🔐 員工系統登入")
 
     with st.form("login"):
-        name = st.selectbox("姓名", list(STAFF_DATA.keys()))
-        code = st.text_input("代碼", type="password")
+        name = st.selectbox("請選擇姓名", list(STAFF_DATA.keys()))
+        code = st.text_input("輸入代碼", type="password")
 
-        if st.form_submit_button("登入"):
+        if st.form_submit_button("進入系統"):
             if str(STAFF_DATA.get(name)) == code:
                 st.session_state.user = name
                 st.rerun()
             else:
-                st.error("密碼錯誤")
+                st.error("❌ 代碼錯誤")
 
-
-# =====================================
-# 主畫面
-# =====================================
 else:
 
     st.sidebar.title(f"👤 {st.session_state.user}")
-    menu = st.sidebar.radio("功能", ["工時回報", "完整報表"])
+
+    options = ["🏗️ 工時回報"]
+    if st.session_state.user == "管理員":
+        options += ["⚙️ 系統帳號管理", "📊 完整工時報表"]
+
+    menu = st.sidebar.radio("功能選單", options)
+
+    if st.sidebar.button("🚪 登出系統"):
+        st.session_state.clear()
+        st.rerun()
 
     # =====================================================
     # 工時回報
     # =====================================================
-    if menu == "工時回報":
+    if menu == "🏗️ 工時回報":
 
-        st.header("⏱️ 工時計時")
+        st.header("🏗️ 生產日報回報")
 
         if "calc_hours" not in st.session_state:
             st.session_state.calc_hours = 0.0
 
-        if "work_start" not in st.session_state:
-            st.session_state.work_start = None
+        # --------------------------
+        # 工時計時器
+        # --------------------------
+        with st.expander("⏱️ 工時計時器", expanded=True):
 
-        c1, c2 = st.columns(2)
+            c1, c2 = st.columns(2)
 
-        # -------------------------
-        # 開始
-        # -------------------------
-        if c1.button("▶️ 開始計時"):
-            st.session_state.work_start = datetime.datetime.now()
-            st.session_state.calc_hours = 0.0
+            if c1.button("⏱️ 開始計時"):
+                st.session_state.work_start = datetime.datetime.now()
 
-        # -------------------------
-        # 結束（⭐ 核心修正點）
-        # -------------------------
-        if c2.button("⏹️ 結束計時"):
-            if st.session_state.work_start:
-                diff = datetime.datetime.now() - st.session_state.work_start
-                hours = round(diff.total_seconds() / 3600, 2)
+            if c2.button("⏹️ 結束計時"):
+                if "work_start" in st.session_state:
+                    end = datetime.datetime.now()
+                    diff = end - st.session_state.work_start
+                    st.session_state.calc_hours = round(diff.total_seconds()/3600, 2)
 
-                # ⭐ 只更新 session_state
-                st.session_state.calc_hours = hours
-
-        # =============================
-        # ⭐ 綠色顯示（保留）
-        # =============================
+        # ⭐⭐⭐ 保留綠色顯示 + 時分格式
         if st.session_state.calc_hours > 0:
             st.success(
                 f"計時結束！自動計算工時：{format_hours_to_hm(st.session_state.calc_hours)}"
             )
 
-        # =================================================
-        # ⭐ 表單（關鍵修正：用 value= 不用 key=）
-        # =================================================
-        with st.form("form"):
+        # --------------------------
+        # 表單
+        # --------------------------
+        with st.form("work_form"):
 
-            status = st.selectbox("狀態", ["作業中", "暫停", "完工"])
+            user_code = STAFF_DATA.get(st.session_state.user, "N/A")
 
-            order_no = st.text_input("製令")
-            pn = st.text_input("P/N")
-            prod_type = st.text_input("Type")
-            stage = st.text_input("工段名稱")
+            c1, c2, c3 = st.columns(3)
+            status = c1.selectbox("狀態", ["作業中", "暫停", "下班", "完工"])
+            order_no = c2.text_input("製令")
+            pn = c3.text_input("P/N")
 
-            # ⭐⭐ 重點在這裡 ⭐⭐
-            hours = st.number_input(
+            c4, c5, c6 = st.columns(3)
+            prod_type = c4.text_input("Type")
+            stage = c5.text_input("工段名稱")
+
+            hours = c6.number_input(
                 "累計工時 (hr)",
                 min_value=0.0,
                 step=0.01,
-                value=st.session_state.calc_hours   # ← 用 value 帶入
+                key="calc_hours"
             )
 
-            st.write(f"工號：{STAFF_DATA[st.session_state.user]}")
-            st.write(f"姓名：{st.session_state.user}")
+            start_str = st.session_state.get(
+                "work_start",
+                datetime.datetime.now()
+            ).strftime("%Y-%m-%d %H:%M:%S")
 
-            if st.form_submit_button("提交"):
+            st.write(f"📌 工號：{user_code} | 姓名：{st.session_state.user}")
+            st.write(f"⏰ 開始時間：{start_str}")
 
-                data = {
+            if st.form_submit_button("🚀 提交紀錄"):
+
+                log_data = {
                     "狀態": status,
                     "製令": order_no,
                     "P/N": pn,
                     "Type": prod_type,
                     "工段名稱": stage,
-                    "工號": STAFF_DATA[st.session_state.user],
+                    "工號": user_code,
                     "姓名": st.session_state.user,
+                    "開始時間": start_str,
+                    "結束時間": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "累計工時": hours,
-                    "時間": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 }
 
-                save_db("work_logs", data)
+                save_db("work_logs", log_data)
 
-                st.success("✅ 已送出")
-
-                # 重置
+                st.success("✅ 紀錄已成功提交！")
                 st.session_state.calc_hours = 0.0
-                st.session_state.work_start = None
 
     # =====================================================
     # 報表
     # =====================================================
-    else:
+    elif menu == "📊 完整工時報表":
 
-        logs = get_db("work_logs")
+        raw_logs = get_db("work_logs")
 
-        if logs:
-            df = pd.DataFrame.from_dict(logs, orient="index")
+        if raw_logs:
+            df = pd.DataFrame.from_dict(raw_logs, orient="index")
             st.dataframe(df, use_container_width=True)
