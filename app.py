@@ -1,105 +1,77 @@
 import streamlit as st
 import pandas as pd
 import datetime
-import os
+import firebase_admin
+from firebase_admin import credentials, db
 import requests
 
-# --- 設定區 ---
-# 若有 Line Token 可貼在此處，沒有則維持原樣
-LINE_TOKEN = "這裡貼上你的Line權杖"
+# --- 1. Firebase 初始化 (解決資料不可被清除的問題) ---
+@st.cache_resource
+def init_firebase():
+    if not firebase_admin._apps:
+        # 請確保這裡使用的是你之前提到的 3bae875 新金鑰內容
+        firebase_key = {
+            "type": "service_account",
+            "project_id": "my-factory-system",
+            "private_key_id": "3bae8750275ed86061094ed09cfb12dcb500802f",
+            "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDE28hhl2Z0HJui\nvYImARy3BxkSmLXWyuJWSiyAKUJTHGqWKf4n0O+QQFOtboqD4Tm4jPH1I6eSVV8q\nCmXfk8XMXCKlmWr5rVfu6FMjj/V4wBBR61NA4xoMIGVwuXxTsdp/mW9JWrvFOFJ1\nKCGx1DhoEdfog1uh647wryh5UTMs2vxMFxswfz4QNSayz5Y4jD9pKFST1gcjPfzi\nzE0gqP5/mYZ6RbhFWKL2DRnqJ43xXmdeiz+uARG2MRjLNacb7PIwhPZB31auMFM/\n2kXqHJxDyMh1MPA7mO+6MVPvbKVI48T+oH1kUGoffB0itYjCJX9pmZf8gJoE97CN\nu6a/vK+9AgMBAAECggEADZUDDfCt30RQsflp7wipRtt/gwVJmSiQVdcc8OQShmdx\n1ysjNPNjw/Zxj4gOmIDD7xQSZuZvMQJ2OWaplrO8Xu2FxRqBA075aoCu/nIimT0v\nIxJzFl6qNRH7IxGOdBEo+8rF9IVaaoYInRAIGxvYSciJYVUcJQolPOfo3qNCk6KS\nhePekkbOpkW6uveYTqfdOItoKhvcyCINghqK2arPwAZckwn3BOH5QaSmOK2KEaSu\na6K/2Gx7ALliBNLMazgkAnBrft8MhpEL/nqpgrJEJq+7jRNrLp0XKZuz4oQY9bMw\nLJil0Rx/tW6LVLS3pXvAQwPp464Cn5xmFQ7o9dJqpQKBgQDx8d0HC6KW0DHKs9YD\QL8n1nztfQmwU4pumYCNikDLzEUAZD1R+EGAIsNwvDPwyxqjdsAlmClRd16d9cuf\n3kV3AQjpn6vHwmN+2CjS0dhV7h/79twpjAXkhlscq0lrrMKAlmAofD664OqiY7U7\nkdaxkIibCTubRN29hXsgLAb+1wKBgQDQS2ivfacPjTde5o4LUeyw4rVTt0j1L6zl\nOKED37AKFAFvChgPZ1xZ2/STAVBT9ADqq25H0kzKWWj2K4Tem7MwFFdPH1SP3hqz\ntSnpKD7A/K8bhZRqxuKG3plhz3PR1/verhG7YHSHJSbw6LSuERIlDNw++BGW19wt\n8aTKxu0XiwKBgCX917pKfm52JMtyr9F08k9cI+Pa9ZGFnMA/RGt1YTVfTxp/ow1j\nEU4Ap3XlZ7aQ/g7bD9MXcK2FNAtT1HS3H2tPc0nUM9I7WQpLASYRo4niyYz0N6Ai\nh65Z1qbK0s2gpC4y7siMsgEAXne/dm7zOKZLTtghfAWmq7cd5baokzSjAoGAZ8II\npdKL051exbFHdLAcnYhxFwCoISrcj1qEKq/Uu1B33l5C2fl88W42CLyQzSExC7TV\nvIUvp2SeenH3QASDYCHh1BIhR4E1/+rws6pOiEfW2njSE9Z6pQBhm22BnjheyPAg\n+Rv1MBT7runchxEN3tLnK57a9C8XCPPkSPaKyD0CgYEAu24+aG2kyix8EfOxqbGu\nwXQXiPC5wYgE3v2fY40mkjxCBk0SOZ3ZvTFLAYCQpHgQIQsv/8S2SrJk+DEE6RfA\nF+zDnCSdtpZ02bHRJGNtBUOIfTpc4wdv7gZZ+puzHY6pQc+Am/9yTzxR9UhnVRST\nWzwfe2GCmiwKKXP15szlgFE=\n-----END PRIVATE KEY-----\n",
+            "client_email": "firebase-adminsdk-fbsvc@my-factory-system.iam.gserviceaccount.com",
+            "token_uri": "https://oauth2.googleapis.com/token",
+        }
+        cred = credentials.Certificate(firebase_key)
+        firebase_admin.initialize_app(cred, {
+            'databaseURL': "https://my-factory-system-default-rtdb.firebaseio.com/"
+        })
 
-# 1. 自定義員工名單 (姓名: 代碼)
-STAFF_DATA = {
-    "管理員": "8888",
-    "賴智文": "1234",
-    "王小明": "5678",
-    "李大華": "0000"
-}
+init_firebase()
 
-# 這是儲存資料的檔案名稱，不需要任何網路授權
-LOG_FILE = "work_logs.csv"
+# --- 2. 核心功能：從 Firebase 讀取與儲存 ---
+def load_staff_data():
+    try:
+        users = db.reference('users').get()
+        return users if users else {"管理員": "8888"}
+    except:
+        return {"管理員": "8888"}
 
-# --- 核心功能：讀取與儲存資料 ---
-def load_data():
-    if os.path.exists(LOG_FILE):
-        try:
-            return pd.read_csv(LOG_FILE)
-        except:
-            return pd.DataFrame(columns=["紀錄時間", "姓名", "工時(hr)"])
-    return pd.DataFrame(columns=["紀錄時間", "姓名", "工時(hr)"])
+def load_work_logs():
+    try:
+        logs = db.reference('work_logs').get()
+        if logs:
+            return pd.DataFrame.from_dict(logs, orient='index')
+        return pd.DataFrame(columns=["紀錄時間", "姓名", "工時(hr)"])
+    except:
+        return pd.DataFrame(columns=["紀錄時間", "姓名", "工時(hr)"])
 
-def save_data(name, hours):
-    df = load_data()
+def save_work_log(name, hours):
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    new_row = pd.DataFrame([[now, name, hours]], columns=["紀錄時間", "姓名", "工時(hr)"])
-    df = pd.concat([df, new_row], ignore_index=True)
-    # 使用 utf-8-sig 確保 Excel 打開不會亂碼
-    df.to_csv(LOG_FILE, index=False, encoding="utf-8-sig")
+    db.reference('work_logs').push({
+        "紀錄時間": now,
+        "姓名": name,
+        "工時(hr)": hours
+    })
     return now
 
-def send_line(msg):
-    if LINE_TOKEN and LINE_TOKEN != "這裡貼上你的Line權杖":
-        try:
-            headers = {"Authorization": "Bearer " + LINE_TOKEN}
-            data = {"message": msg}
-            requests.post("https://notify-bot.line.me/api/notify", headers=headers, data=data)
-        except: 
-            pass
+# --- 3. 頁面配置 ---
+st.set_page_config(page_title="員工工時管理系統", layout="centered")
+STAFF_DATA = load_staff_data()
 
-# --- 頁面設定 ---
-st.set_page_config(page_title="員工自主管理工時系統", layout="centered")
-
-# --- 2. 登入系統 (使用代碼登入) ---
+# --- 4. 登入系統 ---
 if "user" not in st.session_state:
     st.title("🔐 員工系統登入")
-    # 使用 st.container 讓介面更整齊
     with st.form("login_form"):
         input_name = st.selectbox("請選擇您的姓名", list(STAFF_DATA.keys()))
         input_code = st.text_input("請輸入員工代碼", type="password")
-        submit_login = st.form_submit_button("登入系統", use_container_width=True)
-        
-        if submit_login:
-            if STAFF_DATA[input_name] == input_code:
+        if st.form_submit_button("登入系統", use_container_width=True):
+            if STAFF_DATA.get(input_name) == input_code:
                 st.session_state.user = input_name
-                st.success(f"歡迎回來，{input_name}！")
                 st.rerun()
             else:
-                st.error("❌ 代碼錯誤，請重新輸入")
+                st.error("❌ 代碼錯誤")
 else:
-    # --- 3. 已登入介面 ---
+    # --- 5. 已登入介面 ---
     st.sidebar.write(f"👤 當前使用者：{st.session_state.user}")
     if st.sidebar.button("登出"):
         del st.session_state.user
         st.rerun()
 
     st.title(f"🏗️ {st.session_state.user} - 工時回報")
-
-    with st.container(border=True):
-        hours = st.number_input("今日工作時數", min_value=0.5, max_value=24.0, step=0.5, value=8.0)
-        if st.button("🚀 提交工時並通知老闆", use_container_width=True):
-            save_time = save_data(st.session_state.user, hours)
-            # 發送 Line 通知
-            send_line(f"\n📢 工時回報\n員工：{st.session_state.user}\n工時：{hours}\n時間：{save_time}")
-            st.success("✅ 紀錄已成功儲存！")
-            st.balloons()
-
-    # --- 4. 管理員報表專區 ---
-    if st.session_state.user == "管理員":
-        st.divider()
-        st.subheader("📊 完整工時報表 (僅管理員可見)")
-        df_display = load_data()
-        if not df_display.empty:
-            # 排序讓最新的紀錄顯示在最上面
-            st.dataframe(df_display.sort_values(by="紀錄時間", ascending=False), use_container_width=True)
-            
-            # 下載按鈕
-            csv = df_display.to_csv(index=False).encode('utf-8-sig')
-            st.download_button("📥 下載備份 CSV", data=csv, file_name="work_report.csv", mime="text/csv")
-            
-            if st.button("🗑️ 刪除最後一筆紀錄"):
-                df_display = df_display[:-1]
-                df_display.to_csv(LOG_FILE, index=False, encoding="utf-8-sig")
-                st.warning("最後一筆紀錄已移除")
-                st.rerun()
-        else:
-            st.info("目前尚無任何存檔紀錄。")
