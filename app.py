@@ -52,7 +52,7 @@ else:
 
     # --- 6. 頁面內容 ---
 
-    # A. 工時回報頁面
+    # A. 工時回報頁面 (保持原功能)
     if menu == "🏗️ 工時回報":
         st.header("🏗️ 生產日報回報")
         
@@ -122,13 +122,67 @@ else:
                 if 'display_hours' in st.session_state: del st.session_state['display_hours']
                 st.rerun()
 
-    # B. 個人提交紀錄 (修正 KeyError)
+    # B. 個人提交紀錄 (強化版：解決看不見資料的問題)
     elif menu == "📝 個人提交紀錄":
         st.header(f"📝 {st.session_state.user} 的提交紀錄")
         raw_logs = get_db("work_logs")
+        
         if raw_logs:
-            df = pd.DataFrame.from_dict(raw_logs, orient='index')
+            # 將資料字典轉換為 DataFrame，並確保 ID 轉換為欄位
+            df = pd.DataFrame.from_dict(raw_logs, orient='index').reset_index(drop=True)
             
-            # 安全檢查：確保「姓名」欄位存在，避免 KeyError
-            target_col = ""
-            if "姓名" in df.columns: target_col = "姓名"
+            # 自動偵測姓名欄位 (容錯處理)
+            name_col = None
+            for c in ["姓名", "name", "Name"]:
+                if c in df.columns:
+                    name_col = c
+                    break
+            
+            if name_col:
+                # 執行篩選
+                df_personal = df[df[name_col] == st.session_state.user]
+                
+                if not df_personal.empty:
+                    # 定義要顯示的 10 個欄位順序
+                    cols = ["狀態", "製令", "P/N", "Type", "工段名稱", "工號", "姓名", "開始時間", "結束時間", "累計工時"]
+                    existing = [c for c in cols if c in df_personal.columns]
+                    df_display = df_personal[existing]
+                    
+                    # 排序：結束時間最新的在最上面
+                    if "結束時間" in df_display.columns:
+                        df_display = df_display.sort_values(by="結束時間", ascending=False)
+                    
+                    st.dataframe(df_display, use_container_width=True)
+                else:
+                    st.info(f"查無 {st.session_state.user} 的紀錄。請確認您是否已提交報工。")
+            else:
+                st.warning("資料庫格式異常，請聯絡管理員確認欄位名稱。")
+        else:
+            st.info("系統目前尚無任何報工數據。")
+
+    # C. 系統帳號管理
+    elif menu == "⚙️ 系統帳號管理":
+        st.header("👤 系統帳號管理")
+        with st.container(border=True):
+            new_n = st.text_input("新員工姓名")
+            new_c = st.text_input("設定員工工號")
+            if st.button("➕ 建立帳號並同步", use_container_width=True):
+                if new_n and new_c:
+                    save_db(f"users/{new_n}", new_c, method="put")
+                    st.success(f"✅ 員工「{new_n}」帳號已建立！")
+                    st.rerun()
+
+    # D. 完整報表頁面
+    elif menu == "📊 完整工時報表":
+        st.header("📊 完整工時報表")
+        raw_logs = get_db("work_logs")
+        if raw_logs:
+            df = pd.DataFrame.from_dict(raw_logs, orient='index').reset_index(drop=True)
+            cols = ["狀態", "製令", "P/N", "Type", "工段名稱", "工號", "姓名", "開始時間", "結束時間", "累計工時"]
+            existing = [c for c in cols if c in df.columns]
+            df_display = df[existing]
+            if "結束時間" in df_display.columns:
+                df_display = df_display.sort_values(by="結束時間", ascending=False)
+            st.dataframe(df_display, use_container_width=True)
+        else:
+            st.info("目前尚無報工紀錄。")
