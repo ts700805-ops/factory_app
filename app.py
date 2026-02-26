@@ -38,9 +38,10 @@ if "user" not in st.session_state:
                 st.rerun()
             else: st.error("❌ 代碼錯誤")
 else:
-    # --- 5. 左側選單 ---
+    # --- 5. 左側選單 (新增提交紀錄選項) ---
     st.sidebar.title(f"👤 {st.session_state.user}")
-    options = ["🏗️ 工時回報"]
+    # 所有人都看得到「工時回報」與「個人提交紀錄」
+    options = ["🏗️ 工時回報", "📝 個人提交紀錄"]
     if st.session_state.user == "管理員":
         options += ["⚙️ 系統帳號管理", "📊 完整工時報表"]
     menu = st.sidebar.radio("功能選單", options)
@@ -56,7 +57,6 @@ else:
     if menu == "🏗️ 工時回報":
         st.header("🏗️ 生產日報回報")
         
-        # ⏱️ 計時器區 (強化時間顯示明顯度)
         with st.expander("⏱️ 工時計時器", expanded=True):
             col_a, col_b, col_c = st.columns(3)
             if col_a.button("⏱️ 開始計時", use_container_width=True):
@@ -81,7 +81,6 @@ else:
                 if 'display_hours' in st.session_state: del st.session_state['display_hours']
                 st.rerun()
 
-            # 強化顯示：使用明顯的資訊標籤替代原本不明顯的輸入框
             t1, t2 = st.columns(2)
             s_time = st.session_state.get('work_start')
             e_time = st.session_state.get('work_end')
@@ -96,7 +95,6 @@ else:
                 if e_time: st.success(f"⌛ {e_time.strftime('%H:%M:%S')}")
                 else: st.write("---")
 
-        # 🏗️ 報工表單
         with st.form("work_form"):
             user_code = STAFF_DATA.get(st.session_state.user, "N/A")
             c1, c2, c3 = st.columns(3)
@@ -107,10 +105,8 @@ else:
             c4, c5, c6 = st.columns(3)
             prod_type = c4.text_input("Type")
             stage = c5.text_input("工段名稱")
-            # 自動帶入累計工時
             hours_text = c6.text_input("累計工時", value=st.session_state.get('display_hours', "0小時 0分鐘"))
 
-            # 顯示基本資訊，並已移除下方原本圈選的「本次開始時間」文字
             st.write(f"📌 **工號：** {user_code} | **姓名：** {st.session_state.user}")
             
             if st.form_submit_button("🚀 提交紀錄", use_container_width=True):
@@ -123,13 +119,33 @@ else:
                 }
                 save_db("work_logs", log_data)
                 st.success("✅ 紀錄已成功提交！")
-                # 提交後重置
                 if 'work_start' in st.session_state: del st.session_state['work_start']
                 if 'work_end' in st.session_state: del st.session_state['work_end']
                 if 'display_hours' in st.session_state: del st.session_state['display_hours']
                 st.rerun()
 
-    # B. 帳號管理頁面
+    # 新增內容：B. 個人提交紀錄頁面
+    elif menu == "📝 個人提交紀錄":
+        st.header(f"📝 {st.session_state.user} 的提交紀錄")
+        raw_logs = get_db("work_logs")
+        if raw_logs:
+            df = pd.DataFrame.from_dict(raw_logs, orient='index')
+            # 篩選僅顯示當前登入者的姓名
+            df_personal = df[df["姓名"] == st.session_state.user]
+            
+            if not df_personal.empty:
+                cols = ["狀態", "製令", "P/N", "Type", "工段名稱", "工號", "姓名", "開始時間", "結束時間", "累計工時"]
+                existing = [c for c in cols if c in df_personal.columns]
+                df_display = df_personal[existing]
+                if "結束時間" in df_display.columns:
+                    df_display = df_display.sort_values(by="結束時間", ascending=False)
+                st.dataframe(df_display, use_container_width=True)
+            else:
+                st.info("您目前尚無任何提交紀錄。")
+        else:
+            st.info("系統目前尚無任何紀錄。")
+
+    # C. 帳號管理頁面
     elif menu == "⚙️ 系統帳號管理":
         st.header("👤 系統帳號管理 (新增人員)")
         with st.container(border=True):
@@ -141,7 +157,7 @@ else:
                     st.success(f"✅ 員工「{new_n}」帳號已建立！")
                     st.rerun()
 
-    # C. 完整報表頁面
+    # D. 完整報表頁面
     elif menu == "📊 完整工時報表":
         st.header("📊 完整工時報表")
         raw_logs = get_db("work_logs")
