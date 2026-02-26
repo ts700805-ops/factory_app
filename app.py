@@ -72,7 +72,7 @@ else:
                 requests.post(f"{DB_URL}.json", json=log)
                 st.success("✅ 紀錄已成功提交！")
 
-    # --- 4. 歷史紀錄查詢 (新增刪除與匯出功能) ---
+    # --- 4. 歷史紀錄查詢 (調整按鈕位置與刪除邏輯) ---
     elif menu == "📋 歷史紀錄查詢":
         st.header("📋 系統提交紀錄清單")
         try:
@@ -96,28 +96,33 @@ else:
                 if "提交時間" in df.columns:
                     df = df.sort_values(by="提交時間", ascending=False)
 
-                # --- 新增：功能按鈕區 ---
-                col_btn1, col_btn2 = st.columns([1, 5])
-                
-                # 1. 匯出 CSV 按鈕
-                csv = df.drop(columns=['id'], errors='ignore').to_csv(index=False).encode('utf-8-sig')
-                col_btn1.download_button("📥 匯出 CSV", data=csv, file_name=f"工時紀錄_{get_now_str()}.csv", mime="text/csv")
-
-                st.write("---")
-                
-                # 2. 刪除功能 (顯示表格供選擇)
+                # 先顯示表格
                 st.dataframe(df.drop(columns=['id'], errors='ignore'), use_container_width=True)
                 
-                with st.expander("🗑️ 刪除紀錄管理"):
-                    delete_id = st.selectbox("選擇要刪除的提交時間", options=df["提交時間"].tolist() if "提交時間" in df.columns else [])
-                    if st.button("確認刪除此筆紀錄", type="primary"):
-                        target_key = df[df["提交時間"] == delete_id]["id"].values[0]
+                st.write("---")
+                
+                # --- 功能區搬移至下方 ---
+                col_btn1, col_btn2 = st.columns([2, 3])
+                
+                # 1. 匯出 CSV 按鈕 (改到下方)
+                csv = df.drop(columns=['id'], errors='ignore').to_csv(index=False).encode('utf-8-sig')
+                col_btn1.download_button("📥 匯出 CSV 檔", data=csv, file_name=f"工時紀錄_{get_now_str()}.csv", mime="text/csv")
+
+                # 2. 刪除 1 筆紀錄功能
+                with st.expander("🗑️ 刪除單筆紀錄"):
+                    # 使用提交時間與姓名組合，確保選到正確的那一筆
+                    df["顯示選項"] = df["提交時間"] + " (" + df["姓名"] + ")"
+                    selected_option = st.selectbox("請選擇要刪除的一筆紀錄", options=df["顯示選項"].tolist())
+                    
+                    if st.button("確認刪除該筆資料", type="primary"):
+                        # 根據選擇的顯示選項找出對應的 Firebase ID
+                        target_key = df[df["顯示選項"] == selected_option]["id"].values[0]
                         del_r = requests.delete(f"{DB_URL}/{target_key}.json")
                         if del_r.status_code == 200:
-                            st.success(f"已刪除時間為 {delete_id} 的紀錄")
+                            st.success(f"✅ 已成功刪除紀錄：{selected_option}")
                             st.rerun()
                         else:
-                            st.error("刪除失敗，請檢查網路連接")
+                            st.error("❌ 刪除失敗")
             else:
                 st.info("目前尚無資料。")
         except Exception as e:
