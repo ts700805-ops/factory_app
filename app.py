@@ -3,7 +3,7 @@ import pandas as pd
 import datetime
 import requests
 
-# --- 1. 設定區 ---
+# --- 1. 設定區 (維持無授權模式) ---
 DB_URL = "https://my-factory-system-default-rtdb.firebaseio.com/"
 
 # --- 2. 核心功能：Firebase 讀寫 ---
@@ -22,6 +22,7 @@ def save_db(path, data, method="post"):
 # --- 3. 頁面配置 ---
 st.set_page_config(page_title="數位戰情室", layout="wide")
 
+# 獲取員工清單，確保 8888 管理員永遠存在
 raw_users = get_db("users")
 STAFF_DATA = {"管理員": "8888"}
 if raw_users:
@@ -36,43 +37,28 @@ if "user" not in st.session_state:
         if st.form_submit_button("進入系統", use_container_width=True):
             if str(STAFF_DATA.get(input_name)) == input_code:
                 st.session_state.user = input_name
+                st.session_state.start_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 st.rerun()
             else: st.error("❌ 代碼錯誤")
 else:
     # --- 5. 左側選單 ---
     st.sidebar.title(f"👤 {st.session_state.user}")
+    
     options = ["🏗️ 工時回報"]
     if st.session_state.user == "管理員":
         options += ["⚙️ 系統帳號管理", "📊 完整工時報表"]
+    
     menu = st.sidebar.radio("功能選單", options)
     st.sidebar.divider()
     if st.sidebar.button("🚪 登出系統", use_container_width=True):
-        for key in list(st.session_state.keys()): del st.session_state[key]
+        del st.session_state.user
         st.rerun()
 
     # --- 6. 頁面內容 ---
 
-    # A. 工時回報頁面 (新增按鈕與時間計算功能)
+    # A. 工時回報頁面 (10個欄位)
     if menu == "🏗️ 工時回報":
         st.header("🏗️ 生產日報回報")
-        
-        # 時間計算按鈕區 (解決原本顯示錯誤的問題)
-        with st.expander("⏱️ 工時計時器", expanded=True):
-            col_a, col_b = st.columns(2)
-            if col_a.button("⏱️ 開始計時", use_container_width=True):
-                st.session_state.work_start = datetime.datetime.now()
-                st.success(f"已記錄開始時間：{st.session_state.work_start.strftime('%Y-%m-%d %H:%M:%S')}")
-            
-            if col_b.button("⏹️ 結束計時", use_container_width=True):
-                if 'work_start' in st.session_state:
-                    st.session_state.work_end = datetime.datetime.now()
-                    duration = st.session_state.work_end - st.session_state.work_start
-                    st.session_state.calc_hours = round(duration.total_seconds() / 3600, 2)
-                    st.success(f"計時結束！自動計算工時：{st.session_state.calc_hours} hr")
-                else:
-                    st.warning("請先按下『開始計時』")
-
-        # 10 個欄位的報工表單
         with st.form("work_form"):
             user_code = STAFF_DATA.get(st.session_state.user, "N/A")
             c1, c2, c3 = st.columns(3)
@@ -83,26 +69,29 @@ else:
             c4, c5, c6 = st.columns(3)
             prod_type = c4.text_input("Type")
             stage = c5.text_input("工段名稱")
-            # 將計算後的工時填入累計工時欄位
-            hours = c6.number_input("累計工時 (hr)", min_value=0.0, step=0.01, value=st.session_state.get('calc_hours', 0.0))
+            hours = c6.number_input("累計工時", min_value=0.0, step=0.5)
 
             st.write(f"📌 **工號：** {user_code} | **姓名：** {st.session_state.user}")
-            # 顯示修正後的開始與結束時間
-            start_str = st.session_state.get('work_start', datetime.datetime.now()).strftime('%Y-%m-%d %H:%M:%S')
-            st.write(f"⏰ **本次開始時間：** {start_str}")
+            st.write(f"⏰ **開始時間：** {st.session_state.start_time}")
             
             if st.form_submit_button("🚀 提交紀錄", use_container_width=True):
-                final_end = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                now_end = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 log_data = {
-                    "狀態": status, "製令": order_no, "P/N": pn, "Type": prod_type, "工段名稱": stage,
-                    "工號": user_code, "姓名": st.session_state.user,
-                    "開始時間": start_str, "結束時間": final_end, "累計工時": hours
+                    "狀態": status,
+                    "製令": order_no,
+                    "P/N": pn,
+                    "Type": prod_type,
+                    "工段名稱": stage,
+                    "工號": user_code,
+                    "姓名": st.session_state.user,
+                    "開始時間": st.session_state.start_time,
+                    "結束時間": now_end,
+                    "累計工時": hours
                 }
                 save_db("work_logs", log_data)
                 st.success("✅ 紀錄已成功提交！")
-                st.balloons()
 
-    # B. 帳號管理頁面
+    # B. 帳號管理頁面 (管理員專屬)
     elif menu == "⚙️ 系統帳號管理":
         st.header("👤 系統帳號管理 (新增人員)")
         with st.container(border=True):
@@ -114,12 +103,13 @@ else:
                     st.success(f"✅ 員工「{new_n}」帳號已建立！")
                     st.rerun()
 
-    # C. 報表頁面
+    # C. 報表頁面 (管理員專屬)
     elif menu == "📊 完整工時報表":
         st.header("📊 完整工時報表 (格式校對完畢)")
         raw_logs = get_db("work_logs")
         if raw_logs:
             df = pd.DataFrame.from_dict(raw_logs, orient='index')
+            # 依指示排列 10 個欄位
             cols = ["狀態", "製令", "P/N", "Type", "工段名稱", "工號", "姓名", "開始時間", "結束時間", "累計工時"]
             existing = [c for c in cols if c in df.columns]
             df_display = df[existing]
