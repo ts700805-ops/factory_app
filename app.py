@@ -4,15 +4,15 @@ from firebase_admin import credentials, db
 import datetime
 import pandas as pd
 
-# --- 1. 網頁基礎設定 ---
-st.set_page_config(page_title="數位生產管理看板", layout="wide")
+# --- 1. 初始化網頁 ---
+st.set_page_config(page_title="生產管理系統", layout="wide")
 
-# --- 2. Firebase 連線 (強制修復 Invalid JWT Signature) ---
+# --- 2. Firebase 連線 (核心除錯：修復 JWT Signature 錯誤) ---
 @st.cache_resource
 def init_firebase():
     if not firebase_admin._apps:
-        # 強制清理金鑰中的空格與換行錯誤
-        raw_key = """-----BEGIN PRIVATE KEY-----
+        # 使用原始三引號字串，確保換行符號不被系統竄改
+        private_key = """-----BEGIN PRIVATE KEY-----
 MIIEuwIBADANBgkqhkiG9w0BAQEFAASCBKUwggShAgEAAoIBAQC+TW76EuAmGqxR
 9hUmQ7dWvUSJx8qOlLsm47FM6VrzMNreaBnCKaK7VySL8iXLfiuvcfCu/9doXsG0
 uz95UN3EyK6Wh1O9DQvIHUIPC7v0P7hmdjTYBISbmcqmttbgJX62v3LLgsbEP+sN
@@ -44,89 +44,87 @@ Edwli7ADexZRA03ufrQm9SiLrfLiSsjNyDFgVPIoICAvccc1g9ST/NiduXuTpLG/
         firebase_config = {
             "type": "service_account",
             "project_id": "my-factory-system",
-            "private_key": raw_key.replace("\\n", "\n"),
+            "private_key": private_key,
             "client_email": "firebase-adminsdk-fbsvc@my-factory-system.iam.gserviceaccount.com",
             "token_uri": "https://oauth2.googleapis.com/token",
         }
         
         try:
             cred = credentials.Certificate(firebase_config)
+            # 確保資料庫 URL 引用正確，避免截圖中的 SyntaxError
             firebase_admin.initialize_app(cred, {'databaseURL': "https://my-factory-system-default-rtdb.firebaseio.com/"})
         except Exception as e:
             st.error(f"連線失敗：{e}")
 
 init_firebase()
 
-# --- 3. 穩定獲取資料 ---
-def get_safe_data(path):
+# --- 3. 獲取資料 ---
+def get_users():
     try:
-        return db.reference(path).get()
+        u = db.reference('users').get()
+        return u if u else {"管理員": "8888"}
     except:
-        return None
+        return {"管理員": "8888"}
 
 # --- 4. 登入介面 ---
-users = get_safe_data('users')
-user_list = users if users else {"管理員": "8888"}
+user_list = get_users()
 
 if "user" not in st.session_state:
-    st.title("🏭 生產管理系統")
+    st.title("🏭 生產管理系統 - 登入")
     with st.container(border=True):
-        st.subheader("👤 系統登入")
-        # 人員與管理員合併在同一個下拉選單
-        sel_name = st.selectbox("請選擇您的姓名", list(user_list.keys()))
-        sel_code = st.text_input("輸入代碼", type="password")
-        if st.button("確認進入系統", use_container_width=True):
-            if user_list.get(sel_name) == sel_code:
-                st.session_state.user = sel_name
+        name = st.selectbox("請選擇姓名", list(user_list.keys()))
+        code = st.text_input("輸入代碼", type="password")
+        if st.button("登入系統", use_container_width=True):
+            if user_list.get(name) == code:
+                st.session_state.user = name
                 st.rerun()
             else:
-                st.error("❌ 代碼不正確")
+                st.error("❌ 代碼錯誤")
 else:
-    # --- 5. 系統主畫面 ---
+    # --- 5. 登入後功能 ---
     st.sidebar.write(f"當前使用者: **{st.session_state.user}**")
     if st.sidebar.button("登出"):
         del st.session_state.user
         st.rerun()
 
-    # --- 管理員看板 (對應 Excel 需求) ---
+    # --- 管理員專區 ---
     if st.session_state.user == "管理員":
-        st.header("📊 數位戰情看板")
-        logs = get_safe_data('production_logs')
+        st.header("📊 數位戰情室看板")
+        logs = db.reference('production_logs').get()
         if logs:
             df = pd.DataFrame.from_dict(logs, orient='index')
             m1, m2, m3 = st.columns(3)
-            # 彩色大數字看板
+            # 對應 Excel 的統計看板需求
             m1.metric("🔥 現場作業中", f"{len(df[df['狀態'] == '作業中']['姓名'].unique())} 人")
             m2.metric("🏗️ 進行中製令", f"{len(df[df['狀態'] == '作業中']['製令'].unique())} 案")
             today = datetime.date.today().strftime("%Y-%m-%d")
             m3.metric("✅ 今日完工", f"{len(df[(df['日期'] == today) & (df['狀態'] == '完工')])} 筆")
-            st.dataframe(df.tail(5), use_container_width=True)
+            st.dataframe(df.tail(10), use_container_width=True)
         
         st.divider()
-        # 帳號管理：修正 image_dd3ce0.png 的錯誤
-        st.subheader("👤 帳號管理員 (新增人員)")
+        st.subheader("👤 系統帳號管理 (新增人員)")
         with st.container(border=True):
-            col_a, col_b = st.columns(2)
-            n_name = col_a.text_input("新員工姓名")
-            n_code = col_b.text_input("設定員工代碼")
-            if st.button("✨ 建立新帳號"):
-                if n_name and n_code:
+            c_u, c_c = st.columns(2)
+            new_n = c_u.text_input("輸入新員工姓名")
+            new_c = c_c.text_input("設定員工代碼")
+            if st.button("➕ 建立新帳號"):
+                if new_n and new_c:
                     try:
-                        db.reference(f'users/{n_name}').set(n_code)
-                        st.success(f"✅ 「{n_name}」帳號已同步！請點擊登出後確認選單。")
+                        db.reference(f'users/{new_n}').set(new_c)
+                        st.success(f"✅ 「{new_n}」帳號已同步！請登出確認選單。")
                     except Exception as e:
                         st.error(f"寫入失敗：{e}")
         st.divider()
 
-    # --- 報工表單 ---
+    # --- 報工填寫區 (對應 Excel 欄位) ---
     st.header("📝 生產日報回報")
     with st.container(border=True):
-        c1, c2 = st.columns(2)
-        with c1:
+        col1, col2 = st.columns(2)
+        with col1:
             st_val = st.selectbox("狀態 (A)", ["作業中", "完工", "暫停", "下班"])
             order = st.text_input("製令單號 (B)", placeholder="例如: 25M0497-03")
             proc = st.text_input("工段名稱 (E)")
-        with c2:
+        with col2:
             pn = st.text_input("P/N (C)")
             tp = st.text_input("Type (D)")
             wid = st.text_input("工號 (F)")
@@ -139,6 +137,6 @@ else:
                     "PN": pn, "工段": proc, "工號": wid, "Type": tp,
                     "日期": now.strftime("%Y-%m-%d"), "時間": now.strftime("%H:%M:%S")
                 })
-                st.success("✅ 提交成功！")
+                st.success("✅ 紀錄已成功提交！")
             except Exception as e:
-                st.error(f"連線異常：{e}")
+                st.error(f"提交失敗：{e}")
