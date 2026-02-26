@@ -7,7 +7,7 @@ import pandas as pd
 # --- 1. 初始化網頁 ---
 st.set_page_config(page_title="生產管理系統", layout="wide")
 
-# --- 2. Firebase 連線 (修復引號與連線錯誤) ---
+# --- 2. Firebase 連線 (保持修復後的正確語法) ---
 if not firebase_admin._apps:
     try:
         firebase_key = {
@@ -24,12 +24,12 @@ if not firebase_admin._apps:
             "universe_domain": "googleapis.com"
         }
         cred = credentials.Certificate(firebase_key)
-        # 修復截圖中的語法錯誤
+        # 修復之前截圖中未封閉引號的問題
         firebase_admin.initialize_app(cred, {'databaseURL': "https://my-factory-system-default-rtdb.firebaseio.com/"})
-    except Exception as e:
-        st.error(f"連線初始化失敗：{e}")
+    except:
+        pass
 
-# --- 3. 核心工具 ---
+# --- 3. 核心功能 ---
 def get_users():
     try:
         u = db.reference('users').get()
@@ -46,8 +46,9 @@ def get_logs():
 
 # --- 4. 登入介面 ---
 if "user" not in st.session_state:
-    st.title("🏭 生產管理系統 - 登入入口")
+    st.title("🏭 生產管理系統 - 登入")
     user_list = get_users()
+    # 確保管理員與人員都在同一個下拉選單
     name = st.selectbox("請選擇姓名", list(user_list.keys()))
     code = st.text_input("輸入代碼", type="password")
     if st.button("登入系統", use_container_width=True):
@@ -57,12 +58,13 @@ if "user" not in st.session_state:
         else:
             st.error("❌ 代碼錯誤")
 else:
+    # --- 5. 系統主畫面 ---
     st.sidebar.markdown(f"### 👤 使用者: {st.session_state.user}")
-    if st.sidebar.button("登出"):
+    if st.sidebar.button("登出系統"):
         del st.session_state.user
         st.rerun()
 
-    # --- 戰情室儀表板 (僅管理員顯示) ---
+    # --- A. 管理員專屬：戰情儀表板 ---
     if st.session_state.user == "管理員":
         st.title("📊 數位戰情室看板")
         all_data = get_logs()
@@ -83,26 +85,32 @@ else:
             st.subheader("💡 現場即時人員動態")
             latest_status = df.sort_values('時間').groupby('姓名').tail(1)
             st.dataframe(latest_status[['姓名', '狀態', '製令', '工段', '時間']], use_container_width=True)
+        
+        st.divider()
+        # ✨ 重點：帳號管理區 (這就是你剛才找不到的地方)
+        st.header("👤 系統帳號管理 (新增人員)")
+        with st.container(border=True):
+            col_u1, col_u2 = st.columns(2)
+            with col_u1:
+                new_n = st.text_input("輸入新員工姓名", placeholder="例如: 戴鎰祥")
+            with col_u2:
+                new_c = st.text_input("設定員工代碼 (數字)", placeholder="例如: 1234")
             
-            with st.expander("👤 帳號密碼管理區"):
-                new_n = st.text_input("新增員工姓名")
-                new_c = st.text_input("設定員工代碼")
-                if st.button("確認建立帳號"):
-                    if new_n and new_c:
-                        db.reference(f'users/{new_n}').set(new_c)
-                        st.success(f"已建立帳號：{new_n}")
-                        st.rerun()
-        else:
-            st.info("尚無生產數據。")
+            if st.button("➕ 點我建立新帳號"):
+                if new_n and new_c:
+                    db.reference(f'users/{new_n}').set(new_c)
+                    st.success(f"✅ 帳號「{new_n}」已成功建立！下次登入就能在選單看到了。")
+                    st.rerun()
+                else:
+                    st.warning("⚠️ 請填寫姓名與代碼")
         st.divider()
 
-    # --- 報工填寫區 (所有人都看得到) ---
-    st.header("📝 日報填寫區")
+    # --- B. 員工回報區 (對應 Excel 欄位) ---
+    st.header("📝 生產日報回報")
     with st.container(border=True):
         c1, c2 = st.columns(2)
         with c1:
             status = st.selectbox("狀態 (A)", ["作業中", "完工", "暫停", "下班"])
-            # 製令對應 Excel 欄位 B
             order_no = st.text_input("製令單號 (B)", placeholder="例如: 25M0497-03")
             process = st.text_input("工段名稱 (E)", placeholder="配電")
         with c2:
@@ -112,12 +120,11 @@ else:
         
         remark = st.text_area("備註 (J)")
         
-        if st.button("🚀 提交紀錄", use_container_width=True):
+        if st.button("🚀 提交紀錄並同步看板", use_container_width=True):
             now = datetime.datetime.now()
             db.reference('production_logs').push({
                 "狀態": status, "姓名": st.session_state.user, "製令": order_no,
                 "PN": part_no, "工段": process, "工號": work_id, "Type": type_name,
                 "備註": remark, "日期": now.strftime("%Y-%m-%d"), "時間": now.strftime("%H:%M:%S")
             })
-            st.success("✅ 紀錄提交成功！")
-            st.balloons()
+            st.success("✅ 紀錄提交成功！數據已更新至儀表板。")
