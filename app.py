@@ -5,8 +5,8 @@ import datetime
 import pandas as pd
 import requests
 
-# 設定網頁
-st.set_page_config(page_title="2.0 自動化工時系統", layout="wide")
+# 設定網頁為寬版模式
+st.set_page_config(page_title="生產管理戰情室", layout="wide")
 
 # --- 1. Firebase 連線 (沿用你的正確金鑰) ---
 if not firebase_admin._apps:
@@ -25,107 +25,4 @@ if not firebase_admin._apps:
             "universe_domain": "googleapis.com"
         }
         cred = credentials.Certificate(firebase_key)
-        firebase_admin.initialize_app(cred, {'databaseURL': "https://my-factory-system-default-rtdb.firebaseio.com/"})
-    except: pass
-
-# --- 2. 核心功能 ---
-def get_users():
-    u = db.reference('users').get()
-    return u if u else {"管理員": "8888"}
-
-def get_recent_orders():
-    # 抓取最近 50 筆紀錄，用來提供製令單號自動建議
-    logs = db.reference('production_logs').order_by_key().limit_to_last(50).get()
-    if logs:
-        return sorted(list(set([v['製令'] for v in logs.values() if '製令' in v])))
-    return []
-
-# --- 3. 登入系統 ---
-if "user" not in st.session_state:
-    st.title("🏭 自動化生產日報系統")
-    user_list = get_users()
-    name = st.selectbox("請選擇姓名", list(user_list.keys()))
-    code = st.text_input("輸入員工代碼", type="password")
-    if st.button("登入系統", use_container_width=True):
-        if user_list[name] == code:
-            st.session_state.user = name
-            st.rerun()
-        else: st.error("代碼錯誤")
-else:
-    st.sidebar.subheader(f"👤 當前員工：{st.session_state.user}")
-    if st.sidebar.button("登出"):
-        del st.session_state.user
-        st.rerun()
-
-    # --- 功能 A：生產回報區 ---
-    st.header("🕒 即時生產報工")
-    
-    # 建立一個簡單的「開始/結束」紀錄邏輯
-    with st.container(border=True):
-        col_s1, col_s2, col_s3 = st.columns(3)
-        with col_s1:
-            status = st.selectbox("目前狀態", ["作業中", "暫停", "完工", "下班"])
-        with col_s2:
-            # 自動建議功能：從歷史紀錄抓取製令單號
-            recent_orders = get_recent_orders()
-            order_no = st.selectbox("製令單號 (選取或手動輸入)", ["手動輸入"] + recent_orders)
-            if order_no == "手動輸入":
-                order_no = st.text_input("請輸入新製令單號", placeholder="例如: 25M0497-03")
-        with col_s3:
-            process_name = st.text_input("工段名稱 (E)", placeholder="例如: 配電")
-
-        col_s4, col_s5, col_s6 = st.columns(3)
-        with col_s4:
-            work_id = st.text_input("工號 (F)", placeholder="例如: B126")
-        with col_s5:
-            part_no = st.text_input("P/N (C)")
-        with col_s6:
-            type_name = st.text_input("Type (D)")
-
-        remark = st.text_area("備註 (J)")
-
-        if st.button("🚀 提交生產紀錄", use_container_width=True):
-            now = datetime.datetime.now()
-            db.reference('production_logs').push({
-                "狀態": status, "姓名": st.session_state.user, "製令": order_no,
-                "PN": part_no, "工段": process_name, "工號": work_id, "Type": type_name,
-                "備註": remark, "日期": now.strftime("%Y-%m-%d"), "時間": now.strftime("%H:%M:%S")
-            })
-            st.success(f"已紀錄：{order_no} ({status})")
-            st.balloons()
-
-    # --- 功能 B：管理員後台 ---
-    if st.session_state.user == "管理員":
-        st.divider()
-        st.header("📊 生產數據看板")
-        
-        # 即時看板：顯示現在誰在「作業中」
-        all_logs = db.reference('production_logs').get()
-        if all_logs:
-            df = pd.DataFrame.from_dict(all_logs, orient='index')
-            
-            # 看板 1：當前現場狀態
-            st.subheader("💡 現場即時動態")
-            working_df = df[df['狀態'] == '作業中'].tail(10)
-            if not working_df.empty:
-                st.table(working_df[['姓名', '製令', '工段', '時間']])
-            else:
-                st.write("目前現場無人作業中。")
-
-            # 看板 2：完整報表
-            st.subheader("📋 歷史日報表")
-            st.dataframe(df, use_container_width=True)
-            
-            # 匯出 Excel
-            csv = df.to_csv(index=False).encode('utf-8-sig')
-            st.download_button("📥 下載 Excel 生產月報", data=csv, file_name=f"生產日報_{datetime.date.today()}.csv")
-            
-        # 帳號管理
-        with st.expander("👤 帳號密碼管理系統"):
-            n_name = st.text_input("新員工姓名")
-            n_code = st.text_input("設定代碼")
-            if st.button("確認建立帳號"):
-                if n_name and n_code:
-                    db.reference(f'users/{n_name}').set(n_code)
-                    st.success("建立成功！")
-                    st.rerun()
+        firebase_admin.initialize_app(cred, {'databaseURL': "https://my-factory-system-default
