@@ -1,16 +1,14 @@
 import streamlit as st
 import pandas as pd
 import datetime
-import requests  # 改用簡單的 requests 連線，避開 firebase_admin 的金鑰問題
+import requests
 
-# --- 1. 設定區 (只需填入網址，不需要貼上整段 JSON 金鑰) ---
-#
+# --- 1. 設定區 (僅網址，不使用金鑰) ---
 DB_URL = "https://my-factory-system-default-rtdb.firebaseio.com/"
 
-# --- 2. 核心功能：透過 REST API 讀取與儲存 (完全避開認證錯誤) ---
+# --- 2. 核心功能：Firebase 讀取與儲存 ---
 def get_db(path):
     try:
-        # 在 Firebase 規則設為公開的情況下，直接讀取 .json 即可
         response = requests.get(f"{DB_URL}{path}.json")
         return response.json()
     except:
@@ -28,7 +26,7 @@ def save_db(path, data, method="post"):
 # --- 3. 頁面配置與登入邏輯 ---
 st.set_page_config(page_title="生產管理系統", layout="centered")
 
-# 從 Firebase 獲取員工清單
+# 獲取員工清單
 raw_users = get_db("users")
 STAFF_DATA = raw_users if raw_users else {"管理員": "8888"}
 
@@ -50,17 +48,16 @@ else:
         del st.session_state.user
         st.rerun()
 
-    # --- 5. 管理員專區：建立使用者 (放在最上方) ---
+    # --- 5. 管理員專區：建立使用者 (置頂) ---
     if st.session_state.user == "管理員":
         st.header("👤 系統帳號管理")
         with st.container(border=True):
-            st.write("在此建立新員工，資料將永久儲存")
+            st.write("在此建立新員工，資料將永久儲存至 Firebase")
             c1, c2 = st.columns(2)
             new_n = c1.text_input("新員工姓名")
             new_c = c2.text_input("設定員工工號/代碼")
             if st.button("➕ 建立帳號並同步", use_container_width=True):
                 if new_n and new_c:
-                    # 使用 put 直接寫入使用者節點
                     save_db(f"users/{new_n}", new_c, method="put")
                     st.success(f"✅ 員工「{new_n}」建立成功！")
                     st.rerun()
@@ -74,14 +71,19 @@ else:
             now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             log_data = {"紀錄時間": now, "姓名": st.session_state.user, "工時(hr)": hours}
             save_db("work_logs", log_data)
-            st.success("✅ 紀錄已提交！")
+            st.success("✅ 紀錄已提交至 Firebase！")
 
-    # --- 7. 管理員報表 ---
+    # --- 7. 管理員報表 (已修正 KeyError 錯誤) ---
     if st.session_state.user == "管理員":
         st.divider()
         st.subheader("📊 完整工時報表")
         raw_logs = get_db("work_logs")
         if raw_logs:
             df = pd.DataFrame.from_dict(raw_logs, orient='index')
-            st.dataframe(df.sort_values(by="紀錄時間", ascending=False), use_container_width=True)
-            
+            # 修正處：檢查欄位是否存在，避免程式崩潰
+            if "紀錄時間" in df.columns:
+                st.dataframe(df.sort_values(by="紀錄時間", ascending=False), use_container_width=True)
+            else:
+                st.dataframe(df, use_container_width=True)
+        else:
+            st.info("目前尚無報工紀錄。")
