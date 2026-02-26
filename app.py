@@ -3,7 +3,7 @@ import pandas as pd
 import datetime
 import requests
 
-# --- 1. 核心設定 (維持成功版) ---
+# --- 1. 核心設定 ---
 DB_URL = "https://my-factory-system-default-rtdb.firebaseio.com/work_logs"
 
 def get_now_str():
@@ -31,7 +31,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 工時回報 (維持成功版邏輯，未更動) ---
+    # --- 3. 工時回報 ---
     if menu == "🏗️ 工時回報":
         st.header(f"🏗️ {st.session_state.user} 的工時回報")
         with st.expander("⏱️ 計時器工具", expanded=True):
@@ -50,7 +50,22 @@ else:
             if c3.button("🧹 清除時間"):
                 for k in ['t1','t2','dur']: st.session_state.pop(k, None)
                 st.rerun()
-            st.write(f"🕒 開始：{st.session_state.get('t1','--')} | ⌛ 結束：{st.session_state.get('t2','--')}")
+            
+            # ✅ 重新設計的顯示區塊：增加間距、底色與邊框
+            t1_val = st.session_state.get('t1', '--')
+            t2_val = st.session_state.get('t2', '--')
+            st.markdown(f"""
+                <div style="display: flex; gap: 20px; margin-top: 10px;">
+                    <div style="background-color: #e8f4f8; padding: 10px 20px; border-radius: 10px; border-left: 5px solid #2980b9; flex: 1;">
+                        <span style="font-size: 14px; color: #555;">🕒 開始時間</span><br>
+                        <b style="font-size: 18px; color: #2980b9;">{t1_val}</b>
+                    </div>
+                    <div style="background-color: #fff4e6; padding: 10px 20px; border-radius: 10px; border-left: 5px solid #e67e22; flex: 1;">
+                        <span style="font-size: 14px; color: #555;">⌛ 結束時間</span><br>
+                        <b style="font-size: 18px; color: #e67e22;">{t2_val}</b>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
 
         with st.form("work_form"):
             r1 = st.columns(3)
@@ -72,16 +87,14 @@ else:
                 requests.post(f"{DB_URL}.json", json=log)
                 st.success("✅ 紀錄已成功提交！")
 
-    # --- 4. 歷史紀錄查詢 (調整按鈕位置與刪除邏輯) ---
+    # --- 4. 歷史紀錄查詢 ---
     elif menu == "📋 歷史紀錄查詢":
         st.header("📋 系統提交紀錄清單")
         try:
             r = requests.get(f"{DB_URL}.json")
             data = r.json()
             if data:
-                # 為了刪除功能，需保留 Firebase 的 ID (key)
                 df = pd.DataFrame([{"id": k, **v} for k, v in data.items()])
-                
                 rename_map = {
                     "name": "姓名", "hours": "累計工時", "order_no": "製令", "製令:": "製令",
                     "pn": "PN", "PN:": "PN", "stage": "工段名稱", "工段名稱:": "工段名稱",
@@ -96,34 +109,22 @@ else:
                 if "提交時間" in df.columns:
                     df = df.sort_values(by="提交時間", ascending=False)
 
-                # 先顯示表格
-                st.dataframe(df.drop(columns=['id'], errors='ignore'), use_container_width=True)
-                
+                st.dataframe(df.drop(columns=['id', '顯示選項'], errors='ignore'), use_container_width=True)
                 st.write("---")
                 
-                # --- 功能區搬移至下方 ---
                 col_btn1, col_btn2 = st.columns([2, 3])
-                
-                # 1. 匯出 CSV 按鈕 (改到下方)
-                csv = df.drop(columns=['id'], errors='ignore').to_csv(index=False).encode('utf-8-sig')
+                csv = df.drop(columns=['id', '顯示選項'], errors='ignore').to_csv(index=False).encode('utf-8-sig')
                 col_btn1.download_button("📥 匯出 CSV 檔", data=csv, file_name=f"工時紀錄_{get_now_str()}.csv", mime="text/csv")
 
-                # 2. 刪除 1 筆紀錄功能
                 with st.expander("🗑️ 刪除單筆紀錄"):
-                    # 使用提交時間與姓名組合，確保選到正確的那一筆
                     df["顯示選項"] = df["提交時間"] + " (" + df["姓名"] + ")"
                     selected_option = st.selectbox("請選擇要刪除的一筆紀錄", options=df["顯示選項"].tolist())
-                    
                     if st.button("確認刪除該筆資料", type="primary"):
-                        # 根據選擇的顯示選項找出對應的 Firebase ID
                         target_key = df[df["顯示選項"] == selected_option]["id"].values[0]
                         del_r = requests.delete(f"{DB_URL}/{target_key}.json")
                         if del_r.status_code == 200:
-                            st.success(f"✅ 已成功刪除紀錄：{selected_option}")
+                            st.success(f"✅ 已成功刪除紀錄")
                             st.rerun()
-                        else:
-                            st.error("❌ 刪除失敗")
-            else:
-                st.info("目前尚無資料。")
-        except Exception as e:
-            st.error(f"讀取失敗：{e}")
+                        else: st.error("❌ 刪除失敗")
+            else: st.info("目前尚無資料。")
+        except Exception as e: st.error(f"讀取失敗：{e}")
