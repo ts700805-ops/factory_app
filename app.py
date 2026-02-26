@@ -3,12 +3,12 @@ import pandas as pd
 import datetime
 import requests
 
-# --- 1. 核心設定 (對齊您的 Firebase 網址) ---
+# --- 1. 核心設定 ---
 DB_BASE_URL = "https://my-factory-system-default-rtdb.firebaseio.com/"
 LOG_PATH = "work_logs"
 
 def get_now_str():
-    # 取得台灣時間並格式化，刪除微秒與時區
+    # 格式化時間，移除微秒與時區
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
     return now.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -20,15 +20,15 @@ if "user" not in st.session_state:
     u = st.selectbox("請選擇您的姓名", ["管理員", "李小龍", "賴智文", "黃沂澈"])
     p = st.text_input("輸入員工代碼", type="password")
     if st.button("登入", use_container_width=True):
-        # 管理員權限與一般員工代碼
-        if (u == "管理員" and p == "8888") or (u == "李小龍" and p == "1234") or \
-           (u == "賴智文" and p == "098057") or (u == "黃沂澈" and p == "000000"):
+        # 依照 Firebase 中的 users 資料夾設定代碼
+        valid_users = {"管理員": "8888", "李小龍": "1234", "賴智文": "098057", "黃沂澈": "000000"}
+        if u in valid_users and p == valid_users[u]:
             st.session_state.user = u
             st.rerun()
         else:
             st.error("❌ 代碼輸入錯誤")
 else:
-    # --- 顯示登錄者 (新要求) ---
+    # --- 顯示登錄者 (左側顯示) ---
     st.sidebar.markdown(f"### 👤 當前登錄者\n## {st.session_state.user}")
     
     menu = st.sidebar.radio("功能選單", ["🏗️ 工時回報", "📋 歷史紀錄查詢"])
@@ -56,8 +56,6 @@ else:
             if c3.button("🧹 清除", use_container_width=True):
                 for k in ['start_t', 'end_t', 'work_h']: st.session_state.pop(k, None)
                 st.rerun()
-            
-            # 顯示精簡時間
             st.write(f"🕒 開始：{st.session_state.get('start_t','--')} | ⌛ 結束：{st.session_state.get('end_t','--')}")
 
         with st.form("work_log_form"):
@@ -72,33 +70,40 @@ else:
             hours = col2[2].text_input("累計工時", value=st.session_state.get('work_h', "0小時 0分鐘"))
 
             if st.form_submit_button("🚀 提交紀錄", use_container_width=True):
+                # 這裡定義存入資料庫的鍵值為中文，確保顯示時也是中文
                 payload = {
-                    "name": st.session_state.user,
-                    "status": status, "order_no": order, "pn": pn, "type": tp, "stage": stage,
-                    "hours": hours,
-                    "start_time": st.session_state.get('start_t', 'N/A'),
-                    "submit_time": get_now_str()
+                    "姓名": st.session_state.user,
+                    "狀態": status, "製令": order, "PN": pn, "類型": tp, "工段名稱": stage,
+                    "累計工時": hours,
+                    "開始時間": st.session_state.get('start_t', 'N/A'),
+                    "提交時間": get_now_str()
                 }
-                # 提交至 work_logs
                 requests.post(f"{DB_BASE_URL}{LOG_PATH}.json", json=payload)
-                st.success("✅ 紀錄已成功提交！請至查詢頁面確認。")
+                st.success("✅ 紀錄已成功提交！")
 
     # --- 4. 歷史紀錄查詢頁面 ---
     elif menu == "📋 歷史紀錄查詢":
         st.header("📋 系統提交紀錄清單")
         
-        # 從 work_logs 抓取資料
         response = requests.get(f"{DB_BASE_URL}{LOG_PATH}.json")
         all_data = response.json()
         
         if all_data:
-            # 將 Firebase 資料轉換為表格並顯示
+            # 轉換為 DataFrame
             df = pd.DataFrame(list(all_data.values()))
             
-            # 依提交時間倒序排列
-            if "submit_time" in df.columns:
-                df = df.sort_values(by="submit_time", ascending=False)
+            # --- 欄位中文化對照表 (確保截圖圈選處顯示中文) ---
+            rename_map = {
+                "name": "姓名", "hours": "累計工時", "order_no": "製令", 
+                "pn": "PN", "stage": "工段名稱", "start_time": "開始時間", 
+                "status": "狀態", "submit_time": "提交時間", "type": "類型"
+            }
+            df = df.rename(columns=rename_map)
+            
+            # 依「提交時間」排序
+            sort_col = "提交時間" if "提交時間" in df.columns else df.columns[0]
+            df = df.sort_values(by=sort_col, ascending=False)
             
             st.dataframe(df, use_container_width=True)
         else:
-            st.warning("⚠️ 目前資料庫中沒有任何紀錄。請先完成一筆「工時回報」並提交。")
+            st.warning("⚠️ 目前資料庫中沒有任何紀錄。")
