@@ -53,23 +53,29 @@ else:
 
     # --- 6. 頁面內容 ---
 
-    # A. 工時回報頁面 (自動填入累計工時版)
+    # A. 工時回報頁面
     if menu == "🏗️ 工時回報":
         st.header("🏗️ 生產日報回報")
         
-        # ⏱️ 工時計時器區
+        # ⏱️ 計時器區 (優化顯示與格式轉換)
         with st.expander("⏱️ 工時計時器", expanded=True):
             col_a, col_b = st.columns(2)
             if col_a.button("⏱️ 開始計時", use_container_width=True):
+                # 即時更新開始時間
                 st.session_state.work_start = datetime.datetime.now()
-                st.info(f"已記錄開始時間：{st.session_state.work_start.strftime('%Y-%m-%d %H:%M:%S')}")
+                st.rerun() # 立即重繪頁面以顯示最新時間
             
             if col_b.button("⏹️ 結束計時", use_container_width=True):
                 if 'work_start' in st.session_state:
                     st.session_state.work_end = datetime.datetime.now()
                     duration = st.session_state.work_end - st.session_state.work_start
-                    # 將計算結果直接存入變數，不再顯示綠色字體
-                    st.session_state.calc_hours = round(duration.total_seconds() / 3600, 2)
+                    total_seconds = int(duration.total_seconds())
+                    
+                    # 轉換為 小時 + 分鐘 格式
+                    h = total_seconds // 3600
+                    m = (total_seconds % 3600) // 60
+                    st.session_state.display_hours = f"{h}小時 {m}分鐘"
+                    st.rerun()
                 else:
                     st.warning("請先按下『開始計時』")
 
@@ -84,12 +90,17 @@ else:
             c4, c5, c6 = st.columns(3)
             prod_type = c4.text_input("Type")
             stage = c5.text_input("工段名稱")
-            # 關鍵修改：將計算結果自動填入 value
-            hours = c6.number_input("累計工時 (hr)", min_value=0.0, step=0.01, value=st.session_state.get('calc_hours', 0.0))
+            
+            # 將累計工時改為文字輸入框，以配合「小時+分鐘」格式
+            hours_text = c6.text_input("累計工時", value=st.session_state.get('display_hours', "0小時 0分鐘"))
 
             st.write(f"📌 **工號：** {user_code} | **姓名：** {st.session_state.user}")
-            start_val = st.session_state.get('work_start', datetime.datetime.now())
-            start_str = start_val.strftime('%Y-%m-%d %H:%M:%S')
+            
+            # 顯示即時計錄的開始時間
+            if 'work_start' in st.session_state:
+                start_str = st.session_state.work_start.strftime('%Y-%m-%d %H:%M:%S')
+            else:
+                start_str = "尚未開始計時"
             st.write(f"⏰ **本次開始時間：** {start_str}")
             
             if st.form_submit_button("🚀 提交紀錄", use_container_width=True):
@@ -97,15 +108,16 @@ else:
                 log_data = {
                     "狀態": status, "製令": order_no, "P/N": pn, "Type": prod_type, "工段名稱": stage,
                     "工號": user_code, "姓名": st.session_state.user,
-                    "開始時間": start_str, "結束時間": final_end, "累計工時": hours
+                    "開始時間": start_str, "結束時間": final_end, "累計工時": hours_text
                 }
                 save_db("work_logs", log_data)
                 st.success("✅ 紀錄已成功提交！")
-                # 提交後清空計算值以便下次計時
-                if 'calc_hours' in st.session_state: del st.session_state['calc_hours']
+                # 提交後重置計時狀態
+                if 'work_start' in st.session_state: del st.session_state['work_start']
+                if 'display_hours' in st.session_state: del st.session_state['display_hours']
                 st.rerun()
 
-    # B. 帳號管理頁面 (新增人員)
+    # B. 帳號管理頁面 (維持原功能)
     elif menu == "⚙️ 系統帳號管理":
         st.header("👤 系統帳號管理 (新增人員)")
         with st.container(border=True):
@@ -117,13 +129,12 @@ else:
                     st.success(f"✅ 員工「{new_n}」帳號已建立！")
                     st.rerun()
 
-    # C. 報表頁面 (10 欄位排序)
+    # C. 完整報表頁面 (維持 10 欄位排序)
     elif menu == "📊 完整工時報表":
         st.header("📊 完整工時報表 (格式校對完畢)")
         raw_logs = get_db("work_logs")
         if raw_logs:
             df = pd.DataFrame.from_dict(raw_logs, orient='index')
-            # 嚴格執行 10 個欄位的順序
             cols = ["狀態", "製令", "P/N", "Type", "工段名稱", "工號", "姓名", "開始時間", "結束時間", "累計工時"]
             existing = [c for c in cols if c in df.columns]
             df_display = df[existing]
