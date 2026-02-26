@@ -3,10 +3,10 @@ import pandas as pd
 import datetime
 import requests
 
-# --- 1. 設定區 (維持無金鑰連線) ---
+# --- 1. 設定區 ---
 DB_URL = "https://my-factory-system-default-rtdb.firebaseio.com/"
 
-# --- 2. 核心功能：Firebase 讀寫 ---
+# --- 2. 核心功能 ---
 def get_db(path):
     try:
         response = requests.get(f"{DB_URL}{path}.json")
@@ -38,9 +38,8 @@ if "user" not in st.session_state:
                 st.rerun()
             else: st.error("❌ 代碼錯誤")
 else:
-    # --- 5. 左側選單 (新增提交紀錄選項) ---
+    # --- 5. 左側選單 ---
     st.sidebar.title(f"👤 {st.session_state.user}")
-    # 所有人都看得到「工時回報」與「個人提交紀錄」
     options = ["🏗️ 工時回報", "📝 個人提交紀錄"]
     if st.session_state.user == "管理員":
         options += ["⚙️ 系統帳號管理", "📊 完整工時報表"]
@@ -72,8 +71,7 @@ else:
                     m = (total_seconds % 3600) // 60
                     st.session_state.display_hours = f"{h}小時 {m}分鐘"
                     st.rerun()
-                else:
-                    st.warning("請先按下『開始計時』")
+                else: st.warning("請先按下『開始計時』")
 
             if col_c.button("🧹 清除時間", use_container_width=True):
                 if 'work_start' in st.session_state: del st.session_state['work_start']
@@ -124,50 +122,13 @@ else:
                 if 'display_hours' in st.session_state: del st.session_state['display_hours']
                 st.rerun()
 
-    # 新增內容：B. 個人提交紀錄頁面
+    # B. 個人提交紀錄 (修正 KeyError)
     elif menu == "📝 個人提交紀錄":
         st.header(f"📝 {st.session_state.user} 的提交紀錄")
         raw_logs = get_db("work_logs")
         if raw_logs:
             df = pd.DataFrame.from_dict(raw_logs, orient='index')
-            # 篩選僅顯示當前登入者的姓名
-            df_personal = df[df["姓名"] == st.session_state.user]
             
-            if not df_personal.empty:
-                cols = ["狀態", "製令", "P/N", "Type", "工段名稱", "工號", "姓名", "開始時間", "結束時間", "累計工時"]
-                existing = [c for c in cols if c in df_personal.columns]
-                df_display = df_personal[existing]
-                if "結束時間" in df_display.columns:
-                    df_display = df_display.sort_values(by="結束時間", ascending=False)
-                st.dataframe(df_display, use_container_width=True)
-            else:
-                st.info("您目前尚無任何提交紀錄。")
-        else:
-            st.info("系統目前尚無任何紀錄。")
-
-    # C. 帳號管理頁面
-    elif menu == "⚙️ 系統帳號管理":
-        st.header("👤 系統帳號管理 (新增人員)")
-        with st.container(border=True):
-            new_n = st.text_input("新員工姓名")
-            new_c = st.text_input("設定員工工號")
-            if st.button("➕ 建立帳號並同步", use_container_width=True):
-                if new_n and new_c:
-                    save_db(f"users/{new_n}", new_c, method="put")
-                    st.success(f"✅ 員工「{new_n}」帳號已建立！")
-                    st.rerun()
-
-    # D. 完整報表頁面
-    elif menu == "📊 完整工時報表":
-        st.header("📊 完整工時報表")
-        raw_logs = get_db("work_logs")
-        if raw_logs:
-            df = pd.DataFrame.from_dict(raw_logs, orient='index')
-            cols = ["狀態", "製令", "P/N", "Type", "工段名稱", "工號", "姓名", "開始時間", "結束時間", "累計工時"]
-            existing = [c for c in cols if c in df.columns]
-            df_display = df[existing]
-            if "結束時間" in df_display.columns:
-                df_display = df_display.sort_values(by="結束時間", ascending=False)
-            st.dataframe(df_display, use_container_width=True)
-        else:
-            st.info("目前尚無報工紀錄。")
+            # 安全檢查：確保「姓名」欄位存在，避免 KeyError
+            target_col = ""
+            if "姓名" in df.columns: target_col = "姓名"
