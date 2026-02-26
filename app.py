@@ -56,9 +56,8 @@ else:
     if menu == "🏗️ 工時回報":
         st.header("🏗️ 生產日報回報")
         
-        # ⏱️ 計時器區 (新增欄位與清除按鈕)
+        # ⏱️ 計時器區 (強化時間顯示明顯度)
         with st.expander("⏱️ 工時計時器", expanded=True):
-            # 第一排：按鈕區
             col_a, col_b, col_c = st.columns(3)
             if col_a.button("⏱️ 開始計時", use_container_width=True):
                 st.session_state.work_start = datetime.datetime.now()
@@ -76,19 +75,26 @@ else:
                 else:
                     st.warning("請先按下『開始計時』")
 
-            # 清除按鈕：重置所有時間狀態
             if col_c.button("🧹 清除時間", use_container_width=True):
                 if 'work_start' in st.session_state: del st.session_state['work_start']
                 if 'work_end' in st.session_state: del st.session_state['work_end']
                 if 'display_hours' in st.session_state: del st.session_state['display_hours']
                 st.rerun()
 
-            # 第二排：顯示開始與結束時間供確認
+            # 強化顯示：使用明顯的資訊標籤替代原本不明顯的輸入框
             t1, t2 = st.columns(2)
             s_time = st.session_state.get('work_start')
             e_time = st.session_state.get('work_end')
-            t1.text_input("記錄開始時間", value=s_time.strftime('%H:%M:%S') if s_time else "", disabled=True)
-            t2.text_input("記錄結束時間", value=e_time.strftime('%H:%M:%S') if e_time else "", disabled=True)
+            
+            with t1:
+                st.markdown("**🔔 記錄開始時間**")
+                if s_time: st.info(f"🕒 {s_time.strftime('%H:%M:%S')}")
+                else: st.write("---")
+            
+            with t2:
+                st.markdown("**🔔 記錄結束時間**")
+                if e_time: st.success(f"⌛ {e_time.strftime('%H:%M:%S')}")
+                else: st.write("---")
 
         # 🏗️ 報工表單
         with st.form("work_form"):
@@ -101,25 +107,23 @@ else:
             c4, c5, c6 = st.columns(3)
             prod_type = c4.text_input("Type")
             stage = c5.text_input("工段名稱")
-            # 自動帶入格式化後的工時
+            # 自動帶入累計工時
             hours_text = c6.text_input("累計工時", value=st.session_state.get('display_hours', "0小時 0分鐘"))
 
+            # 顯示基本資訊，並已移除下方原本圈選的「本次開始時間」文字
             st.write(f"📌 **工號：** {user_code} | **姓名：** {st.session_state.user}")
             
-            # 本次開始時間顯示 (用於提交紀錄)
-            start_str = s_time.strftime('%Y-%m-%d %H:%M:%S') if s_time else "尚未開始計時"
-            st.write(f"⏰ **本次開始時間：** {start_str}")
-            
             if st.form_submit_button("🚀 提交紀錄", use_container_width=True):
+                final_start = s_time.strftime('%Y-%m-%d %H:%M:%S') if s_time else "N/A"
                 final_end = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 log_data = {
                     "狀態": status, "製令": order_no, "P/N": pn, "Type": prod_type, "工段名稱": stage,
                     "工號": user_code, "姓名": st.session_state.user,
-                    "開始時間": start_str, "結束時間": final_end, "累計工時": hours_text
+                    "開始時間": final_start, "結束時間": final_end, "累計工時": hours_text
                 }
                 save_db("work_logs", log_data)
                 st.success("✅ 紀錄已成功提交！")
-                # 提交後清空
+                # 提交後重置
                 if 'work_start' in st.session_state: del st.session_state['work_start']
                 if 'work_end' in st.session_state: del st.session_state['work_end']
                 if 'display_hours' in st.session_state: del st.session_state['display_hours']
@@ -139,7 +143,7 @@ else:
 
     # C. 完整報表頁面
     elif menu == "📊 完整工時報表":
-        st.header("📊 完整工時報表 (格式校對完畢)")
+        st.header("📊 完整工時報表")
         raw_logs = get_db("work_logs")
         if raw_logs:
             df = pd.DataFrame.from_dict(raw_logs, orient='index')
