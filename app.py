@@ -3,11 +3,11 @@ import pandas as pd
 import datetime
 import requests
 
-# --- 1. 核心設定 ---
+# --- 1. 核心設定 (維持成功版) ---
 DB_URL = "https://my-factory-system-default-rtdb.firebaseio.com/work_logs"
 
 def get_now_str():
-    # 格式化時間：刪除微秒與時區，只留秒
+    # 格式化時間：移除微秒，只留到秒
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
     return now.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -15,7 +15,7 @@ def get_now_str():
 st.set_page_config(page_title="超慧科技工時登錄系統", layout="wide")
 
 if "user" not in st.session_state:
-    # 修改標題為您要求的名稱
+    # 僅修改此處標題字樣
     st.title("🔐 超慧科技工時登錄系統")
     u = st.selectbox("選擇姓名", ["管理員", "李小龍", "賴智文", "黃沂澈"])
     p = st.text_input("輸入員工代碼", type="password")
@@ -26,7 +26,7 @@ if "user" not in st.session_state:
             st.rerun()
         else: st.error("❌ 代碼錯誤")
 else:
-    # 側邊欄：顯示當前登錄者
+    # 側邊欄顯示當前人員
     st.sidebar.markdown(f"## 👤 當前登錄者\n# {st.session_state.user}")
     
     menu = st.sidebar.radio("功能選單", ["🏗️ 工時回報", "📋 歷史紀錄查詢"])
@@ -34,11 +34,11 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 工時回報 (維持成功邏輯) ---
+    # --- 3. 工時回報 (維持成功版邏輯) ---
     if menu == "🏗️ 工時回報":
         st.header(f"🏗️ {st.session_state.user} 的工時回報")
         
-        with st.expander("⏱️ 計時器工具 (已精簡時間)", expanded=True):
+        with st.expander("⏱️ 計時器工具", expanded=True):
             c1, c2, c3 = st.columns(3)
             if c1.button("⏱️ 開始計時"):
                 st.session_state.t1 = get_now_str()
@@ -76,20 +76,35 @@ else:
                 requests.post(f"{DB_URL}.json", json=log)
                 st.success("✅ 紀錄已成功提交！")
 
-    # --- 4. 歷史紀錄查詢 (解決資料不顯示與 None 問題) ---
+    # --- 4. 歷史紀錄查詢 (維持成功版去重與資料合併邏輯) ---
     elif menu == "📋 歷史紀錄查詢":
         st.header("📋 系統提交紀錄清單")
         try:
             r = requests.get(f"{DB_URL}.json")
             data = r.json()
             if data:
-                # 建立原始表格
                 df = pd.DataFrame(list(data.values()))
                 
-                # 強大翻譯對照表：解決帶冒號或英文標籤的問題
+                # 完整的翻譯與合併邏輯
                 rename_map = {
                     "name": "姓名", "hours": "累計工時", "order_no": "製令", "製令:": "製令",
                     "pn": "PN", "PN:": "PN", "stage": "工段名稱", "工段名稱:": "工段名稱",
                     "status": "狀態", "狀態:": "狀態", "type": "類型", "類型:": "類型",
                     "submit_time": "提交時間", "time": "提交時間", "提交時間:": "提交時間",
-                    "start_time": "開始時間", "startTime": "開始時間",
+                    "start_time": "開始時間", "startTime": "開始時間", "開始時間:": "開始時間",
+                    "累計工時:": "累計工時", "姓名:": "姓名"
+                }
+                df = df.rename(columns=rename_map)
+                
+                # 解決 None 與重複欄位問題
+                df = df.stack().unstack()
+                df = df.loc[:, ~df.columns.duplicated()]
+                
+                if "提交時間" in df.columns:
+                    df = df.sort_values(by="提交時間", ascending=False)
+                
+                st.dataframe(df, use_container_width=True)
+            else:
+                st.info("目前尚無資料。")
+        except Exception as e:
+            st.error(f"讀取失敗：{e}")
