@@ -5,10 +5,10 @@ import datetime
 import pandas as pd
 import requests
 
-# 設定網頁
-st.set_page_config(page_title="生產工時管理系統", layout="wide")
+# 設定
+st.set_page_config(page_title="自主管理工時系統", layout="wide")
 
-# --- 1. Firebase 連線 (沿用你的正確金鑰) ---
+# --- 1. Firebase 連線 (用來儲存帳號名單與工時，確保不遺失) ---
 if not firebase_admin._apps:
     try:
         firebase_key = {
@@ -28,85 +28,78 @@ if not firebase_admin._apps:
         firebase_admin.initialize_app(cred, {'databaseURL': "https://my-factory-system-default-rtdb.firebaseio.com/"})
     except: pass
 
-# --- 2. 資料功能 ---
+# --- 2. 核心功能庫 ---
 def get_users():
-    u = db.reference('users').get()
-    return u if u else {"管理員": "8888"}
+    users = db.reference('users').get()
+    return users if users else {"管理員": "8888"} # 預設管理員
 
-# --- 3. 登入系統 ---
+def send_line(msg):
+    # 如果你有 Token 再填入即可
+    token = "這裡填入你的LineToken"
+    if token != "這裡填入你的LineToken":
+        requests.post("https://notify-bot.line.me/api/notify", headers={"Authorization": f"Bearer {token}"}, data={"message": msg})
+
+# --- 3. 登入介面 ---
 if "user" not in st.session_state:
-    st.title("🏭 生產管理系統登入")
+    st.title("🔐 系統登入")
     user_list = get_users()
-    name = st.selectbox("選擇姓名", list(user_list.keys()))
-    code = st.text_input("輸入代碼", type="password")
-    if st.button("登入"):
+    name = st.selectbox("請選擇姓名", list(user_list.keys()))
+    code = st.text_input("請輸入代碼", type="password")
+    if st.button("進入系統", use_container_width=True):
         if user_list[name] == code:
             st.session_state.user = name
             st.rerun()
-        else: st.error("代碼錯誤")
+        else:
+            st.error("❌ 代碼錯誤")
 else:
+    # --- 4. 登入後的畫面 ---
     st.sidebar.title(f"👤 {st.session_state.user}")
-    if st.sidebar.button("登出"):
+    if st.sidebar.button("切換帳號/登出"):
         del st.session_state.user
         st.rerun()
 
-    # --- 功能 A：生產回報 (仿 Excel 欄位) ---
-    st.header("📝 生產日報回報")
+    # --- 功能 A：員工報工區 ---
+    st.header("🏗️ 工時回報")
     with st.container(border=True):
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            status = st.selectbox("狀態", ["作業中", "完工", "暫停", "下班"])
-        with c2:
-            order_no = st.text_input("製令單號 (B)", placeholder="例如: 25M0497-03")
-        with c3:
-            process_name = st.text_input("工段名稱 (E)", placeholder="例如: 配電/模組")
-        
-        c4, c5 = st.columns(2)
-        with c4:
-            part_no = st.text_input("P/N (C)")
-        with c5:
-            work_hours = st.number_input("當前投入工時", min_value=0.0, step=0.5, value=1.0)
-
-        remark = st.text_area("備註 (J)")
-
-        if st.button("✅ 提交紀錄 (寫入雲端)", use_container_width=True):
+        hours = st.number_input("今日時數", min_value=0.5, max_value=24.0, step=0.5, value=8.0)
+        if st.button("🚀 提交紀錄", use_container_width=True):
             now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            db.reference('production_logs').push({
-                "狀態": status, "姓名": st.session_state.user, "製令": order_no,
-                "PN": part_no, "工段": process_name, "工時": work_hours,
-                "備註": remark, "日期時間": now
-            })
-            st.success("紀錄已成功存檔！")
+            db.reference('work_logs').push({"name": st.session_state.user, "hours": hours, "time": now})
+            send_line(f"\n📢 工時回報：{st.session_state.user}\n時數：{hours}\n時間：{now}")
+            st.success("紀錄已存檔！")
             st.balloons()
 
-    # --- 功能 B：管理員後台 (建立帳號 + 完整表單) ---
+    # --- 功能 B：管理員專區 (只有「管理員」可以看到帳號管理) ---
     if st.session_state.user == "管理員":
         st.divider()
         st.header("⚙️ 管理員後台")
-        t1, t2 = st.tabs(["👥 帳號管理", "📊 完整生產報表"])
         
-        with t1:
-            st.subheader("建立新員工")
-            n_name = st.text_input("員工姓名")
-            n_code = st.text_input("設定代碼")
-            if st.button("建立"):
-                if n_name and n_code:
-                    db.reference(f'users/{n_name}').set(n_code)
+        tab1, tab2 = st.tabs(["👤 帳號管理", "📊 工時報表"])
+        
+        with tab1:
+            st.subheader("建立新帳號")
+            new_name = st.text_input("新員工姓名")
+            new_code = st.text_input("設定新代碼 (數字)")
+            if st.button("➕ 建立帳號"):
+                if new_name and new_code:
+                    db.reference(f'users/{new_name}').set(new_code)
+                    st.success(f"帳號 {new_name} 建立成功！")
                     st.rerun()
             
-            st.write("目前名單：", list(get_users().keys()))
+            st.subheader("目前員工名單")
+            current_users = get_users()
+            for u_name, u_code in current_users.items():
+                col_u1, col_u2 = st.columns([3, 1])
+                col_u1.write(f"員工：{u_name} (代碼：{u_code})")
+                if u_name != "管理員": # 不讓自己刪除自己
+                    if col_u2.button("刪除", key=f"del_{u_name}"):
+                        db.reference(f'users/{u_name}').delete()
+                        st.rerun()
 
-        with t2:
-            all_data = db.reference('production_logs').get()
-            if all_data:
-                df = pd.DataFrame.from_dict(all_data, orient='index')
-                # 重新排序列，對應你的 Excel
-                cols = ["日期時間", "狀態", "製令", "工段", "姓名", "工時", "備註"]
-                df = df[cols]
+        with tab2:
+            all_logs = db.reference('work_logs').get()
+            if all_logs:
+                df = pd.DataFrame.from_dict(all_logs, orient='index')[['time', 'name', 'hours']]
                 st.dataframe(df, use_container_width=True)
-                
-                # 下載按鈕
                 csv = df.to_csv(index=False).encode('utf-8-sig')
-                st.download_button("📥 下載完整報表 (Excel可用)", data=csv, file_name="production_report.csv")
-            else:
-                st.info("尚無紀錄")
+                st.download_button("📥 下載 Excel", data=csv, file_name="report.csv")
