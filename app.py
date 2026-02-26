@@ -68,8 +68,9 @@ else:
                 if 'work_start' in st.session_state:
                     st.session_state.work_end = datetime.datetime.now()
                     duration = st.session_state.work_end - st.session_state.work_start
-                    # 將計算結果直接存入變數，不再顯示綠色字體
+                    # 將計算結果存入 session_state
                     st.session_state.calc_hours = round(duration.total_seconds() / 3600, 2)
+                    # 提示已更新，但不使用額外的 success 區塊以保持簡潔
                 else:
                     st.warning("請先按下『開始計時』")
 
@@ -84,10 +85,11 @@ else:
             c4, c5, c6 = st.columns(3)
             prod_type = c4.text_input("Type")
             stage = c5.text_input("工段名稱")
-            # 關鍵修改：將計算結果自動填入 value
+            # 修正：直接帶入計算出的工時到這格
             hours = c6.number_input("累計工時 (hr)", min_value=0.0, step=0.01, value=st.session_state.get('calc_hours', 0.0))
 
             st.write(f"📌 **工號：** {user_code} | **姓名：** {st.session_state.user}")
+            # 修正開始時間顯示
             start_val = st.session_state.get('work_start', datetime.datetime.now())
             start_str = start_val.strftime('%Y-%m-%d %H:%M:%S')
             st.write(f"⏰ **本次開始時間：** {start_str}")
@@ -101,7 +103,7 @@ else:
                 }
                 save_db("work_logs", log_data)
                 st.success("✅ 紀錄已成功提交！")
-                # 提交後清空計算值以便下次計時
+                # 提交後清空計算值以便下次操作
                 if 'calc_hours' in st.session_state: del st.session_state['calc_hours']
                 st.rerun()
 
