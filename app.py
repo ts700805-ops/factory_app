@@ -3,10 +3,9 @@ import pandas as pd
 import datetime
 import requests
 
-# --- 1. 設定區 ---
+# --- 1. 設定區 (維持無金鑰與台灣時區) ---
 DB_URL = "https://my-factory-system-default-rtdb.firebaseio.com/"
 
-# 強制使用台灣時區 (UTC+8)
 def get_now():
     return datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
 
@@ -106,7 +105,6 @@ else:
             c4, c5, c6 = st.columns(3)
             prod_type = c4.text_input("Type")
             stage = c5.text_input("工段名稱")
-            # 取得目前的工時值
             current_hours = st.session_state.get('display_hours', "0小時 0分鐘")
             hours_text = c6.text_input("累計工時", value=current_hours)
 
@@ -126,39 +124,35 @@ else:
                     if k in st.session_state: del st.session_state[k]
                 st.rerun()
 
-    # B. 個人提交紀錄 (徹底修復不顯示問題)
+    # B. 個人提交紀錄 (顯示：開始 + 結束 + 累計工時)
     elif menu == "📝 個人提交紀錄":
         st.header(f"📝 {st.session_state.user} 的提交紀錄")
         raw_logs = get_db("work_logs")
         if raw_logs:
-            # 轉換為 DataFrame 並處理索引
             df = pd.DataFrame.from_dict(raw_logs, orient='index').reset_index(drop=True)
-            
-            # 只要有「姓名」或「name」欄位就進行篩選
             name_key = next((k for k in ["姓名", "name"] if k in df.columns), None)
             
             if name_key:
                 df_personal = df[df[name_key].astype(str) == str(st.session_state.user)]
                 if not df_personal.empty:
-                    cols = ["狀態", "製令", "P/N", "Type", "工段名稱", "工號", "姓名", "開始時間", "結束時間", "累計工時"]
+                    # 依需求排定顯示欄位
+                    cols = ["狀態", "製令", "P/N", "Type", "工段名稱", "開始時間", "結束時間", "累計工時"]
                     existing = [c for c in cols if c in df_personal.columns]
-                    # 依結束時間排序
                     st.dataframe(df_personal[existing].sort_values(by="結束時間", ascending=False), use_container_width=True)
-                else: st.info(f"系統中目前沒有 {st.session_state.user} 的提交紀錄。")
-            else: st.warning("資料庫格式不完全，請先提交一筆新紀錄。")
-        else: st.info("目前資料庫中沒有任何紀錄。")
+                else: st.info("查無您的提交紀錄。")
+            else: st.warning("資料庫格式不符。")
+        else: st.info("目前尚無任何報工數據。")
 
-    # C. 帳號管理
+    # C. 帳號管理 (其餘功能均不改動)
     elif menu == "⚙️ 系統帳號管理":
         st.header("👤 系統帳號管理")
-        with st.container(border=True):
-            new_n = st.text_input("新員工姓名")
-            new_c = st.text_input("設定員工工號")
-            if st.button("➕ 建立帳號並同步", use_container_width=True):
-                if new_n and new_c:
-                    save_db(f"users/{new_n}", new_c, method="put")
-                    st.success(f"✅ 員工「{new_n}」帳號已建立！")
-                    st.rerun()
+        new_n = st.text_input("新員工姓名")
+        new_c = st.text_input("設定員工工號")
+        if st.button("➕ 建立帳號並同步"):
+            if new_n and new_c:
+                save_db(f"users/{new_n}", new_c, method="put")
+                st.success("✅ 帳號已建立！")
+                st.rerun()
 
     # D. 完整報表
     elif menu == "📊 完整工時報表":
@@ -167,4 +161,3 @@ else:
         if raw_logs:
             df = pd.DataFrame.from_dict(raw_logs, orient='index').reset_index(drop=True)
             st.dataframe(df, use_container_width=True)
-        else: st.info("目前尚無報工紀錄。")
