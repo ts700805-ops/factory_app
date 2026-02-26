@@ -22,7 +22,6 @@ def save_db(path, data, method="post"):
 # --- 3. 頁面配置 ---
 st.set_page_config(page_title="數位戰情室", layout="wide")
 
-# 獲取員工清單，確保管理員 8888 永遠存在
 raw_users = get_db("users")
 STAFF_DATA = {"管理員": "8888"}
 if raw_users: STAFF_DATA.update(raw_users)
@@ -39,7 +38,7 @@ if "user" not in st.session_state:
                 st.rerun()
             else: st.error("❌ 代碼錯誤")
 else:
-    # --- 5. 左側選單模式 ---
+    # --- 5. 左側選單 ---
     st.sidebar.title(f"👤 {st.session_state.user}")
     options = ["🏗️ 工時回報"]
     if st.session_state.user == "管理員":
@@ -57,13 +56,14 @@ else:
     if menu == "🏗️ 工時回報":
         st.header("🏗️ 生產日報回報")
         
-        # ⏱️ 計時器區 (優化顯示與格式轉換)
+        # ⏱️ 計時器區
         with st.expander("⏱️ 工時計時器", expanded=True):
             col_a, col_b = st.columns(2)
             if col_a.button("⏱️ 開始計時", use_container_width=True):
-                # 即時更新開始時間
+                # 點擊按鈕時記錄當下精確時間
                 st.session_state.work_start = datetime.datetime.now()
-                st.rerun() # 立即重繪頁面以顯示最新時間
+                # 立即重整，確保「本次開始時間」同步更新
+                st.rerun() 
             
             if col_b.button("⏹️ 結束計時", use_container_width=True):
                 if 'work_start' in st.session_state:
@@ -90,13 +90,12 @@ else:
             c4, c5, c6 = st.columns(3)
             prod_type = c4.text_input("Type")
             stage = c5.text_input("工段名稱")
-            
-            # 將累計工時改為文字輸入框，以配合「小時+分鐘」格式
+            # 累計工時顯示區域
             hours_text = c6.text_input("累計工時", value=st.session_state.get('display_hours', "0小時 0分鐘"))
 
             st.write(f"📌 **工號：** {user_code} | **姓名：** {st.session_state.user}")
             
-            # 顯示即時計錄的開始時間
+            # 顯示「按鈕點擊」的精確開始時間
             if 'work_start' in st.session_state:
                 start_str = st.session_state.work_start.strftime('%Y-%m-%d %H:%M:%S')
             else:
@@ -112,12 +111,12 @@ else:
                 }
                 save_db("work_logs", log_data)
                 st.success("✅ 紀錄已成功提交！")
-                # 提交後重置計時狀態
+                # 提交後清空狀態
                 if 'work_start' in st.session_state: del st.session_state['work_start']
                 if 'display_hours' in st.session_state: del st.session_state['display_hours']
                 st.rerun()
 
-    # B. 帳號管理頁面 (維持原功能)
+    # B. 帳號管理頁面
     elif menu == "⚙️ 系統帳號管理":
         st.header("👤 系統帳號管理 (新增人員)")
         with st.container(border=True):
@@ -129,7 +128,7 @@ else:
                     st.success(f"✅ 員工「{new_n}」帳號已建立！")
                     st.rerun()
 
-    # C. 完整報表頁面 (維持 10 欄位排序)
+    # C. 完整報表頁面
     elif menu == "📊 完整工時報表":
         st.header("📊 完整工時報表 (格式校對完畢)")
         raw_logs = get_db("work_logs")
