@@ -4,12 +4,14 @@ from firebase_admin import credentials, db
 import datetime
 import pandas as pd
 
-# --- 1. 初始化網頁 ---
-st.set_page_config(page_title="生產管理系統", layout="wide")
+# --- 1. 網頁基礎配置 ---
+st.set_page_config(page_title="數位生產戰情室", layout="wide")
 
-# --- 2. Firebase 連線 (保持修復後的正確語法) ---
-if not firebase_admin._apps:
-    try:
+# --- 2. Firebase 連線 (強化重連機制，防止 RefreshError) ---
+@st.cache_resource
+def init_firebase():
+    if not firebase_admin._apps:
+        # 修正 image_de0f6e.png 提到的語法與引號問題
         firebase_key = {
             "type": "service_account",
             "project_id": "my-factory-system",
@@ -24,107 +26,93 @@ if not firebase_admin._apps:
             "universe_domain": "googleapis.com"
         }
         cred = credentials.Certificate(firebase_key)
-        # 修復之前截圖中未封閉引號的問題
         firebase_admin.initialize_app(cred, {'databaseURL': "https://my-factory-system-default-rtdb.firebaseio.com/"})
-    except:
-        pass
+
+init_firebase()
 
 # --- 3. 核心功能 ---
-def get_users():
+def safe_db_get(path):
+    """安全抓取資料，防止 RefreshError"""
     try:
-        u = db.reference('users').get()
-        return u if u else {"管理員": "8888"}
+        return db.reference(path).get()
     except:
-        return {"管理員": "8888"}
-
-def get_logs():
-    try:
-        l = db.reference('production_logs').get()
-        return l if l else {}
-    except:
-        return {}
+        return None
 
 # --- 4. 登入介面 ---
+st.title("🏭 生產管理系統")
+user_data = safe_db_get('users')
+user_list = user_data if user_data else {"管理員": "8888"}
+
 if "user" not in st.session_state:
-    st.title("🏭 生產管理系統 - 登入")
-    user_list = get_users()
-    # 確保管理員與人員都在同一個下拉選單
-    name = st.selectbox("請選擇姓名", list(user_list.keys()))
-    code = st.text_input("輸入代碼", type="password")
-    if st.button("登入系統", use_container_width=True):
-        if user_list.get(name) == code:
-            st.session_state.user = name
-            st.rerun()
-        else:
-            st.error("❌ 代碼錯誤")
+    with st.container(border=True):
+        st.subheader("👤 系統登入")
+        name = st.selectbox("請選擇姓名", list(user_list.keys()))
+        code = st.text_input("輸入員工代碼", type="password")
+        if st.button("確認進入", use_container_width=True):
+            if user_list.get(name) == code:
+                st.session_state.user = name
+                st.rerun()
+            else: st.error("❌ 代碼錯誤")
 else:
-    # --- 5. 系統主畫面 ---
-    st.sidebar.markdown(f"### 👤 使用者: {st.session_state.user}")
-    if st.sidebar.button("登出系統"):
+    # --- 5. 登入後的主畫面 ---
+    st.sidebar.write(f"當前使用者: **{st.session_state.user}**")
+    if st.sidebar.button("登出"):
         del st.session_state.user
         st.rerun()
 
-    # --- A. 管理員專屬：戰情儀表板 ---
+    # --- 管理員區 (戰情看板 + 帳號管理) ---
     if st.session_state.user == "管理員":
-        st.title("📊 數位戰情室看板")
-        all_data = get_logs()
-        if all_data:
-            df = pd.DataFrame.from_dict(all_data, orient='index')
-            # 彩色大數字指標
+        # 1. 戰情室大數字
+        st.header("📊 數位戰情看板")
+        logs = safe_db_get('production_logs')
+        if logs:
+            df = pd.DataFrame.from_dict(logs, orient='index')
             m1, m2, m3 = st.columns(3)
-            working_now = len(df[df['狀態'] == '作業中']['姓名'].unique())
-            m1.metric("🔥 現場作業中", f"{working_now} 人")
-            
-            orders_now = len(df[df['狀態'] == '作業中']['製令'].unique())
-            m2.metric("🏗️ 進行中製令", f"{orders_now} 案")
-            
+            m1.metric("🔥 現場作業中", f"{len(df[df['狀態'] == '作業中']['姓名'].unique())} 人")
+            m2.metric("🏗️ 進行中製令", f"{len(df[df['狀態'] == '作業中']['製令'].unique())} 案")
             today = datetime.date.today().strftime("%Y-%m-%d")
-            done_today = len(df[(df['日期'] == today) & (df['狀態'] == '完工')])
-            m3.metric("✅ 今日完工", f"{done_today} 筆")
+            m3.metric("✅ 今日完工", f"{len(df[(df['日期'] == today) & (df['狀態'] == '完工')])} 筆")
             
-            st.subheader("💡 現場即時人員動態")
-            latest_status = df.sort_values('時間').groupby('姓名').tail(1)
-            st.dataframe(latest_status[['姓名', '狀態', '製令', '工段', '時間']], use_container_width=True)
+            st.subheader("💡 現場動態表格")
+            latest = df.sort_values('時間').groupby('姓名').tail(1)
+            st.dataframe(latest[['姓名', '狀態', '製令', '工段', '時間']], use_container_width=True)
         
         st.divider()
-        # ✨ 重點：帳號管理區 (這就是你剛才找不到的地方)
+        # 2. 帳號管理區 (解決 image_dd40c0.png 錯誤)
         st.header("👤 系統帳號管理 (新增人員)")
         with st.container(border=True):
             col_u1, col_u2 = st.columns(2)
-            with col_u1:
-                new_n = st.text_input("輸入新員工姓名", placeholder="例如: 戴鎰祥")
-            with col_u2:
-                new_c = st.text_input("設定員工代碼 (數字)", placeholder="例如: 1234")
-            
-            if st.button("➕ 點我建立新帳號"):
+            new_n = col_u1.text_input("輸入新員工姓名", key="new_name")
+            new_c = col_u2.text_input("設定員工代碼", key="new_code")
+            if st.button("✨ 建立新帳號並同步"):
                 if new_n and new_c:
-                    db.reference(f'users/{new_n}').set(new_c)
-                    st.success(f"✅ 帳號「{new_n}」已成功建立！下次登入就能在選單看到了。")
-                    st.rerun()
-                else:
-                    st.warning("⚠️ 請填寫姓名與代碼")
+                    try:
+                        db.reference(f'users/{new_n}').set(new_c)
+                        st.success(f"✅ 「{new_n}」建立成功！請登出後確認選單。")
+                        # 這裡不強迫 rerun，讓使用者看清成功訊息
+                    except Exception as e:
+                        st.error(f"寫入失敗，請稍後再試：{e}")
+                else: st.warning("請完整填寫姓名與代碼")
         st.divider()
 
-    # --- B. 員工回報區 (對應 Excel 欄位) ---
+    # --- 報工表單 (對應 Excel 欄位) ---
     st.header("📝 生產日報回報")
     with st.container(border=True):
         c1, c2 = st.columns(2)
         with c1:
-            status = st.selectbox("狀態 (A)", ["作業中", "完工", "暫停", "下班"])
-            order_no = st.text_input("製令單號 (B)", placeholder="例如: 25M0497-03")
-            process = st.text_input("工段名稱 (E)", placeholder="配電")
+            st_val = st.selectbox("狀態 (A)", ["作業中", "完工", "暫停", "下班"])
+            order = st.text_input("製令單號 (B)", placeholder="例如: 25M0497-03")
+            proc = st.text_input("工段名稱 (E)")
         with c2:
-            part_no = st.text_input("P/N (C)")
-            type_name = st.text_input("Type (D)")
-            work_id = st.text_input("工號 (F)")
+            pn = st.text_input("P/N (C)")
+            tp = st.text_input("Type (D)")
+            wid = st.text_input("工號 (F)")
         
-        remark = st.text_area("備註 (J)")
-        
-        if st.button("🚀 提交紀錄並同步看板", use_container_width=True):
+        if st.button("🚀 提交紀錄", use_container_width=True):
             now = datetime.datetime.now()
             db.reference('production_logs').push({
-                "狀態": status, "姓名": st.session_state.user, "製令": order_no,
-                "PN": part_no, "工段": process, "工號": work_id, "Type": type_name,
-                "備註": remark, "日期": now.strftime("%Y-%m-%d"), "時間": now.strftime("%H:%M:%S")
+                "狀態": st_val, "姓名": st.session_state.user, "製令": order,
+                "PN": pn, "工段": proc, "工號": wid, "Type": tp,
+                "日期": now.strftime("%Y-%m-%d"), "時間": now.strftime("%H:%M:%S")
             })
-            st.success("✅ 紀錄提交成功！數據已更新至儀表板。")
+            st.success("✅ 紀錄已同步！")
