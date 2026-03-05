@@ -18,16 +18,20 @@ def get_users():
         data = r.json()
         if data and isinstance(data, dict):
             return data
+        # 如果資料庫沒資料，回傳預設名單（包含正確的黃沂澂）
         return {"管理員": "8888", "李小龍": "1234", "賴智文": "098057", "黃沂澂": "000000"}
     except:
         return {"管理員": "8888", "李小龍": "1234", "賴智文": "098057", "黃沂澂": "000000"}
 
 # --- 2. 登入系統 ---
 st.set_page_config(page_title="超慧科技工時登錄系統", layout="wide")
+
+# 每次重新載入都抓取最新名單
 current_users = get_users()
 
 if "user" not in st.session_state:
     st.title("🔐 超慧科技工時登錄系統")
+    # ✅ 嚴格核對姓名：黃沂澂
     u = st.selectbox("選擇姓名", list(current_users.keys()))
     p = st.text_input("輸入員工代碼", type="password")
     if st.button("登入", use_container_width=True):
@@ -37,6 +41,8 @@ if "user" not in st.session_state:
         else: st.error("❌ 代碼錯誤")
 else:
     st.sidebar.markdown(f"## 👤 當前登錄者\n# {st.session_state.user}")
+    
+    # 🟢 修正：確保選單一定包含管理後台
     menu = st.sidebar.radio("功能選單", ["🏗️ 工時回報", "📋 歷史紀錄查詢", "⚙️ 管理後台"])
     
     if st.sidebar.button("登出系統"):
@@ -63,6 +69,7 @@ else:
                 for k in ['t1','t2','dur']: st.session_state.pop(k, None)
                 st.rerun()
             
+            # ✅ 維持美化版計時器顯示
             t1_val = st.session_state.get('t1', '--')
             t2_val = st.session_state.get('t2', '--')
             st.markdown(f"""
@@ -98,15 +105,21 @@ else:
                 requests.post(f"{DB_URL}.json", json=log)
                 st.success("✅ 紀錄已成功提交！")
 
-    # --- 4. 歷史紀錄查詢 (修正資料遺失問題，並按日期分組) ---
+    # --- 4. 歷史紀錄查詢 (修正資料消失問題) ---
     elif menu == "📋 歷史紀錄查詢":
-        st.header("📋 系統提交紀錄清單 (按日期分組)")
+        st.header("📋 系統提交紀錄清單")
         try:
             r = requests.get(f"{DB_URL}.json")
             data = r.json()
             if data:
-                # ✅ 修正：改用列表建構法，避免 stack().unstack() 造成的資料合併錯誤
-                df = pd.DataFrame([{"id": k, **v} for k, v in data.items()])
+                # ✅ 改進：直接將 Firebase 的 Key (id) 存入每一行，不使用 stack() 避免合併錯誤
+                record_list = []
+                for k, v in data.items():
+                    row = {"id": k}
+                    row.update(v)
+                    record_list.append(row)
+                
+                df = pd.DataFrame(record_list)
                 
                 rename_map = {
                     "name": "姓名", "hours": "累計工時", "order_no": "製令", "製令:": "製令",
@@ -117,32 +130,32 @@ else:
                     "累計工時:": "累計工時", "姓名:": "姓名"
                 }
                 df = df.rename(columns=rename_map)
+                
+                # 移除重複出現的欄位（針對舊格式兼容）
                 df = df.loc[:, ~df.columns.duplicated()]
-
+                
                 if "提交時間" in df.columns:
-                    # ✅ 修正：確保日期轉換穩定，並過濾掉非法資料
+                    # 確保提交時間是字串再排序
                     df["提交時間"] = df["提交時間"].astype(str)
-                    df["日期"] = df["提交時間"].str.split(" ").str[0]
-                    unique_dates = sorted([d for d in df["日期"].unique() if d and d != 'None'], reverse=True)
+                    df = df.sort_values(by="提交時間", ascending=False)
 
-                    for date in unique_dates:
-                        with st.expander(f"📅 {date} 的紀錄", expanded=(date == unique_dates[0])):
-                            day_df = df[df["日期"] == date].sort_values(by="提交時間", ascending=False)
-                            display_df = day_df.drop(columns=['id', '日期', '顯示選項'], errors='ignore')
-                            st.dataframe(display_df, use_container_width=True)
+                # 顯示表格 (排除後台使用的 id 欄位)
+                st.dataframe(df.drop(columns=['id', '顯示選項'], errors='ignore'), use_container_width=True)
+                st.write("---")
+                
+                col_btn1, col_btn2 = st.columns([2, 3])
+                csv = df.drop(columns=['id', '顯示選項'], errors='ignore').to_csv(index=False).encode('utf-8-sig')
+                col_btn1.download_button("📥 匯出 CSV 檔", data=csv, file_name=f"工時紀錄_{get_now_str()}.csv", mime="text/csv")
 
-                            # 功能區：匯出 CSV
-                            csv = display_df.to_csv(index=False).encode('utf-8-sig')
-                            st.download_button(f"📥 匯出 {date} CSV", data=csv, file_name=f"工時_{date}.csv", mime="text/csv", key=f"dl_{date}")
-
-                            # 功能區：刪除
-                            day_df["顯示選項"] = day_df["提交時間"] + " (" + day_df["姓名"].astype(str) + ")"
-                            sel = st.selectbox(f"選擇欲刪除紀錄 ({date})", options=day_df["顯示選項"].tolist(), key=f"sel_{date}")
-                            if st.button(f"🗑️ 刪除選定紀錄", key=f"btn_{date}", type="primary"):
-                                target_key = day_df[day_df["顯示選項"] == sel]["id"].values[0]
-                                requests.delete(f"{DB_URL}/{target_key}.json")
-                                st.success("✅ 刪除成功")
-                                st.rerun()
+                with st.expander("🗑️ 刪除單筆紀錄"):
+                    # 確保刪除選單中的名稱與時間正確對應
+                    df["顯示選項"] = df["提交時間"].astype(str) + " (" + df["姓名"].astype(str) + ")"
+                    selected_option = st.selectbox("請選擇要刪除的一筆紀錄", options=df["顯示選項"].tolist())
+                    if st.button("確認刪除該筆資料", type="primary"):
+                        target_key = df[df["顯示選項"] == selected_option]["id"].values[0]
+                        requests.delete(f"{DB_URL}/{target_key}.json")
+                        st.success(f"✅ 已成功刪除紀錄")
+                        st.rerun()
             else: st.info("目前尚無資料。")
         except Exception as e: st.error(f"讀取失敗：{e}")
 
