@@ -18,7 +18,6 @@ def get_users():
         data = r.json()
         if data and isinstance(data, dict):
             return data
-        # 如果資料庫沒資料，回傳預設名單
         return {"管理員": "8888", "李小龍": "1234", "賴智文": "098057", "黃沂澂": "000000"}
     except:
         return {"管理員": "8888", "李小龍": "1234", "賴智文": "098057", "黃沂澂": "000000"}
@@ -44,7 +43,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 工時回報 (維持原始邏輯與美化顯示) ---
+    # --- 3. 工時回報 (完全維持您提供的原始碼) ---
     if menu == "🏗️ 工時回報":
         st.header(f"🏗️ {st.session_state.user} 的工時回報")
         with st.expander("⏱️ 計時器工具", expanded=True):
@@ -99,22 +98,31 @@ else:
                 requests.post(f"{DB_URL}.json", json=log)
                 st.success("✅ 紀錄已成功提交！")
 
-    # --- 4. 歷史紀錄查詢 (修正資料消失問題，並導入 B 方案分組) ---
+    # --- 4. 歷史紀錄查詢 (新增區間查詢功能，並修正資料遺失問題) ---
     elif menu == "📋 歷史紀錄查詢":
-        st.header("📋 系統提交紀錄清單 (按日期分組)")
+        st.header("📋 系統提交紀錄查詢")
+        
+        # 🟢 在左側側邊欄增加日期區間篩選
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("📅 資料區間篩選")
+        today = datetime.date.today()
+        start_date = st.sidebar.date_input("開始日期", today - datetime.timedelta(days=7))
+        end_date = st.sidebar.date_input("結束日期", today)
+
         try:
             r = requests.get(f"{DB_URL}.json")
             data = r.json()
             if data:
-                # ✅ 關鍵改動：直接建立 list，不再使用 stack().unstack()，保證每筆資料獨立存在
+                # ✅ 修正：改用 list 方式讀取，絕對不使用 stack()，避免資料遺失
                 record_list = []
                 for k, v in data.items():
                     row = {"id": k}
                     row.update(v)
                     record_list.append(row)
+                
                 df = pd.DataFrame(record_list)
 
-                # 統一對齊欄位名稱
+                # 欄位名稱校正 (對應您舊資料與新資料的所有可能名稱)
                 rename_map = {
                     "name": "姓名", "hours": "累計工時", "order_no": "製令", "PN:": "PN",
                     "stage": "工段名稱", "status": "狀態", "type": "類型",
@@ -124,34 +132,32 @@ else:
                 df = df.loc[:, ~df.columns.duplicated()] # 移除重複欄位
 
                 if "提交時間" in df.columns:
-                    # 依日期分組：提取日期部分
-                    df["日期"] = df["提交時間"].astype(str).str.split(" ").str[0]
-                    # 排除日期為 'nan' 或無效值的狀況
-                    unique_dates = sorted([d for d in df["日期"].unique() if d != 'nan'], reverse=True)
+                    # 轉換時間格式以進行篩選
+                    df["查詢日期"] = pd.to_datetime(df["提交時間"]).dt.date
+                    # 執行區間篩選
+                    mask = (df["查詢日期"] >= start_date) & (df["查詢日期"] <= end_date)
+                    df = df.loc[mask].sort_values(by="提交時間", ascending=False)
 
-                    for date in unique_dates:
-                        # 導入 B 方案：使用 expander 按日期分組顯示
-                        with st.expander(f"📅 日期：{date}", expanded=(date == unique_dates[0])):
-                            day_df = df[df["日期"] == date].sort_values(by="提交時間", ascending=False)
-                            # 顯示表格，移除內部 ID 與輔助日期欄位
-                            st.dataframe(day_df.drop(columns=['id', '日期'], errors='ignore'), use_container_width=True)
-                            
-                            # 該日 CSV 匯出
-                            csv = day_df.to_csv(index=False).encode('utf-8-sig')
-                            st.download_button(f"📥 匯出 {date} CSV", data=csv, file_name=f"工時_{date}.csv", key=f"dl_{date}")
-                            
-                            # 該日單筆刪除功能
-                            day_df["顯示選項"] = day_df["提交時間"].astype(str) + " (" + day_df["姓名"].astype(str) + ")"
-                            selected = st.selectbox(f"選擇欲刪除紀錄 ({date})", options=day_df["顯示選項"].tolist(), key=f"sel_{date}")
-                            if st.button(f"🗑️ 刪除選定紀錄", key=f"btn_{date}", type="primary"):
-                                target_id = day_df[day_df["顯示選項"] == selected]["id"].values[0]
-                                requests.delete(f"{DB_URL}/{target_id}.json")
-                                st.success("✅ 已刪除")
-                                st.rerun()
+                    st.info(f"📅 顯示區間：{start_date} 至 {end_date} (共 {len(df)} 筆紀錄)")
+                    st.dataframe(df.drop(columns=['id', '查詢日期'], errors='ignore'), use_container_width=True)
+                    
+                    st.write("---")
+                    col_btn1, col_btn2 = st.columns([2, 3])
+                    csv = df.drop(columns=['id', '查詢日期'], errors='ignore').to_csv(index=False).encode('utf-8-sig')
+                    col_btn1.download_button("📥 匯出當前區間 CSV", data=csv, file_name=f"工時紀錄_{start_date}_{end_date}.csv", mime="text/csv")
+
+                    with st.expander("🗑️ 刪除單筆紀錄"):
+                        df["顯示選項"] = df["提交時間"].astype(str) + " (" + df["姓名"].astype(str) + ")"
+                        selected_option = st.selectbox("請選擇要刪除的一筆紀錄", options=df["顯示選項"].tolist())
+                        if st.button("確認刪除該筆資料", type="primary"):
+                            target_key = df[df["顯示選項"] == selected_option]["id"].values[0]
+                            requests.delete(f"{DB_URL}/{target_key}.json")
+                            st.success(f"✅ 已成功刪除")
+                            st.rerun()
             else: st.info("目前尚無資料。")
-        except Exception as e: st.error(f"讀取資料發生錯誤：{e}")
+        except Exception as e: st.error(f"讀取資料發生錯誤，請檢查網路或資料庫格式：{e}")
 
-    # --- 5. 管理後台 (維持原始功能) ---
+    # --- 5. 管理後台 (完全維持您提供的原始碼) ---
     elif menu == "⚙️ 管理後台":
         st.header("⚙️ 人員帳號管理")
         with st.form("add_user_form"):
