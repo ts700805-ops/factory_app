@@ -39,7 +39,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 工時回報 (維持美化版計時器) ---
+    # --- 3. 工時回報 (維持美化版計時器區塊) ---
     if menu == "🏗️ 工時回報":
         st.header(f"🏗️ {st.session_state.user} 的工時回報")
         with st.expander("⏱️ 計時器工具", expanded=True):
@@ -94,32 +94,38 @@ else:
                 requests.post(f"{DB_URL}.json", json=log)
                 st.success("✅ 紀錄已成功提交！")
 
-    # --- 4. 歷史紀錄查詢 (恢復至最穩定單一表格版) ---
+    # --- 4. 歷史紀錄查詢 (恢復穩定讀取版本) ---
     elif menu == "📋 歷史紀錄查詢":
         st.header("📋 系統提交紀錄清單")
         try:
             r = requests.get(f"{DB_URL}.json")
             data = r.json()
             if data:
+                # 使用 DataFrame 轉換，確保不遺漏資料
                 df = pd.DataFrame([{"id": k, **v} for k, v in data.items()])
+                
+                # 統一處理欄位轉換
                 rename_map = {
                     "name": "姓名", "hours": "累計工時", "order_no": "製令", "pn": "PN", 
                     "stage": "工段名稱", "status": "狀態", "type": "類型", 
                     "submit_time": "提交時間", "start_time": "開始時間"
                 }
                 df = df.rename(columns=rename_map)
-                df = df.loc[:, ~df.columns.duplicated()] # 移除重複欄位
+                
+                # 關鍵：處理 None 或重複欄位
+                df = df.loc[:, ~df.columns.duplicated()]
                 
                 if "提交時間" in df.columns:
                     df = df.sort_values(by="提交時間", ascending=False)
 
+                # 顯示表格
                 st.dataframe(df.drop(columns=['id', '顯示選項'], errors='ignore'), use_container_width=True)
                 st.write("---")
                 
-                # 功能區
-                c1, c2 = st.columns([2, 3])
+                # 下方按鈕區
+                c_btn = st.columns([1, 1, 1])
                 csv = df.drop(columns=['id'], errors='ignore').to_csv(index=False).encode('utf-8-sig')
-                c1.download_button("📥 匯出 CSV 檔", data=csv, file_name=f"工時紀錄_{get_now_str()}.csv", mime="text/csv")
+                c_btn[0].download_button("📥 匯出 CSV 檔", data=csv, file_name=f"工時紀錄_{get_now_str()}.csv", mime="text/csv")
 
                 with st.expander("🗑️ 刪除單筆紀錄"):
                     df["顯示選項"] = df["提交時間"].astype(str) + " (" + df["姓名"].astype(str) + ")"
@@ -132,7 +138,7 @@ else:
             else: st.info("目前尚無資料。")
         except Exception as e: st.error(f"讀取失敗：{e}")
 
-    # --- 5. 管理後台 (維持原本成功功能) ---
+    # --- 5. 管理後台 (保留管理員系統功能) ---
     elif menu == "⚙️ 管理後台":
         st.header("⚙️ 人員帳號管理")
         with st.form("add_user_form"):
