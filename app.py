@@ -25,6 +25,7 @@ current_users = get_users()
 
 if "user" not in st.session_state:
     st.title("🔐 超慧科技工時登錄系統")
+    # ✅ 嚴格核對姓名：黃沂澂
     u = st.selectbox("選擇姓名", list(current_users.keys()))
     p = st.text_input("輸入員工代碼", type="password")
     if st.button("登入", use_container_width=True):
@@ -39,7 +40,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 工時回報 ---
+    # --- 3. 工時回報 (包含美化底色計時器) ---
     if menu == "🏗️ 工時回報":
         st.header(f"🏗️ {st.session_state.user} 的工時回報")
         with st.expander("⏱️ 計時器工具", expanded=True):
@@ -59,6 +60,7 @@ else:
                 for k in ['t1','t2','dur']: st.session_state.pop(k, None)
                 st.rerun()
             
+            # ✅ 視覺美化區塊保留
             t1_val = st.session_state.get('t1', '--')
             t2_val = st.session_state.get('t2', '--')
             st.markdown(f"""
@@ -94,7 +96,7 @@ else:
                 requests.post(f"{DB_URL}.json", json=log)
                 st.success("✅ 紀錄已成功提交！")
 
-    # --- 4. 歷史紀錄查詢 (方案 B：按日期分組) ---
+    # --- 4. 歷史紀錄查詢 (修正分組邏輯) ---
     elif menu == "📋 歷史紀錄查詢":
         st.header("📋 系統提交紀錄清單 (按日期分組)")
         try:
@@ -108,39 +110,40 @@ else:
                     "start_time": "開始時間"
                 }
                 df = df.rename(columns=rename_map)
-                # 統一處理欄位並過濾多餘名稱
-                df = df.loc[:, ~df.columns.duplicated()]
                 
+                # ✅ 關鍵修復：確保「提交時間」欄位是字串，避免 float 導致排序失敗
                 if "提交時間" in df.columns:
-                    # 擷取日期部分 (YYYY-MM-DD)
-                    df["日期"] = df["提交時間"].str.split(" ").str[0]
-                    unique_dates = sorted(df["日期"].unique(), reverse=True)
+                    df["提交時間"] = df["提交時間"].astype(str)
+                    df["日期"] = df["提交時間"].apply(lambda x: x.split(" ")[0] if " " in x else "未知日期")
+                    
+                    # 排除重複欄位
+                    df = df.loc[:, ~df.columns.duplicated()]
+                    unique_dates = sorted([d for d in df["日期"].unique() if d != "未知日期"], reverse=True)
 
                     for date in unique_dates:
-                        # 為每一天建立一個可摺疊區塊
                         with st.expander(f"📅 {date} 的提交紀錄", expanded=(date == unique_dates[0])):
                             day_df = df[df["日期"] == date].sort_values(by="提交時間", ascending=False)
-                            # 顯示當天表格
                             display_df = day_df.drop(columns=['id', '日期'], errors='ignore')
                             st.dataframe(display_df, use_container_width=True)
                             
-                            # 當天功能按鈕
                             c1, c2 = st.columns([2, 3])
                             csv = display_df.to_csv(index=False).encode('utf-8-sig')
-                            c1.download_button(f"📥 匯出 {date} CSV", data=csv, file_name=f"工時_{date}.csv", mime="text/csv")
+                            c1.download_button(f"📥 匯出 {date} CSV", data=csv, file_name=f"工時_{date}.csv", mime="text/csv", key=f"dl_{date}")
                             
-                            # 當天單筆刪除
+                            # 單筆刪除功能
                             day_df["顯示選項"] = day_df["提交時間"] + " (" + day_df["姓名"] + ")"
-                            sel = st.selectbox(f"選擇欲刪除紀錄 ({date})", options=day_df["顯示選項"].tolist(), key=f"sel_{date}")
-                            if st.button(f"🗑️ 刪除選定紀錄", key=f"btn_{date}", type="primary"):
+                            sel = st.selectbox(f"選擇欲刪除紀錄", options=day_df["顯示選項"].tolist(), key=f"sel_{date}")
+                            if st.button(f"🗑️ 刪除該筆資料", key=f"btn_{date}", type="primary"):
                                 target_key = day_df[day_df["顯示選項"] == sel]["id"].values[0]
                                 requests.delete(f"{DB_URL}/{target_key}.json")
                                 st.success("✅ 刪除成功")
                                 st.rerun()
             else: st.info("目前尚無資料。")
-        except Exception as e: st.error(f"讀取失敗：{e}")
+        except Exception as e:
+            # 如果還是失敗，顯示更清楚的訊息
+            st.error(f"系統暫時無法處理部分舊資料格式，請檢查資料庫。錯誤訊息：{e}")
 
-    # --- 5. 管理後台 ---
+    # --- 5. 管理後台 (維持原本成功功能) ---
     elif menu == "⚙️ 管理後台":
         st.header("⚙️ 人員帳號管理")
         with st.form("add_user_form"):
