@@ -5,33 +5,51 @@ import requests
 
 # --- 1. 核心設定 ---
 DB_URL = "https://my-factory-system-default-rtdb.firebaseio.com/work_logs"
+USER_DB_URL = "https://my-factory-system-default-rtdb.firebaseio.com/users" # 新增人員資料夾
 
 def get_now_str():
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
     return now.strftime("%Y-%m-%d %H:%M:%S")
 
+# 取得最新人員名單
+def get_users():
+    try:
+        r = requests.get(f"{USER_DB_URL}.json")
+        data = r.json()
+        if data:
+            return data
+        return {"管理員": "8888", "李小龍": "1234", "賴智文": "098057", "黃沂澂": "000000"}
+    except:
+        return {"管理員": "8888", "李小龍": "1234", "賴智文": "098057", "黃沂澂": "000000"}
+
 # --- 2. 登入系統 ---
 st.set_page_config(page_title="超慧科技工時登錄系統", layout="wide")
 
+current_users = get_users()
+
 if "user" not in st.session_state:
     st.title("🔐 超慧科技工時登錄系統")
-    # ✅ 嚴格核對姓名：黃沂澂
-    u = st.selectbox("選擇姓名", ["管理員", "李小龍", "賴智文", "黃沂澂"])
+    u = st.selectbox("選擇姓名", list(current_users.keys()))
     p = st.text_input("輸入員工代碼", type="password")
     if st.button("登入", use_container_width=True):
-        codes = {"管理員": "8888", "李小龍": "1234", "賴智文": "098057", "黃沂澂": "000000"}
-        if u in codes and p == codes[u]:
+        if u in current_users and p == current_users[u]:
             st.session_state.user = u
             st.rerun()
         else: st.error("❌ 代碼錯誤")
 else:
     st.sidebar.markdown(f"## 👤 當前登錄者\n# {st.session_state.user}")
-    menu = st.sidebar.radio("功能選單", ["🏗️ 工時回報", "📋 歷史紀錄查詢"])
+    # 增加「管理後台」選項
+    menu_options = ["🏗️ 工時回報", "📋 歷史紀錄查詢"]
+    if st.session_state.user == "管理員":
+        menu_options.append("⚙️ 管理後台")
+    
+    menu = st.sidebar.radio("功能選單", menu_options)
+    
     if st.sidebar.button("登出系統"):
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 工時回報 ---
+    # --- 3. 工時回報 (維持原樣) ---
     if menu == "🏗️ 工時回報":
         st.header(f"🏗️ {st.session_state.user} 的工時回報")
         with st.expander("⏱️ 計時器工具", expanded=True):
@@ -51,7 +69,6 @@ else:
                 for k in ['t1','t2','dur']: st.session_state.pop(k, None)
                 st.rerun()
             
-            # ✅ 重新設計的顯示區塊：增加間距、底色與邊框
             t1_val = st.session_state.get('t1', '--')
             t2_val = st.session_state.get('t2', '--')
             st.markdown(f"""
@@ -87,7 +104,7 @@ else:
                 requests.post(f"{DB_URL}.json", json=log)
                 st.success("✅ 紀錄已成功提交！")
 
-    # --- 4. 歷史紀錄查詢 ---
+    # --- 4. 歷史紀錄查詢 (維持原樣) ---
     elif menu == "📋 歷史紀錄查詢":
         st.header("📋 系統提交紀錄清單")
         try:
@@ -111,7 +128,6 @@ else:
 
                 st.dataframe(df.drop(columns=['id', '顯示選項'], errors='ignore'), use_container_width=True)
                 st.write("---")
-                
                 col_btn1, col_btn2 = st.columns([2, 3])
                 csv = df.drop(columns=['id', '顯示選項'], errors='ignore').to_csv(index=False).encode('utf-8-sig')
                 col_btn1.download_button("📥 匯出 CSV 檔", data=csv, file_name=f"工時紀錄_{get_now_str()}.csv", mime="text/csv")
@@ -121,10 +137,39 @@ else:
                     selected_option = st.selectbox("請選擇要刪除的一筆紀錄", options=df["顯示選項"].tolist())
                     if st.button("確認刪除該筆資料", type="primary"):
                         target_key = df[df["顯示選項"] == selected_option]["id"].values[0]
-                        del_r = requests.delete(f"{DB_URL}/{target_key}.json")
-                        if del_r.status_code == 200:
-                            st.success(f"✅ 已成功刪除紀錄")
-                            st.rerun()
-                        else: st.error("❌ 刪除失敗")
+                        requests.delete(f"{DB_URL}/{target_key}.json")
+                        st.success(f"✅ 已成功刪除紀錄")
+                        st.rerun()
             else: st.info("目前尚無資料。")
         except Exception as e: st.error(f"讀取失敗：{e}")
+
+    # --- 5. 管理後台 (新增功能) ---
+    elif menu == "⚙️ 管理後台":
+        st.header("⚙️ 人員帳號管理")
+        
+        # A. 新增人員區
+        with st.form("add_user_form"):
+            st.subheader("➕ 新增人員")
+            new_name = st.text_input("人員姓名")
+            new_code = st.text_input("員工代碼 (密碼)")
+            if st.form_submit_button("確認新增"):
+                if new_name and new_code:
+                    current_users[new_name] = new_code
+                    requests.patch(f"{USER_DB_URL}.json", json={new_name: new_code})
+                    st.success(f"✅ 已新增人員：{new_name}")
+                    st.rerun()
+                else: st.warning("請填寫完整資訊")
+
+        st.write("---")
+        
+        # B. 現有人員名單與刪除
+        st.subheader("👤 現有人員清單")
+        for name, code in current_users.items():
+            col1, col2, col3 = st.columns([2, 2, 1])
+            col1.write(f"**姓名：** {name}")
+            col2.write(f"**代碼：** {code}")
+            if name != "管理員": # 不允許刪除管理員本人
+                if col3.button(f"🗑️ 刪除", key=f"del_{name}"):
+                    requests.delete(f"{USER_DB_URL}/{name}.json")
+                    st.success(f"已刪除 {name}")
+                    st.rerun()
