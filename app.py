@@ -22,12 +22,11 @@ def get_settings():
     except:
         return {"orders": [], "assigners": ["管理員"], "workers": ["人員"], "processes": ["預設工序"]}
 
-# --- 2. 頁面配置 (維持大字體樣式) ---
+# --- 2. 頁面配置 ---
 st.set_page_config(page_title="超慧科技●神鬼奇航●派工系統", layout="wide")
 
 st.markdown("""
     <style>
-    /* 表格明細區字體放大 */
     div[data-testid="stDataFrame"] div[role="gridcell"] > div {
         font-size: 80px !important;
         line-height: 1.2 !important;
@@ -40,8 +39,6 @@ st.markdown("""
     div[data-testid="stDataFrame"] div[role="row"] {
         height: 120px !important;
     }
-
-    /* 篩選區與按鈕樣式 */
     .stSelectbox label { font-size: 26px !important; font-weight: bold !important; }
     .stSelectbox div[data-baseweb="select"] > div { font-size: 24px !important; height: 60px !important; }
     .main-title { font-size: 48px !important; font-weight: bold; color: #1E3A8A; border-bottom: 4px solid #1E3A8A; margin-bottom: 25px; }
@@ -80,15 +77,12 @@ else:
                     all_logs.append(v)
                 df = pd.DataFrame(all_logs)
 
-                # 看板統計
                 c1, c2 = st.columns(2)
                 with c1: st.markdown(f'<div class="stat-card">總派件數<br><span style="font-size:65px; font-weight:bold; color:#1E3A8A;">{len(df)}</span> 件</div>', unsafe_allow_html=True)
                 with c2:
                     worker_count = df['作業人員'].nunique() if not df.empty else 0
                     st.markdown(f'<div class="stat-card">動員人力<br><span style="font-size:65px; font-weight:bold; color:#1E3A8A;">{worker_count}</span> 人</div>', unsafe_allow_html=True)
                 
-                # 篩選功能
-                st.write("")
                 st.subheader("🔍 快速篩選資料") 
                 with st.expander("點擊展開篩選選單", expanded=True):
                     f1, f2, f3, f4 = st.columns(4)
@@ -103,11 +97,9 @@ else:
                 if sel_assigner != "全部": filtered_df = filtered_df[filtered_df["派工人員"] == sel_assigner]
                 if sel_worker != "全部": filtered_df = filtered_df[filtered_df["作業人員"] == sel_worker]
 
-                # 顯示大字體表格
                 st.subheader("📑 待辦派工明細清單") 
                 st.dataframe(filtered_df[["製令", "製造工序", "派工人員", "作業人員", "作業期限"]], use_container_width=True, height=400, hide_index=True)
 
-                # 完工按鈕區
                 st.markdown("---")
                 st.subheader("📦 快速結案 (點擊按鈕標記完工)")
                 for index, row in filtered_df.iterrows():
@@ -126,7 +118,6 @@ else:
             else:
                 st.info("目前尚無待辦派工。")
 
-            # --- ✨ 您要新增的：完工紀錄查詢區 ---
             st.markdown("---")
             st.markdown('<p class="main-title" style="color: #059669; border-bottom: 4px solid #059669;">✅ 已完工歷史紀錄查詢</p>', unsafe_allow_html=True)
             try:
@@ -134,18 +125,15 @@ else:
                 done_data = r_done.json()
                 if done_data:
                     df_done = pd.DataFrame(list(done_data.values()))
-                    # 依完工時間排序 (新的在前)
                     if '實際完工時間' in df_done.columns:
                         df_done = df_done.sort_values(by='實際完工時間', ascending=False)
-                    
                     st.dataframe(df_done[["實際完工時間", "製令", "製造工序", "作業人員"]], use_container_width=True, height=400, hide_index=True)
                 else:
                     st.info("目前尚無完工紀錄。")
             except:
                 st.write("完工紀錄讀取中...")
-
         except:
-            st.error("連線資料庫失敗，請檢查網路。")
+            st.error("連線資料庫失敗。")
 
     # --- 4. 📝 現場派工作業 ---
     elif menu == "📝 現場派工作業":
@@ -162,7 +150,7 @@ else:
                 requests.post(f"{DB_URL}.json", json=log)
                 st.success("任務已發布！")
 
-    # --- 5. 📋 歷史紀錄查詢 ---
+    # --- 5. 📋 歷史紀錄查詢 (修正編輯功能) ---
     elif menu == "📋 歷史紀錄查詢":
         st.header("📋 待辦紀錄維護")
         try:
@@ -171,28 +159,51 @@ else:
             if db_data:
                 all_logs = []
                 for k, v in db_data.items():
-                    all_logs.append({"id": k, "製令": v.get("製令", "無"), "製造工序": v.get("製造工序", "無"), "派工人員": v.get("派工人員", "無"), "作業人員": v.get("作業人員", "無"), "作業期限": v.get("作業期限", "無")})
-                df = pd.DataFrame(all_logs)
+                    all_logs.append({
+                        "id": k, 
+                        "製令": v.get("製令", "無"), 
+                        "製造工序": v.get("製造工序", "無"), 
+                        "派工人員": v.get("派工人員", "無"), 
+                        "作業人員": v.get("作業人員", "無"), 
+                        "作業期限": v.get("作業期限", "無")
+                    })
                 
-                log_options = {log['id']: f"製令：{log['製令']} | 人員：{log['作業人員']}" for log in all_logs}
+                log_options = {log['id']: f"製令：{log['製令']} | 作業員：{log['作業人員']}" for log in all_logs}
                 target_id = st.selectbox("請選擇要編輯或刪除的紀錄", options=list(log_options.keys()), format_func=lambda x: log_options[x])
                 
                 curr = next(item for item in all_logs if item["id"] == target_id)
-                with st.expander("📝 編輯此筆內容"):
+                
+                with st.expander("📝 編輯此筆內容", expanded=True):
                     ec1, ec2 = st.columns(2)
+                    # 修改製令與工序
                     new_order = ec1.selectbox("修改製令", settings.get("orders", []), index=settings.get("orders", []).index(curr['製令']) if curr['製令'] in settings.get("orders", []) else 0)
                     new_proc = ec2.selectbox("修改工序", settings.get("processes", []), index=settings.get("processes", []).index(curr['製造工序']) if curr['製造工序'] in settings.get("processes", []) else 0)
+                    
+                    # 找回來的：修改派工人員與作業人員
+                    ec3, ec4 = st.columns(2)
+                    new_assigner = ec3.selectbox("修改派工人員", settings.get("assigners", []), index=settings.get("assigners", []).index(curr['派工人員']) if curr['派工人員'] in settings.get("assigners", []) else 0)
+                    new_worker = ec4.selectbox("修改作業人員", settings.get("workers", []), index=settings.get("workers", []).index(curr['作業人員']) if curr['作業人員'] in settings.get("workers", []) else 0)
+                    
                     if st.button("💾 儲存修改"):
-                        requests.patch(f"{DB_URL}/{target_id}.json", json={"製令": new_order, "製造工序": new_proc})
+                        updated_data = {
+                            "製令": new_order, 
+                            "製造工序": new_proc,
+                            "派工人員": new_assigner,
+                            "作業人員": new_worker
+                        }
+                        requests.patch(f"{DB_URL}/{target_id}.json", json=updated_data)
                         st.success("紀錄已更新！")
                         st.rerun()
 
+                st.markdown("---")
                 if st.button("🗑️ 刪除選定紀錄", type="primary"):
                     requests.delete(f"{DB_URL}/{target_id}.json")
                     st.warning("紀錄已刪除。")
                     st.rerun()
+            else:
+                st.info("目前沒有待辦紀錄。")
         except:
-            st.write("目前沒有待辦紀錄可操作。")
+            st.write("讀取資料失敗。")
 
     # --- 6. ⚙️ 系統內容管理 ---
     elif menu == "⚙️ 系統內容管理":
