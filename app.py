@@ -21,23 +21,30 @@ def get_settings():
     except:
         return {"orders": [], "assigners": ["管理員"], "workers": ["人員"], "processes": ["預設工序"]}
 
-# --- 2. 頁面配置 (精準調校：藍框字體 2 倍，綠框比例 1.5 倍) ---
+# --- 2. 頁面配置 (精準調校：紅色框框表格字體放大 10 倍) ---
 st.set_page_config(page_title="超慧科技●神鬼奇航●派工系統", layout="wide")
 
 st.markdown("""
     <style>
-    /* 【藍框框：表格明細區】字體放大 2 倍 (約 32px) */
+    /* 【關鍵修改：表格明細區】字體放大 10 倍 (約 80px) */
     div[data-testid="stDataFrame"] div[role="gridcell"] > div {
-        font-size: 32px !important;
-        line-height: 1.6 !important;
-    }
-    /* 表格欄位標題同步放大 */
-    div[data-testid="stDataFrame"] div[role="columnheader"] span {
-        font-size: 28px !important;
+        font-size: 80px !important;
+        line-height: 1.2 !important;
         font-weight: bold !important;
     }
+    
+    /* 表格欄位標題同步放大 (約 50px) */
+    div[data-testid="stDataFrame"] div[role="columnheader"] span {
+        font-size: 50px !important;
+        font-weight: bold !important;
+    }
+    
+    /* 調整表格行高以容納特大字體 */
+    div[data-testid="stDataFrame"] div[role="row"] {
+        height: 120px !important;
+    }
 
-    /* 【綠框框：篩選區】符合 1.5 倍的大小與高度 */
+    /* 【綠框框：篩選區】保持適當比例 */
     .stSelectbox label {
         font-size: 26px !important;
         font-weight: bold !important;
@@ -99,7 +106,7 @@ else:
                     st.markdown(f'<div class="stat-card">動員人力<br><span style="font-size:65px; font-weight:bold; color:#1E3A8A;">{worker_count}</span> 人</div>', unsafe_allow_html=True)
                 
                 st.write("")
-                st.subheader("🔍 快速篩選資料") # 這是綠框區塊
+                st.subheader("🔍 快速篩選資料") 
                 with st.expander("點擊展開篩選選單", expanded=True):
                     f1, f2, f3, f4 = st.columns(4)
                     order_list = ["全部"] + sorted(df["製令"].unique().tolist())
@@ -118,8 +125,9 @@ else:
                 if sel_assigner != "全部": filtered_df = filtered_df[filtered_df["派工人員"] == sel_assigner]
                 if sel_worker != "全部": filtered_df = filtered_df[filtered_df["作業人員"] == sel_worker]
 
-                st.subheader("📑 派工明細清單") # 這是藍框區塊
-                st.dataframe(filtered_df[["製令", "製造工序", "派工人員", "作業人員", "作業期限"]], use_container_width=True, height=600, hide_index=True)
+                st.subheader("📑 派工明細清單") 
+                # 這裡的表格文字已透過頂部 CSS 放大 10 倍
+                st.dataframe(filtered_df[["製令", "製造工序", "派工人員", "作業人員", "作業期限"]], use_container_width=True, height=800, hide_index=True)
             else: st.info("目前尚無派工資料。")
         except: st.error("連線資料庫失敗")
 
