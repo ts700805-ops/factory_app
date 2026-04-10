@@ -25,20 +25,36 @@ def get_settings():
     except:
         return {"orders": [], "assigners": ["管理員"], "workers": ["現場人員"], "processes": ["預設工序"]}
 
-# --- 2. 頁面配置 (調整字體大小為 1.5 倍) ---
+# --- 2. 頁面配置 (精準調整字體比例) ---
 st.set_page_config(page_title="超慧科技●神鬼奇航●派工系統", layout="wide")
 
 st.markdown("""
     <style>
-    /* 全域字體放大 1.5 倍 (約 24px) */
-    html, body, [class*="css"], .stMarkdown, .stSelectbox, .stButton, .stDateInput, label {
-        font-size: 24px !important;
+    /* 1. 針對表格內文字放大 (DataFrame) */
+    div[data-testid="stDataFrame"] div[role="gridcell"] > div {
+        font-size: 26px !important;
     }
-    .main-title { font-size: 48px !important; font-weight: bold; color: #1E3A8A; border-bottom: 3px solid #1E3A8A; padding-bottom: 10px; }
-    .stat-card { background-color: #ffffff; padding: 25px; border-radius: 15px; border-top: 5px solid #1E3A8A; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
-    .stButton>button { width: 100%; height: 60px; font-size: 28px !important; }
-    /* 調整側邊欄選單字體 */
-    .stRadio label { font-size: 26px !important; }
+    /* 2. 針對表格欄位標題放大 */
+    div[data-testid="stDataFrame"] div[role="columnheader"] span {
+        font-size: 24px !important;
+        font-weight: bold !important;
+    }
+    /* 3. 針對表單標籤 (Label) 放大 */
+    .stSelectbox label, .stTextInput label, .stDateInput label, .stTextArea label {
+        font-size: 28px !important;
+        font-weight: bold !important;
+        color: #1E3A8A !important;
+    }
+    /* 4. 針對下拉選單內容放大 */
+    .stSelectbox div[data-baseweb="select"] > div {
+        font-size: 26px !important;
+    }
+    /* 5. 標題與按鈕優化 */
+    .main-title { font-size: 42px !important; font-weight: bold; color: #1E3A8A; border-bottom: 3px solid #1E3A8A; margin-bottom: 20px; }
+    .stat-card { background-color: #ffffff; padding: 20px; border-radius: 15px; border-top: 5px solid #1E3A8A; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
+    .stButton>button { height: 65px; font-size: 30px !important; font-weight: bold !important; background-color: #1E3A8A !important; color: white !important; }
+    /* 6. 側邊欄放大 */
+    [data-testid="stSidebar"] .stRadio label { font-size: 24px !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -52,14 +68,14 @@ if "user" not in st.session_state:
         st.session_state.user = u
         st.rerun()
 else:
-    st.sidebar.markdown(f"👤 **當前使用者：{st.session_state.user}**")
+    st.sidebar.markdown(f"👤 **使用者：{st.session_state.user}**")
     menu = st.sidebar.radio("導航選單", ["📊 經營者看板 (首頁)", "📝 現場派工作業", "📋 歷史紀錄查詢", "⚙️ 系統內容管理"])
     
     if st.sidebar.button("登出系統"):
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 📊 經營者看板 (首頁) [新增派工人員篩選] ---
+    # --- 3. 📊 經營者看板 (首頁) [維持篩選功能，修復字體] ---
     if menu == "📊 經營者看板 (首頁)":
         st.markdown('<p class="main-title">📊 派工執行實況看板</p>', unsafe_allow_html=True)
         try:
@@ -78,27 +94,25 @@ else:
                 df = pd.DataFrame(all_logs)
 
                 c1, c2 = st.columns(2)
-                with c1: st.markdown(f'<div class="stat-card">總派件數<br><span style="font-size:60px; font-weight:bold; color:#1E3A8A;">{len(df)}</span> 件</div>', unsafe_allow_html=True)
+                with c1: st.markdown(f'<div class="stat-card">總派件數<br><span style="font-size:50px; font-weight:bold; color:#1E3A8A;">{len(df)}</span> 件</div>', unsafe_allow_html=True)
                 with c2:
                     worker_count = df['作業人員'].nunique() if not df.empty else 0
-                    st.markdown(f'<div class="stat-card">動員人力<br><span style="font-size:60px; font-weight:bold; color:#1E3A8A;">{worker_count}</span> 人</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="stat-card">動員人力<br><span style="font-size:50px; font-weight:bold; color:#1E3A8A;">{worker_count}</span> 人</div>', unsafe_allow_html=True)
                 
                 st.write("")
-                st.subheader("🔍 篩選我要的項目")
+                st.subheader("🔍 快速篩選資料")
                 with st.expander("點擊展開篩選選單", expanded=True):
-                    f1, f2, f3, f4 = st.columns(4) # 欄位改為 4 欄
-                    
+                    f1, f2, f3, f4 = st.columns(4)
                     order_list = ["全部"] + sorted(df["製令"].unique().tolist())
                     process_list = ["全部"] + sorted(df["製造工序"].unique().tolist())
-                    assigner_list = ["全部"] + sorted(df["派工人員"].unique().tolist()) # 新增清單
+                    assigner_list = ["全部"] + sorted(df["派工人員"].unique().tolist())
                     worker_list = ["全部"] + sorted(df["作業人員"].unique().tolist())
                     
                     sel_order = f1.selectbox("按製令篩選", order_list)
                     sel_process = f2.selectbox("按工序篩選", process_list)
-                    sel_assigner = f3.selectbox("按派工員篩選", assigner_list) # 新增篩選選單
+                    sel_assigner = f3.selectbox("按派工員篩選", assigner_list)
                     sel_worker = f4.selectbox("按作業員篩選", worker_list)
 
-                # 篩選邏輯
                 filtered_df = df.copy()
                 if sel_order != "全部": filtered_df = filtered_df[filtered_df["製令"] == sel_order]
                 if sel_process != "全部": filtered_df = filtered_df[filtered_df["製造工序"] == sel_process]
@@ -106,9 +120,8 @@ else:
                 if sel_worker != "全部": filtered_df = filtered_df[filtered_df["作業人員"] == sel_worker]
 
                 st.subheader("📑 派工明細清單")
-                st.write(f"顯示結果：共 {len(filtered_df)} 筆資料")
-                st.dataframe(filtered_df[["製令", "製造工序", "派工人員", "作業人員", "作業期限"]], use_container_width=True, height=500, hide_index=True)
-            else: st.info("目前尚無派工資料。")
+                st.dataframe(filtered_df[["製令", "製造工序", "派工人員", "作業人員", "作業期限"]], use_container_width=True, height=550, hide_index=True)
+            else: st.info("目前尚無資料。")
         except: st.error("連線資料庫失敗")
 
     # --- 4. 📝 現場派工作業 (維持原樣) ---
@@ -148,7 +161,7 @@ else:
                 st.dataframe(df[["製令", "製造工序", "派工人員", "作業人員", "作業期限"]], use_container_width=True, hide_index=True)
                 st.write("---")
                 st.subheader("🛠️ 紀錄維護工具")
-                log_options = {log['id']: f"【{log['製令']} - {log['製造工序']}】 作業：{log['作業人員']}" for log in all_logs}
+                log_options = {log['id']: f"【{log['製令']}】 作業：{log['作業人員']}" for log in all_logs}
                 target_id = st.selectbox("請選擇要編輯或刪除的紀錄", options=list(log_options.keys()), format_func=lambda x: log_options[x])
                 curr = next(item for item in all_logs if item["id"] == target_id)
                 with st.expander("📝 編輯此筆內容"):
@@ -176,16 +189,16 @@ else:
         st.header("⚙️ 選單內容管理")
         with st.form("settings_form"):
             st.subheader("📦 編輯製令清單")
-            new_orders = st.text_area("請用逗號隔開", value=",".join(settings.get("orders", [])), height=80)
+            new_orders = st.text_area("請用逗號隔開", value=",".join(settings.get("orders", [])), height=100)
             c1, c2 = st.columns(2)
             with c1:
                 st.subheader("🚩 編輯派工人員清單")
-                new_assigners = st.text_area("通常為管理層/組長", value=",".join(settings.get("assigners", [])), height=100)
+                new_assigners = st.text_area("管理層/組長", value=",".join(settings.get("assigners", [])), height=120)
             with c2:
                 st.subheader("👷 編輯作業人員清單")
-                new_workers = st.text_area("通常為現場執行人員", value=",".join(settings.get("workers", [])), height=100)
+                new_workers = st.text_area("現場執行人員", value=",".join(settings.get("workers", [])), height=120)
             st.subheader("⚙️ 編輯製造工序清單")
-            new_procs = st.text_area("請用逗號隔開", value=",".join(settings.get("processes", [])), height=80)
+            new_procs = st.text_area("請用逗號隔開", value=",".join(settings.get("processes", [])), height=100)
             if st.form_submit_button("✅ 儲存並更新所有設定"):
                 requests.patch(f"{SETTING_URL}.json", json={
                     "orders": [x.strip() for x in new_orders.split(",") if x.strip()],
