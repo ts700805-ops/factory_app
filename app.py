@@ -25,14 +25,20 @@ def get_settings():
     except:
         return {"orders": [], "assigners": ["管理員"], "workers": ["現場人員"], "processes": ["預設工序"]}
 
-# --- 2. 頁面配置 ---
+# --- 2. 頁面配置 (調整字體大小為 1.5 倍) ---
 st.set_page_config(page_title="超慧科技●神鬼奇航●派工系統", layout="wide")
 
 st.markdown("""
     <style>
-    .main-title { font-size: 32px; font-weight: bold; color: #1E3A8A; border-bottom: 2px solid #1E3A8A; padding-bottom: 10px; }
+    /* 全域字體放大 1.5 倍 (約 24px) */
+    html, body, [class*="css"], .stMarkdown, .stSelectbox, .stButton, .stDateInput, label {
+        font-size: 24px !important;
+    }
+    .main-title { font-size: 48px !important; font-weight: bold; color: #1E3A8A; border-bottom: 3px solid #1E3A8A; padding-bottom: 10px; }
     .stat-card { background-color: #ffffff; padding: 25px; border-radius: 15px; border-top: 5px solid #1E3A8A; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
-    .stButton>button { width: 100%; }
+    .stButton>button { width: 100%; height: 60px; font-size: 28px !important; }
+    /* 調整側邊欄選單字體 */
+    .stRadio label { font-size: 26px !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -53,7 +59,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 📊 經營者看板 (首頁) [新增精準篩選功能] ---
+    # --- 3. 📊 經營者看板 (首頁) [新增派工人員篩選] ---
     if menu == "📊 經營者看板 (首頁)":
         st.markdown('<p class="main-title">📊 派工執行實況看板</p>', unsafe_allow_html=True)
         try:
@@ -71,51 +77,41 @@ else:
                     })
                 df = pd.DataFrame(all_logs)
 
-                # --- 統計數據區 ---
                 c1, c2 = st.columns(2)
-                with c1: st.markdown(f'<div class="stat-card">總派件數<br><span style="font-size:40px; font-weight:bold; color:#1E3A8A;">{len(df)}</span> 件</div>', unsafe_allow_html=True)
+                with c1: st.markdown(f'<div class="stat-card">總派件數<br><span style="font-size:60px; font-weight:bold; color:#1E3A8A;">{len(df)}</span> 件</div>', unsafe_allow_html=True)
                 with c2:
                     worker_count = df['作業人員'].nunique() if not df.empty else 0
-                    st.markdown(f'<div class="stat-card">動員人力<br><span style="font-size:40px; font-weight:bold; color:#1E3A8A;">{worker_count}</span> 人</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="stat-card">動員人力<br><span style="font-size:60px; font-weight:bold; color:#1E3A8A;">{worker_count}</span> 人</div>', unsafe_allow_html=True)
                 
                 st.write("")
-                
-                # --- 【新增：精準篩選控制區】 ---
                 st.subheader("🔍 篩選我要的項目")
                 with st.expander("點擊展開篩選選單", expanded=True):
-                    f1, f2, f3 = st.columns(3)
+                    f1, f2, f3, f4 = st.columns(4) # 欄位改為 4 欄
                     
-                    # 抓取資料中現有的項目作為選項
                     order_list = ["全部"] + sorted(df["製令"].unique().tolist())
                     process_list = ["全部"] + sorted(df["製造工序"].unique().tolist())
+                    assigner_list = ["全部"] + sorted(df["派工人員"].unique().tolist()) # 新增清單
                     worker_list = ["全部"] + sorted(df["作業人員"].unique().tolist())
                     
                     sel_order = f1.selectbox("按製令篩選", order_list)
                     sel_process = f2.selectbox("按工序篩選", process_list)
-                    sel_worker = f3.selectbox("按作業員篩選", worker_list)
+                    sel_assigner = f3.selectbox("按派工員篩選", assigner_list) # 新增篩選選單
+                    sel_worker = f4.selectbox("按作業員篩選", worker_list)
 
-                # 執行篩選邏輯
+                # 篩選邏輯
                 filtered_df = df.copy()
-                if sel_order != "全部":
-                    filtered_df = filtered_df[filtered_df["製令"] == sel_order]
-                if sel_process != "全部":
-                    filtered_df = filtered_df[filtered_df["製造工序"] == sel_process]
-                if sel_worker != "全部":
-                    filtered_df = filtered_df[filtered_df["作業人員"] == sel_worker]
+                if sel_order != "全部": filtered_df = filtered_df[filtered_df["製令"] == sel_order]
+                if sel_process != "全部": filtered_df = filtered_df[filtered_df["製造工序"] == sel_process]
+                if sel_assigner != "全部": filtered_df = filtered_df[filtered_df["派工人員"] == sel_assigner]
+                if sel_worker != "全部": filtered_df = filtered_df[filtered_df["作業人員"] == sel_worker]
 
                 st.subheader("📑 派工明細清單")
                 st.write(f"顯示結果：共 {len(filtered_df)} 筆資料")
-                st.dataframe(
-                    filtered_df[["製令", "製造工序", "派工人員", "作業人員", "作業期限"]], 
-                    use_container_width=True, 
-                    height=500,
-                    hide_index=True
-                )
-            else:
-                st.info("目前尚無派工資料。")
+                st.dataframe(filtered_df[["製令", "製造工序", "派工人員", "作業人員", "作業期限"]], use_container_width=True, height=500, hide_index=True)
+            else: st.info("目前尚無派工資料。")
         except: st.error("連線資料庫失敗")
 
-    # --- 4. 📝 現場派工作業 (不亂動) ---
+    # --- 4. 📝 現場派工作業 (維持原樣) ---
     elif menu == "📝 現場派工作業":
         st.header("📝 建立新派工任務")
         with st.form("dispatch_form"):
@@ -130,7 +126,7 @@ else:
                 requests.post(f"{DB_URL}.json", json=log)
                 st.success("任務已發布！")
 
-    # --- 5. 📋 歷史紀錄查詢 (不亂動) ---
+    # --- 5. 📋 歷史紀錄查詢 (維持原樣) ---
     elif menu == "📋 歷史紀錄查詢":
         st.header("📋 歷史紀錄維護")
         try:
@@ -175,7 +171,7 @@ else:
             else: st.info("目前沒有紀錄。")
         except Exception as e: st.error(f"系統異常: {e}")
 
-    # --- 6. ⚙️ 系統內容管理 (不亂動) ---
+    # --- 6. ⚙️ 系統內容管理 (維持原樣) ---
     elif menu == "⚙️ 系統內容管理":
         st.header("⚙️ 選單內容管理")
         with st.form("settings_form"):
@@ -197,5 +193,5 @@ else:
                     "workers": [x.strip() for x in new_workers.split(",") if x.strip()],
                     "processes": [x.strip() for x in new_procs.split(",") if x.strip()]
                 })
-                st.success("人員清單已分類儲存！")
+                st.success("設定已分類儲存！")
                 st.rerun()
