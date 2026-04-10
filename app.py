@@ -21,44 +21,32 @@ def get_settings():
     except:
         return {"orders": [], "assigners": ["管理員"], "workers": ["人員"], "processes": ["預設工序"]}
 
-# --- 2. 頁面配置 (精準調校：紅色框框表格字體放大 10 倍) ---
+# --- 2. 頁面配置 (字體維持極大化 80px) ---
 st.set_page_config(page_title="超慧科技●神鬼奇航●派工系統", layout="wide")
 
 st.markdown("""
     <style>
-    /* 【關鍵修改：表格明細區】字體放大 10 倍 (約 80px) */
+    /* 表格明細區字體放大 */
     div[data-testid="stDataFrame"] div[role="gridcell"] > div {
         font-size: 80px !important;
         line-height: 1.2 !important;
         font-weight: bold !important;
     }
-    
-    /* 表格欄位標題同步放大 (約 50px) */
     div[data-testid="stDataFrame"] div[role="columnheader"] span {
         font-size: 50px !important;
         font-weight: bold !important;
     }
-    
-    /* 調整表格行高以容納特大字體 */
     div[data-testid="stDataFrame"] div[role="row"] {
         height: 120px !important;
     }
 
-    /* 【綠框框：篩選區】保持適當比例 */
-    .stSelectbox label {
-        font-size: 26px !important;
-        font-weight: bold !important;
-    }
-    .stSelectbox div[data-baseweb="select"] > div {
-        font-size: 24px !important;
-        height: 60px !important; 
-        display: flex;
-        align-items: center;
-    }
+    /* 篩選區 */
+    .stSelectbox label { font-size: 26px !important; font-weight: bold !important; }
+    .stSelectbox div[data-baseweb="select"] > div { font-size: 24px !important; height: 60px !important; }
 
-    /* 其他標題與按鈕視覺優化 */
+    /* 標題與按鈕 */
     .main-title { font-size: 48px !important; font-weight: bold; color: #1E3A8A; border-bottom: 4px solid #1E3A8A; margin-bottom: 25px; }
-    .stat-card { background-color: #ffffff; padding: 20px; border-radius: 15px; border-top: 6px solid #1E3A8A; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center; }
+    .stat-card { background-color: #ffffff; padding: 20px; border-radius: 15px; border-top: 6px solid #1E3A8A; text-align: center; }
     .stButton>button { height: 75px; font-size: 32px !important; font-weight: bold !important; }
     [data-testid="stSidebar"] .stRadio label { font-size: 26px !important; }
     </style>
@@ -71,6 +59,7 @@ if "user" not in st.session_state:
     u = st.selectbox("登入者姓名", settings.get("assigners", ["管理員"]))
     p = st.text_input("員工代碼", type="password")
     if st.button("啟航"):
+        st.balloons() # 🎈 特效
         st.session_state.user = u
         st.rerun()
 else:
@@ -126,7 +115,6 @@ else:
                 if sel_worker != "全部": filtered_df = filtered_df[filtered_df["作業人員"] == sel_worker]
 
                 st.subheader("📑 派工明細清單") 
-                # 這裡的表格文字已透過頂部 CSS 放大 10 倍
                 st.dataframe(filtered_df[["製令", "製造工序", "派工人員", "作業人員", "作業期限"]], use_container_width=True, height=800, hide_index=True)
             else: st.info("目前尚無派工資料。")
         except: st.error("連線資料庫失敗")
@@ -144,6 +132,7 @@ else:
             if st.form_submit_button("🚀 發布任務"):
                 log = {"製令": order_no, "製造工序": process_name, "派工人員": assigner, "作業人員": worker, "作業期限": str(deadline), "提交時間": get_now_str()}
                 requests.post(f"{DB_URL}.json", json=log)
+                st.balloons() # 🎈 特效
                 st.success("任務已發布！")
 
     # --- 5. 📋 歷史紀錄查詢 ---
@@ -183,10 +172,12 @@ else:
                     new_d = ec5.date_input("編輯期限", d_val)
                     if st.button("💾 儲存修改"):
                         requests.patch(f"{DB_URL}/{target_id}.json", json={"製令": new_order, "製造工序": new_proc, "派工人員": new_a, "作業人員": new_w, "作業期限": str(new_d)})
+                        st.balloons() # 🎈 特效
                         st.success("更新完成！")
                         st.rerun()
                 if st.button("🗑️ 刪除選定紀錄", type="primary"):
                     requests.delete(f"{DB_URL}/{target_id}.json")
+                    st.balloons() # 🎈 特效
                     st.rerun()
             else: st.info("目前沒有紀錄。")
         except Exception as e: st.error(f"系統異常: {e}")
@@ -213,5 +204,6 @@ else:
                     "workers": [x.strip() for x in new_workers.split(",") if x.strip()],
                     "processes": [x.strip() for x in new_procs.split(",") if x.strip()]
                 })
+                st.balloons() # 🎈 特效
                 st.success("設定已分類儲存！")
                 st.rerun()
