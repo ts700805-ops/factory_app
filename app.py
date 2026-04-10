@@ -3,7 +3,7 @@ import pandas as pd
 import datetime
 import requests
 
-# --- 1. 核心連線設定 (請確保網址結尾沒有多餘空格) ---
+# --- 1. 核心連線設定 ---
 DB_URL = "https://my-factory-system-default-rtdb.firebaseio.com/work_logs"
 DONE_URL = "https://my-factory-system-default-rtdb.firebaseio.com/completed_logs"
 SETTING_URL = "https://my-factory-system-default-rtdb.firebaseio.com/settings"
@@ -22,7 +22,7 @@ def get_settings():
     except:
         return {"orders": [], "assigners": ["管理員"], "workers": ["人員"], "processes": ["預設工序"]}
 
-# --- 2. 介面樣式優化 (縮小字體以顯示更多資料) ---
+# --- 2. 介面樣式優化 (縮小字體以符合顯示多筆資料需求) ---
 st.set_page_config(page_title="超慧科技管理系統", layout="wide")
 
 st.markdown("""
@@ -30,33 +30,32 @@ st.markdown("""
     /* 縮小全網頁基礎字體 */
     html, body, [class*="st-"] { font-size: 14px; }
     
-    /* 待辦事項卡片：緊湊設計 */
+    /* 待辦事項卡片：緊湊設計，方便顯示更多筆 */
     .task-container {
         background-color: #ffffff;
         border: 1px solid #e0e0e0;
         border-left: 5px solid #1E3A8A;
         border-radius: 5px;
-        padding: 8px 12px;
-        margin-bottom: 5px;
+        padding: 6px 10px;
+        margin-bottom: 4px;
         display: flex;
         justify-content: space-between;
         align-items: center;
     }
     .task-main-text {
-        font-size: 16px !important;
+        font-size: 15px !important;
         font-weight: bold;
         color: #1E3A8A;
     }
     .task-sub-text {
-        font-size: 13px !important;
+        font-size: 12px !important;
         color: #666;
-        margin-top: 2px;
     }
-    /* 讓按鈕區塊更緊湊 */
+    /* 完工按鈕樣式優化 */
     .stButton>button {
-        padding: 2px 10px !important;
-        font-size: 14px !important;
-        height: auto !important;
+        padding: 2px 12px !important;
+        font-size: 13px !important;
+        height: 32px !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -71,15 +70,14 @@ if "user" not in st.session_state:
         st.session_state.user = u
         st.rerun()
 else:
-    # 側邊欄
-    st.sidebar.markdown(f"👤 **當前使用者：{st.session_state.user}**")
+    st.sidebar.markdown(f"👤 **使用者：{st.session_state.user}**")
     menu = st.sidebar.radio("導航選單", ["📊 經營者看板 (首頁)", "📝 現場派工作業", "📜 完工紀錄查詢", "⚙️ 系統內容管理"])
     
     if st.sidebar.button("登出"):
         st.session_state.clear()
         st.rerun()
 
-    # --- 4. 📊 經營者看板 (核心修正區) ---
+    # --- 4. 📊 經營者看板 ---
     if menu == "📊 經營者看板 (首頁)":
         st.subheader("📊 派工執行實況看板")
         
@@ -94,12 +92,10 @@ else:
                     all_logs.append(v)
                 df = pd.DataFrame(all_logs)
 
-                # 頂部統計數據
                 c1, c2 = st.columns(2)
                 c1.metric("總派件數", f"{len(df)} 件")
                 c2.metric("動員人力", f"{df['作業人員'].nunique()} 人")
 
-                # 快速篩選 (橫向排列節省空間)
                 with st.expander("🔍 快速篩選資料", expanded=False):
                     f1, f2, f3, f4 = st.columns(4)
                     s_order = f1.selectbox("製令", ["全部"] + sorted(df["製令"].unique().tolist()))
@@ -107,7 +103,6 @@ else:
                     s_worker = f3.selectbox("作業員", ["全部"] + sorted(df["作業人員"].unique().tolist()))
                     s_assign = f4.selectbox("派工員", ["全部"] + sorted(df["派工人員"].unique().tolist()))
 
-                # 套用篩選
                 f_df = df.copy()
                 if s_order != "全部": f_df = f_df[f_df["製令"] == s_order]
                 if s_proc != "全部": f_df = f_df[f_df["製造工序"] == s_proc]
@@ -115,13 +110,10 @@ else:
                 if s_assign != "全部": f_df = f_df[f_df["派工人員"] == s_assign]
 
                 st.markdown("---")
-                st.markdown("### 📋 待辦派工明細")
+                st.markdown("### 📋 待辦派工明細 (點擊按鈕結案)")
 
-                # 顯示列表
                 for _, row in f_df.iterrows():
-                    # 建立橫向資訊條
-                    col_content, col_btn = st.columns([9, 1])
-                    
+                    col_content, col_btn = st.columns([8.5, 1.5])
                     with col_content:
                         st.markdown(f"""
                         <div class="task-container">
@@ -133,29 +125,22 @@ else:
                         """, unsafe_allow_html=True)
                     
                     with col_btn:
-                        # 修正第 140 行附近的語法錯誤，並補齊括號
+                        st.write("") # 垂直微調對齊
                         if st.button("✅ 完工", key=f"done_{row['id']}"):
                             try:
-                                # 準備移轉資料
-                                done_data = row.to_dict()
-                                done_data['實際完工時間'] = get_now_str()
-                                
-                                # 1. 寫入完工資料庫 (修正語法：確保括號閉合)
-                                resp = requests.post(f"{DONE_URL}.json", json=done_data)
-                                
+                                done_item = row.to_dict()
+                                done_item['實際完工時間'] = get_now_str()
+                                # 修正語法：確保 Requests 括號正確閉合
+                                resp = requests.post(f"{DONE_URL}.json", json=done_item)
                                 if resp.status_code == 200:
-                                    # 2. 刪除待辦資料庫中的該筆資料
                                     requests.delete(f"{DB_URL}/{row['id']}.json")
-                                    st.success(f"{row['製令']} 已結案")
                                     st.rerun()
-                                else:
-                                    st.error("寫入資料失敗，請檢查網路。")
                             except Exception as e:
                                 st.error(f"連線失敗: {e}")
             else:
                 st.info("目前沒有待辦任務。")
         except:
-            st.error("連線資料庫失敗，請檢查 Firebase URL 是否設定正確。")
+            st.error("連線資料庫失敗，請確認 Firebase URL 設定正確。")
 
     # --- 5. 📝 現場派工作業 ---
     elif menu == "📝 現場派工作業":
@@ -165,18 +150,10 @@ else:
             f_proc = st.selectbox("選擇工序", settings.get("processes", []))
             f_worker = st.selectbox("作業人員", settings.get("workers", []))
             f_date = st.date_input("作業期限", datetime.date.today())
-            
             if st.form_submit_button("發布任務"):
-                new_task = {
-                    "製令": f_order,
-                    "製造工序": f_proc,
-                    "作業人員": f_worker,
-                    "派工人員": st.session_state.user,
-                    "作業期限": str(f_date),
-                    "派工時間": get_now_str()
-                }
+                new_task = {"製令": f_order, "製造工序": f_proc, "作業人員": f_worker, "派工人員": st.session_state.user, "作業期限": str(f_date), "派工時間": get_now_str()}
                 requests.post(f"{DB_URL}.json", json=new_task)
-                st.success("任務發布成功！")
+                st.success("發布成功")
                 st.rerun()
 
     # --- 6. 📜 完工紀錄查詢 ---
@@ -187,4 +164,27 @@ else:
             done_data = r.json()
             if done_data:
                 df_done = pd.DataFrame([v for k, v in done_data.items()])
-                st.dataframe(df_done, use_
+                # 修正第 190 行：補齊 st.dataframe 的括號
+                st.dataframe(df_done, use_container_width=True, hide_index=True)
+            else:
+                st.write("尚無完工紀錄。")
+        except:
+            st.write("讀取資料失敗。")
+
+    # --- 7. ⚙️ 系統內容管理 ---
+    elif menu == "⚙️ 系統內容管理":
+        st.subheader("⚙️ 選單設定")
+        with st.form("sys_config"):
+            c_orders = st.text_area("製令清單", ",".join(settings.get("orders", [])))
+            c_workers = st.text_area("人員清單", ",".join(settings.get("workers", [])))
+            c_procs = st.text_area("工序清單", ",".join(settings.get("processes", [])))
+            if st.form_submit_button("儲存"):
+                new_conf = {
+                    "orders": [x.strip() for x in c_orders.split(",") if x.strip()],
+                    "assigners": settings.get("assigners", ["管理員"]),
+                    "workers": [x.strip() for x in c_workers.split(",") if x.strip()],
+                    "processes": [x.strip() for x in c_procs.split(",") if x.strip()]
+                }
+                requests.patch(f"{SETTING_URL}.json", json=new_conf)
+                st.success("設定更新")
+                st.rerun()
