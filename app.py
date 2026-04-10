@@ -3,7 +3,7 @@ import pandas as pd
 import datetime
 import requests
 
-# --- 1. 核心設定 (絕對不改動功能) ---
+# --- 1. 核心設定 ---
 DB_URL = "https://my-factory-system-default-rtdb.firebaseio.com/work_logs"
 SETTING_URL = "https://my-factory-system-default-rtdb.firebaseio.com/settings"
 
@@ -21,40 +21,39 @@ def get_settings():
     except:
         return {"orders": [], "assigners": ["管理員"], "workers": ["人員"], "processes": ["預設工序"]}
 
-# --- 2. 頁面配置 (字體極致放大至 60px) ---
+# --- 2. 頁面配置 (精準調校：藍框字體 2 倍，綠框比例 1.5 倍) ---
 st.set_page_config(page_title="超慧科技●神鬼奇航●派工系統", layout="wide")
 
 st.markdown("""
     <style>
-    /* 【震撼放大】表格內文字直接拉到 60px */
+    /* 【藍框框：表格明細區】字體放大 2 倍 (約 32px) */
     div[data-testid="stDataFrame"] div[role="gridcell"] > div {
-        font-size: 60px !important;
-        line-height: 1.5 !important;
-        font-weight: 800 !important;
-        color: #000000 !important;
+        font-size: 32px !important;
+        line-height: 1.6 !important;
     }
-    
-    /* 表格標題同步放大到 50px */
+    /* 表格欄位標題同步放大 */
     div[data-testid="stDataFrame"] div[role="columnheader"] span {
-        font-size: 50px !important;
+        font-size: 28px !important;
         font-weight: bold !important;
-        color: #1E3A8A !important;
     }
 
-    /* 調整表格行高，避免文字重疊 */
-    div[data-testid="stDataFrame"] div[role="row"] {
-        height: 100px !important;
+    /* 【綠框框：篩選區】符合 1.5 倍的大小與高度 */
+    .stSelectbox label {
+        font-size: 26px !important;
+        font-weight: bold !important;
+    }
+    .stSelectbox div[data-baseweb="select"] > div {
+        font-size: 24px !important;
+        height: 60px !important; 
+        display: flex;
+        align-items: center;
     }
 
-    /* 篩選選單標籤與文字放大 */
-    .stSelectbox label { font-size: 35px !important; font-weight: bold !important; }
-    .stSelectbox div[data-baseweb="select"] > div { font-size: 30px !important; height: 80px !important; }
-
-    /* 全域視覺調整 */
-    .main-title { font-size: 60px !important; font-weight: bold; color: #1E3A8A; border-bottom: 6px solid #1E3A8A; margin-bottom: 40px; }
-    .stat-card { background-color: #ffffff; padding: 30px; border-radius: 20px; border-top: 10px solid #1E3A8A; box-shadow: 0 6px 20px rgba(0,0,0,0.15); text-align: center; }
-    .stButton>button { height: 100px; font-size: 40px !important; font-weight: bold !important; border-radius: 15px; }
-    [data-testid="stSidebar"] .stRadio label { font-size: 32px !important; }
+    /* 其他標題與按鈕視覺優化 */
+    .main-title { font-size: 48px !important; font-weight: bold; color: #1E3A8A; border-bottom: 4px solid #1E3A8A; margin-bottom: 25px; }
+    .stat-card { background-color: #ffffff; padding: 20px; border-radius: 15px; border-top: 6px solid #1E3A8A; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center; }
+    .stButton>button { height: 75px; font-size: 32px !important; font-weight: bold !important; }
+    [data-testid="stSidebar"] .stRadio label { font-size: 26px !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -94,13 +93,13 @@ else:
                 df = pd.DataFrame(all_logs)
 
                 c1, c2 = st.columns(2)
-                with c1: st.markdown(f'<div class="stat-card">總派件數<br><span style="font-size:85px; font-weight:bold; color:#1E3A8A;">{len(df)}</span> 件</div>', unsafe_allow_html=True)
+                with c1: st.markdown(f'<div class="stat-card">總派件數<br><span style="font-size:65px; font-weight:bold; color:#1E3A8A;">{len(df)}</span> 件</div>', unsafe_allow_html=True)
                 with c2:
                     worker_count = df['作業人員'].nunique() if not df.empty else 0
-                    st.markdown(f'<div class="stat-card">動員人力<br><span style="font-size:85px; font-weight:bold; color:#1E3A8A;">{worker_count}</span> 人</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="stat-card">動員人力<br><span style="font-size:65px; font-weight:bold; color:#1E3A8A;">{worker_count}</span> 人</div>', unsafe_allow_html=True)
                 
                 st.write("")
-                st.subheader("🔍 快速篩選資料")
+                st.subheader("🔍 快速篩選資料") # 這是綠框區塊
                 with st.expander("點擊展開篩選選單", expanded=True):
                     f1, f2, f3, f4 = st.columns(4)
                     order_list = ["全部"] + sorted(df["製令"].unique().tolist())
@@ -119,8 +118,8 @@ else:
                 if sel_assigner != "全部": filtered_df = filtered_df[filtered_df["派工人員"] == sel_assigner]
                 if sel_worker != "全部": filtered_df = filtered_df[filtered_df["作業人員"] == sel_worker]
 
-                st.subheader("📑 派工明細清單 (60px 特大字體)")
-                st.dataframe(filtered_df[["製令", "製造工序", "派工人員", "作業人員", "作業期限"]], use_container_width=True, height=800, hide_index=True)
+                st.subheader("📑 派工明細清單") # 這是藍框區塊
+                st.dataframe(filtered_df[["製令", "製造工序", "派工人員", "作業人員", "作業期限"]], use_container_width=True, height=600, hide_index=True)
             else: st.info("目前尚無派工資料。")
         except: st.error("連線資料庫失敗")
 
@@ -139,7 +138,7 @@ else:
                 requests.post(f"{DB_URL}.json", json=log)
                 st.success("任務已發布！")
 
-    # --- 5. 📋 歷史紀錄查詢 (編輯/刪除功能已補回) ---
+    # --- 5. 📋 歷史紀錄查詢 ---
     elif menu == "📋 歷史紀錄查詢":
         st.header("📋 歷史紀錄維護")
         try:
@@ -157,30 +156,48 @@ else:
                         "作業期限": v.get("作業期限", str(datetime.date.today()))
                     })
                 df = pd.DataFrame(all_logs)
-                # 這裡的表格也會是特大字體
-                st.dataframe(df[["製令", "製造工序", "派工人員", "作業人員", "作業期限"]], use_container_width=True, height=500, hide_index=True)
-                
+                st.subheader("🔍 當前紀錄清單")
+                st.dataframe(df[["製令", "製造工序", "派工人員", "作業人員", "作業期限"]], use_container_width=True, hide_index=True)
                 st.write("---")
                 st.subheader("🛠️ 紀錄維護工具")
-                log_options = {log['id']: f"製令：{log['製令']} | 人員：{log['作業人員']} | 期限：{log['作業期限']}" for log in all_logs}
+                log_options = {log['id']: f"【{log['製令']}】 作業：{log['作業人員']}" for log in all_logs}
                 target_id = st.selectbox("請選擇要編輯或刪除的紀錄", options=list(log_options.keys()), format_func=lambda x: log_options[x])
-                
-                col_del, col_space = st.columns([1, 4])
-                if col_del.button("🗑️ 刪除這筆紀錄", type="primary"):
+                curr = next(item for item in all_logs if item["id"] == target_id)
+                with st.expander("📝 編輯此筆內容"):
+                    ec1, ec2 = st.columns(2)
+                    new_order = ec1.selectbox("修改製令", settings.get("orders", []), index=settings.get("orders", []).index(curr['製令']) if curr['製令'] in settings.get("orders", []) else 0)
+                    new_proc = ec2.selectbox("修改工序", settings.get("processes", []), index=settings.get("processes", []).index(curr['製造工序']) if curr['製造工序'] in settings.get("processes", []) else 0)
+                    ec3, ec4, ec5 = st.columns(3)
+                    new_a = ec3.selectbox("編輯派工員", settings.get("assigners", []), index=settings.get("assigners", []).index(curr['派工人員']) if curr['派工人員'] in settings.get("assigners", []) else 0)
+                    new_w = ec4.selectbox("編輯作業員", settings.get("workers", []), index=settings.get("workers", []).index(curr['作業人員']) if curr['作業人員'] in settings.get("workers", []) else 0)
+                    try: d_val = datetime.datetime.strptime(curr['作業期限'], '%Y-%m-%d').date()
+                    except: d_val = datetime.date.today()
+                    new_d = ec5.date_input("編輯期限", d_val)
+                    if st.button("💾 儲存修改"):
+                        requests.patch(f"{DB_URL}/{target_id}.json", json={"製令": new_order, "製造工序": new_proc, "派工人員": new_a, "作業人員": new_w, "作業期限": str(new_d)})
+                        st.success("更新完成！")
+                        st.rerun()
+                if st.button("🗑️ 刪除選定紀錄", type="primary"):
                     requests.delete(f"{DB_URL}/{target_id}.json")
-                    st.success("紀錄已刪除！")
                     st.rerun()
-            else: st.info("目前無任何紀錄可供編輯。")
-        except: st.error("連線資料庫發生異常")
+            else: st.info("目前沒有紀錄。")
+        except Exception as e: st.error(f"系統異常: {e}")
 
     # --- 6. ⚙️ 系統內容管理 ---
     elif menu == "⚙️ 系統內容管理":
         st.header("⚙️ 選單內容管理")
         with st.form("settings_form"):
-            new_orders = st.text_area("編輯製令清單 (用逗號隔開)", value=",".join(settings.get("orders", [])), height=150)
-            new_assigners = st.text_area("編輯派工人員 (用逗號隔開)", value=",".join(settings.get("assigners", [])), height=150)
-            new_workers = st.text_area("編輯作業人員 (用逗號隔開)", value=",".join(settings.get("workers", [])), height=150)
-            new_procs = st.text_area("編輯工序清單 (用逗號隔開)", value=",".join(settings.get("processes", [])), height=150)
+            st.subheader("📦 編輯製令清單")
+            new_orders = st.text_area("請用逗號隔開", value=",".join(settings.get("orders", [])), height=120)
+            c1, c2 = st.columns(2)
+            with c1:
+                st.subheader("🚩 編輯派工人員清單")
+                new_assigners = st.text_area("管理人員", value=",".join(settings.get("assigners", [])), height=150)
+            with c2:
+                st.subheader("👷 編輯作業人員清單")
+                new_workers = st.text_area("執行人員", value=",".join(settings.get("workers", [])), height=150)
+            st.subheader("⚙️ 編輯製造工序清單")
+            new_procs = st.text_area("請用逗號隔開", value=",".join(settings.get("processes", [])), height=120)
             if st.form_submit_button("✅ 儲存並更新所有設定"):
                 requests.patch(f"{SETTING_URL}.json", json={
                     "orders": [x.strip() for x in new_orders.split(",") if x.strip()],
@@ -188,5 +205,5 @@ else:
                     "workers": [x.strip() for x in new_workers.split(",") if x.strip()],
                     "processes": [x.strip() for x in new_procs.split(",") if x.strip()]
                 })
-                st.success("系統設定已成功更新！")
+                st.success("設定已分類儲存！")
                 st.rerun()
