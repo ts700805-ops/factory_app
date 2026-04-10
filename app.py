@@ -5,27 +5,32 @@ import requests
 
 # --- 1. 核心設定 ---
 DB_URL = "https://my-factory-system-default-rtdb.firebaseio.com/work_logs"
-USER_DB_URL = "https://my-factory-system-default-rtdb.firebaseio.com/users"
 SETTING_URL = "https://my-factory-system-default-rtdb.firebaseio.com/settings"
 
 def get_now_str():
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
     return now.strftime("%Y-%m-%d %H:%M:%S")
 
+# 修改獲取人員清單的邏輯：優先從資料庫設定抓取
 def get_users():
     try:
-        r = requests.get(f"{USER_DB_URL}.json")
+        r = requests.get(f"{SETTING_URL}.json")
         data = r.json()
-        if data and isinstance(data, dict): return list(data.keys())
+        if data and "users" in data:
+            return data["users"]
+        return ["管理員", "賴智文", "黃沂澂"] # 預設值
+    except:
         return ["管理員", "賴智文", "黃沂澂"]
-    except: return ["管理員", "賴智文", "黃沂澂"]
 
 def get_settings():
     try:
         r = requests.get(f"{SETTING_URL}.json")
         data = r.json()
-        return data if data else {"orders": []}
-    except: return {"orders": []}
+        if not data: return {"orders": [], "users": ["管理員", "賴智文", "黃沂澂"]}
+        if "users" not in data: data["users"] = ["管理員", "賴智文", "黃沂澂"]
+        return data
+    except:
+        return {"orders": [], "users": ["管理員", "賴智文", "黃沂澂"]}
 
 # --- 2. 頁面配置 ---
 st.set_page_config(page_title="超慧科技●神鬼奇航●派工系統", layout="wide")
@@ -70,13 +75,11 @@ else:
                         "作業期限": v.get("作業期限", "無")
                     })
                 df = pd.DataFrame(all_logs)
-                
                 c1, c2 = st.columns(2)
                 with c1: st.markdown(f'<div class="stat-card">總派件數<br><span style="font-size:40px; font-weight:bold; color:#1E3A8A;">{len(df)}</span> 件</div>', unsafe_allow_html=True)
                 with c2:
                     worker_count = df['作業人員'].nunique() if not df.empty else 0
                     st.markdown(f'<div class="stat-card">動員人力<br><span style="font-size:40px; font-weight:bold; color:#1E3A8A;">{worker_count}</span> 人</div>', unsafe_allow_html=True)
-                
                 st.write("")
                 st.subheader("📑 派工明細清單")
                 st.dataframe(df[["製令", "派工人員", "作業人員", "作業期限"]], use_container_width=True, height=500)
@@ -88,9 +91,9 @@ else:
     elif menu == "📝 現場派工作業":
         st.header("📝 建立新派工任務")
         current_settings = get_settings()
-        user_list = get_users()
+        user_list = current_settings.get("users", [])
         with st.form("dispatch_form"):
-            order_no = st.selectbox("📦 選擇製令編號", current_settings.get("orders", ["(請先設定選單)"]))
+            order_no = st.selectbox("📦 選擇製令編號", current_settings.get("orders", ["(請先設定)"]))
             c1, c2 = st.columns(2)
             assigner = c1.selectbox("🚩 派工人員", user_list, index=user_list.index(st.session_state.user) if st.session_state.user in user_list else 0)
             worker = c2.selectbox("👷 作業人員", user_list)
@@ -100,7 +103,7 @@ else:
                 requests.post(f"{DB_URL}.json", json=log)
                 st.success("任務已發布！")
 
-    # --- 5. 📋 歷史紀錄查詢 (加入 派工人員 欄位與修正報錯) ---
+    # --- 5. 📋 歷史紀錄查詢 ---
     elif menu == "📋 歷史紀錄查詢":
         st.header("📋 歷史紀錄維護")
         try:
@@ -116,65 +119,57 @@ else:
                         "作業人員": v.get("作業人員", "無"),
                         "作業期限": v.get("作業期限", str(datetime.date.today()))
                     })
-                
                 df = pd.DataFrame(all_logs)
-                
                 st.subheader("🔍 當前紀錄清單")
-                # 表格顯示四欄，包含派工人員
                 st.dataframe(df[["製令", "派工人員", "作業人員", "作業期限"]], use_container_width=True)
-                
                 st.write("---")
-                
                 st.subheader("🛠️ 紀錄維護工具")
-                log_options = {log['id']: f"【{log['製令']}】 派工：{log['派工人員']} | 作業：{log['作業人員']} | 期限：{log['作業期限']}" for log in all_logs}
-                
-                target_id = st.selectbox("請選擇要編輯或刪除的紀錄", 
-                                       options=list(log_options.keys()), 
-                                       format_func=lambda x: log_options[x])
-                
+                log_options = {log['id']: f"【{log['製令']}】 派工：{log['派工人員']} | 作業：{log['作業人員']}" for log in all_logs}
+                target_id = st.selectbox("請選擇要編輯或刪除的紀錄", options=list(log_options.keys()), format_func=lambda x: log_options[x])
                 current_log = next(item for item in all_logs if item["id"] == target_id)
                 
-                with st.expander("📝 編輯此筆內容", expanded=False):
+                user_list = get_users()
+                with st.expander("📝 編輯此筆內容"):
                     ec1, ec2, ec3 = st.columns(3)
-                    
-                    # 編輯派工人員
-                    new_a = ec1.selectbox("編輯派工人員", get_users(), 
-                                       index=get_users().index(current_log['派工人員']) if current_log['派工人員'] in get_users() else 0)
-                    
-                    # 編輯作業人員
-                    new_w = ec2.selectbox("編輯作業人員", get_users(), 
-                                       index=get_users().index(current_log['作業人員']) if current_log['作業人員'] in get_users() else 0)
-                    
-                    # 編輯日期格式
-                    try:
-                        d_val = datetime.datetime.strptime(current_log['作業期限'], '%Y-%m-%d').date()
-                    except:
-                        d_val = datetime.date.today()
+                    new_a = ec1.selectbox("編輯派工人員", user_list, index=user_list.index(current_log['派工人員']) if current_log['派工人員'] in user_list else 0)
+                    new_w = ec2.selectbox("編輯作業人員", user_list, index=user_list.index(current_log['作業人員']) if current_log['作業人員'] in user_list else 0)
+                    try: d_val = datetime.datetime.strptime(current_log['作業期限'], '%Y-%m-%d').date()
+                    except: d_val = datetime.date.today()
                     new_d = ec3.date_input("編輯作業期限", d_val)
-                    
                     if st.button("💾 儲存修改"):
                         requests.patch(f"{DB_URL}/{target_id}.json", json={"派工人員": new_a, "作業人員": new_w, "作業期限": str(new_d)})
                         st.success("更新成功！")
                         st.rerun()
-
                 if st.button("🗑️ 刪除選定紀錄", type="primary"):
                     requests.delete(f"{DB_URL}/{target_id}.json")
-                    st.warning("紀錄已從系統移除。")
+                    st.warning("紀錄已刪除。")
                     st.rerun()
-            else:
-                st.info("目前沒有紀錄。")
-        except Exception as e:
-            st.error(f"系統讀取異常，請檢查資料格式: {e}")
+            else: st.info("目前沒有紀錄。")
+        except Exception as e: st.error(f"讀取錯誤: {e}")
 
-    # --- 6. ⚙️ 系統內容管理 ---
+    # --- 6. ⚙️ 系統內容管理 (新增 派工人員 編輯功能) ---
     elif menu == "⚙️ 系統內容管理":
         st.header("⚙️ 選單內容管理")
         current_settings = get_settings()
-        with st.form("fav_edit"):
-            existing_str = ",".join(current_settings.get("orders", []))
-            new_orders_raw = st.text_area("編輯製令清單 (用逗號隔開)", value=existing_str, height=200)
-            if st.form_submit_button("✅ 儲存並更新"):
-                new_list = [x.strip() for x in new_orders_raw.split(",") if x.strip()]
-                requests.patch(f"{SETTING_URL}.json", json={"orders": new_list})
-                st.success("更新完成！")
+        
+        with st.form("settings_form"):
+            # A. 編輯製令清單
+            st.subheader("📦 編輯製令清單")
+            existing_orders = ",".join(current_settings.get("orders", []))
+            new_orders_raw = st.text_area("請用英文逗號 , 隔開", value=existing_orders, height=150, key="order_area")
+            
+            st.write("---")
+            
+            # B. 新增：編輯派工人員清單
+            st.subheader("👤 編輯派工人員清單")
+            existing_users = ",".join(current_settings.get("users", ["管理員", "賴智文", "黃沂澂"]))
+            new_users_raw = st.text_area("請用英文逗號 , 隔開 (例如: 賴智文,黃沂澂,郭富城)", value=existing_users, height=150, key="user_area")
+            
+            if st.form_submit_button("✅ 儲存並更新所有設定"):
+                order_list = [x.strip() for x in new_orders_raw.split(",") if x.strip()]
+                user_list = [x.strip() for x in new_users_raw.split(",") if x.strip()]
+                
+                # 同步儲存到 Firebase
+                requests.patch(f"{SETTING_URL}.json", json={"orders": order_list, "users": user_list})
+                st.success("所有選單（製令與人員）已成功同步更新！")
                 st.rerun()
