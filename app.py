@@ -30,11 +30,10 @@ def get_settings():
 # --- 2. 頁面配置 ---
 st.set_page_config(page_title="超慧科技●神鬼奇航●派工系統", layout="wide")
 
-# 自定義專業 CSS 樣式
 st.markdown("""
     <style>
     .main-title { font-size: 32px; font-weight: bold; color: #1E3A8A; border-bottom: 2px solid #1E3A8A; padding-bottom: 10px; }
-    .stat-card { background-color: #F3F4F6; padding: 20px; border-radius: 10px; border-left: 5px solid #1E3A8A; }
+    .stat-card { background-color: #ffffff; padding: 25px; border-radius: 15px; border-top: 5px solid #1E3A8A; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -47,7 +46,6 @@ if "user" not in st.session_state:
         st.session_state.user = u
         st.rerun()
 else:
-    # 側邊欄選單
     st.sidebar.markdown(f"👤 **當前使用者：{st.session_state.user}**")
     menu = st.sidebar.radio("導航選單", ["📊 經營者看板 (首頁)", "📝 現場派工作業", "📋 歷史紀錄查詢", "⚙️ 系統內容管理"])
     
@@ -55,7 +53,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 📊 經營者看板 (專為老闆設計的主頁) ---
+    # --- 3. 📊 經營者看板 (老闆首頁 - 隱藏時間，強調總量) ---
     if menu == "📊 經營者看板 (首頁)":
         st.markdown('<p class="main-title">📊 派工執行實況看板</p>', unsafe_allow_html=True)
         
@@ -65,28 +63,27 @@ else:
             if data:
                 df = pd.DataFrame([{"id": k, **v} for k, v in data.items()])
                 
-                # 數據統計指標
-                c1, c2, c3 = st.columns(3)
+                # 僅顯示 老闆要求的核心指標
+                c1, c2 = st.columns(2)
                 with c1:
-                    st.markdown(f'<div class="stat-card">總派工件數<br><span style="font-size:30px;">{len(df)}</span> 件</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="stat-card"><span style="color:#666;">總派件數</span><br><span style="font-size:40px; font-weight:bold; color:#1E3A8A;">{len(df)}</span> <span style="font-size:18px;">件</span></div>', unsafe_allow_html=True)
                 with c2:
-                    today_count = len(df[df['提交時間'].str.contains(datetime.date.today().strftime("%Y-%m-%d"))]) if '提交時間' in df.columns else 0
-                    st.markdown(f'<div class="stat-card">今日新增<br><span style="font-size:30px;">{today_count}</span> 件</div>', unsafe_allow_html=True)
-                with c3:
                     worker_count = df['作業人員'].nunique() if '作業人員' in df.columns else 0
-                    st.markdown(f'<div class="stat-card">動員人力<br><span style="font-size:30px;">{worker_count}</span> 人</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="stat-card"><span style="color:#666;">動員人力</span><br><span style="font-size:40px; font-weight:bold; color:#1E3A8A;">{worker_count}</span> <span style="font-size:18px;">人</span></div>', unsafe_allow_html=True)
                 
-                st.write("---")
+                st.write("")
                 
-                # 專業表格顯示
-                st.subheader("📑 即時派工明細")
-                display_df = df[["提交時間", "製令", "派工人員", "作業人員", "作業期限"]].sort_values(by="提交時間", ascending=False)
+                # 表格移除提交時間，只顯示內容
+                st.subheader("📑 派工明細清單")
+                # 這裡移除 "提交時間" 欄位
+                cols_to_show = ["製令", "派工人員", "作業人員", "作業期限"]
+                display_df = df[[c for c in cols_to_show if c in df.columns]]
                 st.dataframe(display_df, use_container_width=True, height=500)
                 
             else:
-                st.info("⚓ 航道清空，目前尚無派工資料。")
+                st.info("⚓ 目前尚無派工資料。")
         except:
-            st.error("讀取雲端資料庫時發生通訊錯誤。")
+            st.error("讀取失敗")
 
     # --- 4. 📝 現場派工作業 ---
     elif menu == "📝 現場派工作業":
@@ -95,7 +92,7 @@ else:
         user_list = get_users()
         
         with st.form("dispatch_form"):
-            order_options = current_settings.get("orders", ["(請至管理頁面設定製令)"])
+            order_options = current_settings.get("orders", ["(請至管理頁面設定)"])
             order_no = st.selectbox("📦 選擇製令編號", order_options)
             
             c1, c2 = st.columns(2)
@@ -104,25 +101,65 @@ else:
             
             deadline = st.date_input("⏳ 作業期限", datetime.date.today() + datetime.timedelta(days=1))
             
-            if st.form_submit_button("🚀 發布任務並存檔", use_container_width=True):
-                log = {"提交者": st.session_state.user, "製令": order_no, "派工人員": assigner, "作業人員": worker, "作業期限": str(deadline), "提交時間": get_now_str()}
+            if st.form_submit_button("🚀 發布任務", use_container_width=True):
+                log = {"製令": order_no, "派工人員": assigner, "作業人員": worker, "作業期限": str(deadline), "提交時間": get_now_str()}
                 requests.post(f"{DB_URL}.json", json=log)
-                st.success("任務已同步至雲端，老闆已可看見。")
+                st.success("任務已同步至雲端看板。")
 
-    # --- 5. 📋 歷史紀錄查詢 (含刪除功能) ---
+    # --- 5. 📋 歷史紀錄查詢 (維護管理) ---
     elif menu == "📋 歷史紀錄查詢":
-        st.header("📋 歷史紀錄管理")
-        # (這裡放原本的查詢與刪除邏輯...)
-        st.write("目前資料已顯示於看板，此處可進行維護。")
+        st.header("📋 歷史紀錄維護")
+        try:
+            r = requests.get(f"{DB_URL}.json")
+            data = r.json()
+            if data:
+                df = pd.DataFrame([{"id": k, **v} for k, v in data.items()])
+                st.dataframe(df, use_container_width=True)
+                
+                with st.expander("🗑️ 刪除紀錄"):
+                    to_delete = st.selectbox("選擇要刪除的製令紀錄", df['id'].tolist())
+                    if st.button("確認刪除"):
+                        requests.delete(f"{DB_URL}/{to_delete}.json")
+                        st.rerun()
+        except: st.write("尚無紀錄")
 
-    # --- 6. ⚙️ 系統內容管理 ---
+    # --- 6. ⚙️ 系統內容管理 (新增編輯與刪除功能) ---
     elif menu == "⚙️ 系統內容管理":
-        st.header("⚙️ 系統選單設定")
+        st.header("⚙️ 選單內容控制台")
         current_settings = get_settings()
-        with st.form("set_orders"):
-            existing = ",".join(current_settings.get("orders", []))
-            raw = st.text_area("編輯下拉選單內容 (用逗號隔開)", value=existing)
-            if st.form_submit_button("儲存並更新選單"):
-                new_list = [x.strip() for x in raw.split(",") if x.strip()]
-                requests.patch(f"{SETTING_URL}.json", json={"orders": new_list})
-                st.rerun()
+        orders = current_settings.get("orders", [])
+
+        # A. 新增內容
+        with st.expander("➕ 新增製令選項", expanded=True):
+            new_order = st.text_input("輸入新製令編號")
+            if st.button("加入選單"):
+                if new_order and new_order not in orders:
+                    orders.append(new_order)
+                    requests.patch(f"{SETTING_URL}.json", json={"orders": orders})
+                    st.success(f"已新增: {new_order}")
+                    st.rerun()
+
+        st.write("---")
+        
+        # B. 編輯與刪除現有內容
+        st.subheader("📝 現有選單編輯")
+        if not orders:
+            st.info("目前選單是空的。")
+        else:
+            for i, ord_item in enumerate(orders):
+                col_name, col_edit, col_del = st.columns([3, 2, 1])
+                col_name.write(f"📦 {ord_item}")
+                
+                # 編輯功能
+                new_val = col_edit.text_input("修改名稱", value=ord_item, key=f"edit_{i}")
+                if new_val != ord_item:
+                    if col_edit.button("儲存修改", key=f"save_{i}"):
+                        orders[i] = new_val
+                        requests.patch(f"{SETTING_URL}.json", json={"orders": orders})
+                        st.rerun()
+                
+                # 刪除功能
+                if col_del.button("🗑️ 刪除", key=f"del_{i}"):
+                    orders.remove(ord_item)
+                    requests.patch(f"{SETTING_URL}.json", json={"orders": orders})
+                    st.rerun()
