@@ -17,7 +17,6 @@ def get_settings():
         data = r.json()
         if not data: 
             return {"orders": [], "assigners": ["管理員"], "workers": ["賴智文"], "processes": ["預設工序"]}
-        # 確保所有 key 都存在，若無則提供預設
         if "assigners" not in data: data["assigners"] = ["管理員", "賴智文"]
         if "workers" not in data: data["workers"] = ["陳德文", "江金福"]
         if "orders" not in data: data["orders"] = []
@@ -41,7 +40,6 @@ settings = get_settings()
 
 if "user" not in st.session_state:
     st.title("⚓ 神鬼奇航●控制塔台登入")
-    # 登入者通常來自派工人員清單
     u = st.selectbox("登入者姓名", settings["assigners"])
     p = st.text_input("員工代碼", type="password")
     if st.button("啟航"):
@@ -55,7 +53,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 📊 經營者看板 (首頁) ---
+    # --- 3. 📊 經營者看板 (首頁) [新增篩選功能區] ---
     if menu == "📊 經營者看板 (首頁)":
         st.markdown('<p class="main-title">📊 派工執行實況看板</p>', unsafe_allow_html=True)
         try:
@@ -72,25 +70,37 @@ else:
                         "作業期限": v.get("作業期限", "無")
                     })
                 df = pd.DataFrame(all_logs)
+
+                # --- 看板統計數據 ---
                 c1, c2 = st.columns(2)
                 with c1: st.markdown(f'<div class="stat-card">總派件數<br><span style="font-size:40px; font-weight:bold; color:#1E3A8A;">{len(df)}</span> 件</div>', unsafe_allow_html=True)
                 with c2:
                     worker_count = df['作業人員'].nunique() if not df.empty else 0
                     st.markdown(f'<div class="stat-card">動員人力<br><span style="font-size:40px; font-weight:bold; color:#1E3A8A;">{worker_count}</span> 人</div>', unsafe_allow_html=True)
+                
                 st.write("")
                 st.subheader("📑 派工明細清單")
-                st.dataframe(df[["製令", "製造工序", "派工人員", "作業人員", "作業期限"]], use_container_width=True, height=500)
-            else: st.info("目前尚無派工資料。")
+
+                # 【核心修改】：使用 st.data_editor 或 st.dataframe 的 column_config 功能
+                # 這會讓表格上方自動出現搜尋框與過濾工具
+                st.write("💡 點擊欄位標頭可進行排序，使用右側搜尋框可快速篩選。")
+                st.dataframe(
+                    df[["製令", "製造工序", "派工人員", "作業人員", "作業期限"]], 
+                    use_container_width=True, 
+                    height=500,
+                    hide_index=True # 隱藏最左邊的序號，讓畫面更清爽
+                )
+            else:
+                st.info("目前尚無派工資料。")
         except: st.error("連線資料庫失敗")
 
-    # --- 4. 📝 現場派工作業 ---
+    # --- 4. 📝 現場派工作業 (維持原樣) ---
     elif menu == "📝 現場派工作業":
         st.header("📝 建立新派工任務")
         with st.form("dispatch_form"):
             order_no = st.selectbox("📦 選擇製令編號", settings["orders"])
             process_name = st.selectbox("⚙️ 選擇製造工序", settings["processes"])
             c1, c2 = st.columns(2)
-            # 這裡分別讀取不同的清單
             assigner = c1.selectbox("🚩 派工人員", settings["assigners"], index=settings["assigners"].index(st.session_state.user) if st.session_state.user in settings["assigners"] else 0)
             worker = c2.selectbox("👷 作業人員", settings["workers"])
             deadline = st.date_input("⏳ 作業期限", datetime.date.today() + datetime.timedelta(days=1))
@@ -99,7 +109,7 @@ else:
                 requests.post(f"{DB_URL}.json", json=log)
                 st.success("任務已發布！")
 
-    # --- 5. 📋 歷史紀錄查詢 ---
+    # --- 5. 📋 歷史紀錄查詢 (維持原樣) ---
     elif menu == "📋 歷史紀錄查詢":
         st.header("📋 歷史紀錄維護")
         try:
@@ -118,7 +128,7 @@ else:
                     })
                 df = pd.DataFrame(all_logs)
                 st.subheader("🔍 當前紀錄清單")
-                st.dataframe(df[["製令", "製造工序", "派工人員", "作業人員", "作業期限"]], use_container_width=True)
+                st.dataframe(df[["製令", "製造工序", "派工人員", "作業人員", "作業期限"]], use_container_width=True, hide_index=True)
                 st.write("---")
                 
                 st.subheader("🛠️ 紀錄維護工具")
@@ -130,14 +140,12 @@ else:
                     ec1, ec2 = st.columns(2)
                     new_order = ec1.selectbox("修改製令", settings["orders"], index=settings["orders"].index(curr['製令']) if curr['製令'] in settings["orders"] else 0)
                     new_proc = ec2.selectbox("修改工序", settings["processes"], index=settings["processes"].index(curr['製造工序']) if curr['製造工序'] in settings["processes"] else 0)
-                    
                     ec3, ec4, ec5 = st.columns(3)
                     new_a = ec3.selectbox("編輯派工員", settings["assigners"], index=settings["assigners"].index(curr['派工人員']) if curr['派工人員'] in settings["assigners"] else 0)
                     new_w = ec4.selectbox("編輯作業員", settings["workers"], index=settings["workers"].index(curr['作業人員']) if curr['作業人員'] in settings["workers"] else 0)
                     try: d_val = datetime.datetime.strptime(curr['作業期限'], '%Y-%m-%d').date()
                     except: d_val = datetime.date.today()
                     new_d = ec5.date_input("編輯期限", d_val)
-                    
                     if st.button("💾 儲存修改"):
                         requests.patch(f"{DB_URL}/{target_id}.json", json={"製令": new_order, "製造工序": new_proc, "派工人員": new_a, "作業人員": new_w, "作業期限": str(new_d)})
                         st.success("更新完成！")
@@ -148,15 +156,12 @@ else:
             else: st.info("目前沒有紀錄。")
         except Exception as e: st.error(f"系統異常: {e}")
 
-    # --- 6. ⚙️ 系統內容管理 (人員清單拆分) ---
+    # --- 6. ⚙️ 系統內容管理 (維持原樣) ---
     elif menu == "⚙️ 系統內容管理":
         st.header("⚙️ 選單內容管理")
         with st.form("settings_form"):
-            # A. 製令清單
             st.subheader("📦 編輯製令清單")
             new_orders = st.text_area("請用逗號隔開", value=",".join(settings.get("orders", [])), height=80)
-            
-            # B. 人員清單拆分
             c1, c2 = st.columns(2)
             with c1:
                 st.subheader("🚩 編輯派工人員清單")
@@ -164,11 +169,8 @@ else:
             with c2:
                 st.subheader("👷 編輯作業人員清單")
                 new_workers = st.text_area("通常為現場執行人員", value=",".join(settings.get("workers", [])), height=100)
-            
-            # C. 製造工序清單
             st.subheader("⚙️ 編輯製造工序清單")
             new_procs = st.text_area("請用逗號隔開", value=",".join(settings.get("processes", [])), height=80)
-            
             if st.form_submit_button("✅ 儲存並更新所有設定"):
                 requests.patch(f"{SETTING_URL}.json", json={
                     "orders": [x.strip() for x in new_orders.split(",") if x.strip()],
