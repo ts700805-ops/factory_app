@@ -53,7 +53,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 📊 經營者看板 (首頁) [新增篩選功能區] ---
+    # --- 3. 📊 經營者看板 (首頁) [新增精準篩選功能] ---
     if menu == "📊 經營者看板 (首頁)":
         st.markdown('<p class="main-title">📊 派工執行實況看板</p>', unsafe_allow_html=True)
         try:
@@ -71,7 +71,7 @@ else:
                     })
                 df = pd.DataFrame(all_logs)
 
-                # --- 看板統計數據 ---
+                # --- 統計數據區 ---
                 c1, c2 = st.columns(2)
                 with c1: st.markdown(f'<div class="stat-card">總派件數<br><span style="font-size:40px; font-weight:bold; color:#1E3A8A;">{len(df)}</span> 件</div>', unsafe_allow_html=True)
                 with c2:
@@ -79,22 +79,43 @@ else:
                     st.markdown(f'<div class="stat-card">動員人力<br><span style="font-size:40px; font-weight:bold; color:#1E3A8A;">{worker_count}</span> 人</div>', unsafe_allow_html=True)
                 
                 st.write("")
-                st.subheader("📑 派工明細清單")
+                
+                # --- 【新增：精準篩選控制區】 ---
+                st.subheader("🔍 篩選我要的項目")
+                with st.expander("點擊展開篩選選單", expanded=True):
+                    f1, f2, f3 = st.columns(3)
+                    
+                    # 抓取資料中現有的項目作為選項
+                    order_list = ["全部"] + sorted(df["製令"].unique().tolist())
+                    process_list = ["全部"] + sorted(df["製造工序"].unique().tolist())
+                    worker_list = ["全部"] + sorted(df["作業人員"].unique().tolist())
+                    
+                    sel_order = f1.selectbox("按製令篩選", order_list)
+                    sel_process = f2.selectbox("按工序篩選", process_list)
+                    sel_worker = f3.selectbox("按作業員篩選", worker_list)
 
-                # 【核心修改】：使用 st.data_editor 或 st.dataframe 的 column_config 功能
-                # 這會讓表格上方自動出現搜尋框與過濾工具
-                st.write("💡 點擊欄位標頭可進行排序，使用右側搜尋框可快速篩選。")
+                # 執行篩選邏輯
+                filtered_df = df.copy()
+                if sel_order != "全部":
+                    filtered_df = filtered_df[filtered_df["製令"] == sel_order]
+                if sel_process != "全部":
+                    filtered_df = filtered_df[filtered_df["製造工序"] == sel_process]
+                if sel_worker != "全部":
+                    filtered_df = filtered_df[filtered_df["作業人員"] == sel_worker]
+
+                st.subheader("📑 派工明細清單")
+                st.write(f"顯示結果：共 {len(filtered_df)} 筆資料")
                 st.dataframe(
-                    df[["製令", "製造工序", "派工人員", "作業人員", "作業期限"]], 
+                    filtered_df[["製令", "製造工序", "派工人員", "作業人員", "作業期限"]], 
                     use_container_width=True, 
                     height=500,
-                    hide_index=True # 隱藏最左邊的序號，讓畫面更清爽
+                    hide_index=True
                 )
             else:
                 st.info("目前尚無派工資料。")
         except: st.error("連線資料庫失敗")
 
-    # --- 4. 📝 現場派工作業 (維持原樣) ---
+    # --- 4. 📝 現場派工作業 (不亂動) ---
     elif menu == "📝 現場派工作業":
         st.header("📝 建立新派工任務")
         with st.form("dispatch_form"):
@@ -109,7 +130,7 @@ else:
                 requests.post(f"{DB_URL}.json", json=log)
                 st.success("任務已發布！")
 
-    # --- 5. 📋 歷史紀錄查詢 (維持原樣) ---
+    # --- 5. 📋 歷史紀錄查詢 (不亂動) ---
     elif menu == "📋 歷史紀錄查詢":
         st.header("📋 歷史紀錄維護")
         try:
@@ -130,12 +151,10 @@ else:
                 st.subheader("🔍 當前紀錄清單")
                 st.dataframe(df[["製令", "製造工序", "派工人員", "作業人員", "作業期限"]], use_container_width=True, hide_index=True)
                 st.write("---")
-                
                 st.subheader("🛠️ 紀錄維護工具")
                 log_options = {log['id']: f"【{log['製令']} - {log['製造工序']}】 作業：{log['作業人員']}" for log in all_logs}
                 target_id = st.selectbox("請選擇要編輯或刪除的紀錄", options=list(log_options.keys()), format_func=lambda x: log_options[x])
                 curr = next(item for item in all_logs if item["id"] == target_id)
-                
                 with st.expander("📝 編輯此筆內容"):
                     ec1, ec2 = st.columns(2)
                     new_order = ec1.selectbox("修改製令", settings["orders"], index=settings["orders"].index(curr['製令']) if curr['製令'] in settings["orders"] else 0)
@@ -156,7 +175,7 @@ else:
             else: st.info("目前沒有紀錄。")
         except Exception as e: st.error(f"系統異常: {e}")
 
-    # --- 6. ⚙️ 系統內容管理 (維持原樣) ---
+    # --- 6. ⚙️ 系統內容管理 (不亂動) ---
     elif menu == "⚙️ 系統內容管理":
         st.header("⚙️ 選單內容管理")
         with st.form("settings_form"):
