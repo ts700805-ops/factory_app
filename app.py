@@ -61,14 +61,13 @@ else:
             r = requests.get(f"{DB_URL}.json")
             data = r.json()
             if data:
-                # 使用 .get() 確保舊資料沒欄位時不會報錯
                 all_logs = []
                 for k, v in data.items():
                     all_logs.append({
                         "製令": v.get("製令", "無"),
+                        "派工人員": v.get("派工人員", "無"),
                         "作業人員": v.get("作業人員", "無"),
-                        "作業期限": v.get("作業期限", "無"),
-                        "提交時間": v.get("提交時間", "")
+                        "作業期限": v.get("作業期限", "無")
                     })
                 df = pd.DataFrame(all_logs)
                 
@@ -80,7 +79,7 @@ else:
                 
                 st.write("")
                 st.subheader("📑 派工明細清單")
-                st.dataframe(df[["製令", "作業人員", "作業期限"]], use_container_width=True, height=500)
+                st.dataframe(df[["製令", "派工人員", "作業人員", "作業期限"]], use_container_width=True, height=500)
             else:
                 st.info("目前尚無派工資料。")
         except: st.error("連線資料庫失敗")
@@ -101,19 +100,19 @@ else:
                 requests.post(f"{DB_URL}.json", json=log)
                 st.success("任務已發布！")
 
-    # --- 5. 📋 歷史紀錄查詢 (解決欄位缺失報錯問題) ---
+    # --- 5. 📋 歷史紀錄查詢 (加入 派工人員 欄位與修正報錯) ---
     elif menu == "📋 歷史紀錄查詢":
         st.header("📋 歷史紀錄維護")
         try:
             r = requests.get(f"{DB_URL}.json")
             db_data = r.json()
             if db_data:
-                # 【重要修正】：使用 .get 避免 KeyError: '製令'
                 all_logs = []
                 for k, v in db_data.items():
                     all_logs.append({
                         "id": k,
                         "製令": v.get("製令", "無"),
+                        "派工人員": v.get("派工人員", "無"),
                         "作業人員": v.get("作業人員", "無"),
                         "作業期限": v.get("作業期限", str(datetime.date.today()))
                     })
@@ -121,13 +120,13 @@ else:
                 df = pd.DataFrame(all_logs)
                 
                 st.subheader("🔍 當前紀錄清單")
-                st.dataframe(df[["製令", "作業人員", "作業期限"]], use_container_width=True)
+                # 表格顯示四欄，包含派工人員
+                st.dataframe(df[["製令", "派工人員", "作業人員", "作業期限"]], use_container_width=True)
                 
                 st.write("---")
                 
                 st.subheader("🛠️ 紀錄維護工具")
-                # 下拉選單顯示
-                log_options = {log['id']: f"製令：{log['製令']} | 人員：{log['作業人員']} | 期限：{log['作業期限']}" for log in all_logs}
+                log_options = {log['id']: f"【{log['製令']}】 派工：{log['派工人員']} | 作業：{log['作業人員']} | 期限：{log['作業期限']}" for log in all_logs}
                 
                 target_id = st.selectbox("請選擇要編輯或刪除的紀錄", 
                                        options=list(log_options.keys()), 
@@ -136,32 +135,36 @@ else:
                 current_log = next(item for item in all_logs if item["id"] == target_id)
                 
                 with st.expander("📝 編輯此筆內容", expanded=False):
-                    ec1, ec2 = st.columns(2)
-                    current_w = current_log['作業人員']
-                    new_w = ec1.selectbox("更換作業人員", get_users(), 
-                                       index=get_users().index(current_w) if current_w in get_users() else 0)
+                    ec1, ec2, ec3 = st.columns(3)
                     
-                    # 處理日期格式容錯
+                    # 編輯派工人員
+                    new_a = ec1.selectbox("編輯派工人員", get_users(), 
+                                       index=get_users().index(current_log['派工人員']) if current_log['派工人員'] in get_users() else 0)
+                    
+                    # 編輯作業人員
+                    new_w = ec2.selectbox("編輯作業人員", get_users(), 
+                                       index=get_users().index(current_log['作業人員']) if current_log['作業人員'] in get_users() else 0)
+                    
+                    # 編輯日期格式
                     try:
                         d_val = datetime.datetime.strptime(current_log['作業期限'], '%Y-%m-%d').date()
                     except:
                         d_val = datetime.date.today()
-                        
-                    new_d = ec2.date_input("更換作業期限", d_val)
+                    new_d = ec3.date_input("編輯作業期限", d_val)
                     
                     if st.button("💾 儲存修改"):
-                        requests.patch(f"{DB_URL}/{target_id}.json", json={"作業人員": new_w, "作業期限": str(new_d)})
+                        requests.patch(f"{DB_URL}/{target_id}.json", json={"派工人員": new_a, "作業人員": new_w, "作業期限": str(new_d)})
                         st.success("更新成功！")
                         st.rerun()
 
                 if st.button("🗑️ 刪除選定紀錄", type="primary"):
                     requests.delete(f"{DB_URL}/{target_id}.json")
-                    st.warning("紀錄已刪除。")
+                    st.warning("紀錄已從系統移除。")
                     st.rerun()
             else:
                 st.info("目前沒有紀錄。")
         except Exception as e:
-            st.error(f"讀取資料發生錯誤: {e}")
+            st.error(f"系統讀取異常，請檢查資料格式: {e}")
 
     # --- 6. ⚙️ 系統內容管理 ---
     elif menu == "⚙️ 系統內容管理":
@@ -173,5 +176,5 @@ else:
             if st.form_submit_button("✅ 儲存並更新"):
                 new_list = [x.strip() for x in new_orders_raw.split(",") if x.strip()]
                 requests.patch(f"{SETTING_URL}.json", json={"orders": new_list})
-                st.success("更新成功！")
+                st.success("更新完成！")
                 st.rerun()
