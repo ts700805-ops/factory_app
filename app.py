@@ -73,7 +73,8 @@ else:
                 st.dataframe(df[["製令", "作業人員", "作業期限"]], use_container_width=True, height=500)
             else:
                 st.info("目前尚無派工資料。")
-        except: st.error("連線資料庫失敗")
+        except:
+            st.error("連線資料庫失敗")
 
     # --- 4. 📝 現場派工作業 ---
     elif menu == "📝 現場派工作業":
@@ -91,11 +92,63 @@ else:
                 requests.post(f"{DB_URL}.json", json=log)
                 st.success("任務已發布！")
 
-    # --- 5. 📋 歷史紀錄查詢 (依照要求：只顯示三欄 + 清楚的操作按鈕) ---
+    # --- 5. 📋 歷史紀錄查詢 (修正後的完整功能) ---
     elif menu == "📋 歷史紀錄查詢":
         st.header("📋 歷史紀錄維護")
         try:
             r = requests.get(f"{DB_URL}.json")
             db_data = r.json()
             if db_data:
-                # 轉換為清
+                # 轉換為清單與 DataFrame
+                all_logs = [{"id": k, **v} for k, v in db_data.items()]
+                df = pd.DataFrame(all_logs)
+                
+                # 顯示表格：只顯示三欄
+                st.subheader("🔍 當前紀錄清單")
+                st.dataframe(df[["製令", "作業人員", "作業期限"]], use_container_width=True)
+                
+                st.write("---")
+                
+                # 維護工具：編輯與刪除
+                st.subheader("🛠️ 紀錄維護工具")
+                log_options = {log['id']: f"製令：{log['製令']} | 人員：{log['作業人員']} | 期限：{log['作業期限']}" for log in all_logs}
+                
+                target_id = st.selectbox("請選擇要編輯或刪除的紀錄", 
+                                       options=list(log_options.keys()), 
+                                       format_func=lambda x: log_options[x])
+                
+                current_log = next(item for item in all_logs if item["id"] == target_id)
+                
+                # 編輯按鈕區
+                with st.expander("📝 編輯此筆內容", expanded=False):
+                    ec1, ec2 = st.columns(2)
+                    new_w = ec1.selectbox("更換作業人員", get_users(), index=get_users().index(current_log['作業人員']) if current_log['作業人員'] in get_users() else 0)
+                    new_d = ec2.date_input("更換作業期限", datetime.datetime.strptime(current_log['作業期限'], '%Y-%m-%d').date())
+                    
+                    if st.button("💾 儲存修改"):
+                        requests.patch(f"{DB_URL}/{target_id}.json", json={"作業人員": new_w, "作業期限": str(new_d)})
+                        st.success("資料已更新！")
+                        st.rerun()
+
+                # 刪除按鈕區
+                if st.button("🗑️ 刪除選定紀錄", type="primary"):
+                    requests.delete(f"{DB_URL}/{target_id}.json")
+                    st.warning("紀錄已永久刪除。")
+                    st.rerun()
+            else:
+                st.info("目前沒有歷史紀錄。")
+        except Exception as e:
+            st.error(f"讀取資料發生錯誤: {e}")
+
+    # --- 6. ⚙️ 系統內容管理 (大框框模式) ---
+    elif menu == "⚙️ 系統內容管理":
+        st.header("⚙️ 選單內容管理")
+        current_settings = get_settings()
+        with st.form("fav_edit"):
+            existing_str = ",".join(current_settings.get("orders", []))
+            new_orders_raw = st.text_area("編輯製令清單 (請用英文逗號 , 隔開)", value=existing_str, height=200)
+            if st.form_submit_button("✅ 儲存並更新"):
+                new_list = [x.strip() for x in new_orders_raw.split(",") if x.strip()]
+                requests.patch(f"{SETTING_URL}.json", json={"orders": new_list})
+                st.success("選單已更新！")
+                st.rerun()
