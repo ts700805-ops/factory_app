@@ -34,6 +34,7 @@ st.markdown("""
     <style>
     .main-title { font-size: 32px; font-weight: bold; color: #1E3A8A; border-bottom: 2px solid #1E3A8A; padding-bottom: 10px; }
     .stat-card { background-color: #ffffff; padding: 25px; border-radius: 15px; border-top: 5px solid #1E3A8A; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
+    .stButton>button { width: 100%; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -42,7 +43,7 @@ if "user" not in st.session_state:
     user_list = get_users()
     u = st.selectbox("登入者姓名", user_list)
     p = st.text_input("員工代碼", type="password")
-    if st.button("啟航", use_container_width=True):
+    if st.button("啟航"):
         st.session_state.user = u
         st.rerun()
 else:
@@ -53,7 +54,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 📊 經營者看板 (首頁 - 老闆視角) ---
+    # --- 3. 📊 經營者看板 (首頁) ---
     if menu == "📊 經營者看板 (首頁)":
         st.markdown('<p class="main-title">📊 派工執行實況看板</p>', unsafe_allow_html=True)
         try:
@@ -69,8 +70,7 @@ else:
                 
                 st.write("")
                 st.subheader("📑 派工明細清單")
-                # 老闆看板：隱藏提交時間，隱藏 ID
-                st.dataframe(df[["製令", "派工人員", "作業人員", "作業期限"]], use_container_width=True, height=500)
+                st.dataframe(df[["製令", "作業人員", "作業期限"]], use_container_width=True, height=500)
             else:
                 st.info("目前尚無派工資料。")
         except: st.error("連線資料庫失敗")
@@ -86,62 +86,16 @@ else:
             assigner = c1.selectbox("🚩 派工人員", user_list, index=user_list.index(st.session_state.user) if st.session_state.user in user_list else 0)
             worker = c2.selectbox("👷 作業人員", user_list)
             deadline = st.date_input("⏳ 作業期限", datetime.date.today() + datetime.timedelta(days=1))
-            if st.form_submit_button("🚀 發布任務", use_container_width=True):
+            if st.form_submit_button("🚀 發布任務"):
                 log = {"製令": order_no, "派工人員": assigner, "作業人員": worker, "作業期限": str(deadline), "提交時間": get_now_str()}
                 requests.post(f"{DB_URL}.json", json=log)
                 st.success("任務已發布！")
 
-    # --- 5. 📋 歷史紀錄查詢 (編輯與刪除都在這！) ---
+    # --- 5. 📋 歷史紀錄查詢 (依照要求：只顯示三欄 + 清楚的操作按鈕) ---
     elif menu == "📋 歷史紀錄查詢":
-        st.header("📋 歷史紀錄維護與管理")
+        st.header("📋 歷史紀錄維護")
         try:
             r = requests.get(f"{DB_URL}.json")
             db_data = r.json()
             if db_data:
-                all_logs = [{"id": k, **v} for k, v in db_data.items()]
-                df_all = pd.DataFrame(all_logs)
-                
-                # 顯示完整資料供參考 (包含隱藏的提交時間)
-                st.subheader("🔍 資料總覽")
-                st.dataframe(df_all.drop(columns=['id'], errors='ignore'), use_container_width=True)
-                
-                st.write("---")
-                # 編輯與刪除區塊
-                st.subheader("🛠️ 紀錄操作 (編輯 / 刪除)")
-                selected_log = st.selectbox("選擇一筆紀錄進行操作", all_logs, format_func=lambda x: f"【{x['製令']}】{x['作業人員']} - 期限：{x['作業期限']}")
-                
-                if selected_log:
-                    c1, c2 = st.columns(2)
-                    edit_worker = c1.selectbox("編輯作業人員", get_users(), index=get_users().index(selected_log['作業人員']) if selected_log['作業人員'] in get_users() else 0)
-                    edit_deadline = c2.date_input("編輯作業期限", datetime.datetime.strptime(selected_log['作業期限'], '%Y-%m-%d').date())
-                    
-                    btn_col1, btn_col2 = st.columns(2)
-                    if btn_col1.button("💾 儲存修改", use_container_width=True):
-                        requests.patch(f"{DB_URL}/{selected_log['id']}.json", json={"作業人員": edit_worker, "作業期限": str(edit_deadline)})
-                        st.success("資料更新完成！")
-                        st.rerun()
-                    
-                    if btn_col2.button("🗑️ 刪除這筆紀錄", use_container_width=True):
-                        requests.delete(f"{DB_URL}/{selected_log['id']}.json")
-                        st.warning("紀錄已刪除。")
-                        st.rerun()
-            else:
-                st.info("目前沒有歷史紀錄。")
-        except: st.error("讀取失敗")
-
-    # --- 6. ⚙️ 系統內容管理 (回歸您最愛的製令管理模式) ---
-    elif menu == "⚙️ 系統內容管理":
-        st.header("⚙️ 選單內容管理")
-        st.subheader("📦 下拉選單製令清單")
-        current_settings = get_settings()
-        
-        with st.form("fav_edit"):
-            # 您最喜歡的大框框模式
-            existing_str = ",".join(current_settings.get("orders", []))
-            new_orders_raw = st.text_area("編輯製令清單 (請用英文逗號 , 隔開)", value=existing_str, height=200)
-            
-            if st.form_submit_button("✅ 儲存並更新選單內容"):
-                new_list = [x.strip() for x in new_orders_raw.split(",") if x.strip()]
-                requests.patch(f"{SETTING_URL}.json", json={"orders": new_list})
-                st.success("製令選單已更新！")
-                st.rerun()
+                # 轉換為清
