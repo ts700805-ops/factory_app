@@ -4,7 +4,6 @@ import datetime
 import requests
 
 # --- 1. 核心設定 ---
-# 這裡維持您的資料庫路徑，並新增完工區路徑
 DB_URL = "https://my-factory-system-default-rtdb.firebaseio.com/work_logs"
 DONE_URL = "https://my-factory-system-default-rtdb.firebaseio.com/completed_logs"
 SETTING_URL = "https://my-factory-system-default-rtdb.firebaseio.com/settings"
@@ -23,7 +22,7 @@ def get_settings():
     except:
         return {"orders": [], "assigners": ["管理員"], "workers": ["人員"], "processes": ["預設工序"]}
 
-# --- 2. 頁面配置 (字體維持 80px) ---
+# --- 2. 頁面配置 (維持大字體樣式) ---
 st.set_page_config(page_title="超慧科技●神鬼奇航●派工系統", layout="wide")
 
 st.markdown("""
@@ -48,15 +47,6 @@ st.markdown("""
     .main-title { font-size: 48px !important; font-weight: bold; color: #1E3A8A; border-bottom: 4px solid #1E3A8A; margin-bottom: 25px; }
     .stat-card { background-color: #ffffff; padding: 20px; border-radius: 15px; border-top: 6px solid #1E3A8A; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center; }
     .stButton>button { height: 75px; font-size: 32px !important; font-weight: bold !important; }
-    
-    /* 完工卡片樣式 */
-    .done-card {
-        padding: 20px;
-        border: 2px solid #e0e0e0;
-        border-radius: 10px;
-        margin-bottom: 10px;
-        background-color: #f9f9f9;
-    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -86,7 +76,7 @@ else:
             if data:
                 all_logs = []
                 for k, v in data.items():
-                    v['db_key'] = k # 紀錄 Firebase 的原始 key 用於刪除
+                    v['db_key'] = k
                     all_logs.append(v)
                 df = pd.DataFrame(all_logs)
 
@@ -97,7 +87,7 @@ else:
                     worker_count = df['作業人員'].nunique() if not df.empty else 0
                     st.markdown(f'<div class="stat-card">動員人力<br><span style="font-size:65px; font-weight:bold; color:#1E3A8A;">{worker_count}</span> 人</div>', unsafe_allow_html=True)
                 
-                # 篩選功能 (維持原樣)
+                # 篩選功能
                 st.write("")
                 st.subheader("🔍 快速篩選資料") 
                 with st.expander("點擊展開篩選選單", expanded=True):
@@ -114,39 +104,50 @@ else:
                 if sel_worker != "全部": filtered_df = filtered_df[filtered_df["作業人員"] == sel_worker]
 
                 # 顯示大字體表格
-                st.subheader("📑 派工明細清單") 
-                st.dataframe(filtered_df[["製令", "製造工序", "派工人員", "作業人員", "作業期限"]], use_container_width=True, height=500, hide_index=True)
+                st.subheader("📑 待辦派工明細清單") 
+                st.dataframe(filtered_df[["製令", "製造工序", "派工人員", "作業人員", "作業期限"]], use_container_width=True, height=400, hide_index=True)
 
-                # --- 新增：完工按鈕區 ---
+                # 完工按鈕區
                 st.markdown("---")
-                st.subheader("📦 待辦派工明細 (點擊完工按鈕結案)")
+                st.subheader("📦 快速結案 (點擊按鈕標記完工)")
                 for index, row in filtered_df.iterrows():
                     with st.container():
                         col_info, col_btn = st.columns([4, 1])
                         with col_info:
                             st.markdown(f"### 📦 製令：{row['製令']} | 👷 作業員：{row['作業人員']}")
-                            st.write(f"工序：{row['製造工序']} | 期限：{row['作業期限']} | 派工：{row['派工人員']}")
-                        
-                        # 完工按鈕邏輯
                         if col_btn.button(f"✅ 完工", key=f"btn_{row['db_key']}"):
                             done_data = row.to_dict()
-                            db_key = done_data.pop('db_key') # 移除暫存 key
+                            db_key = done_data.pop('db_key')
                             done_data['實際完工時間'] = get_now_str()
-                            
-                            # 1. 傳送到完工區
                             requests.post(f"{DONE_URL}.json", json=done_data)
-                            # 2. 從待辦區刪除
                             requests.delete(f"{DB_URL}/{db_key}.json")
-                            
                             st.balloons()
-                            st.success(f"{row['製令']} 已完工！")
                             st.rerun()
             else:
                 st.info("目前尚無待辦派工。")
-        except:
-            st.error("連線資料庫失敗，請檢查網路或 URL。")
 
-    # --- 4. 📝 現場派工作業 (維持原樣) ---
+            # --- ✨ 您要新增的：完工紀錄查詢區 ---
+            st.markdown("---")
+            st.markdown('<p class="main-title" style="color: #059669; border-bottom: 4px solid #059669;">✅ 已完工歷史紀錄查詢</p>', unsafe_allow_html=True)
+            try:
+                r_done = requests.get(f"{DONE_URL}.json")
+                done_data = r_done.json()
+                if done_data:
+                    df_done = pd.DataFrame(list(done_data.values()))
+                    # 依完工時間排序 (新的在前)
+                    if '實際完工時間' in df_done.columns:
+                        df_done = df_done.sort_values(by='實際完工時間', ascending=False)
+                    
+                    st.dataframe(df_done[["實際完工時間", "製令", "製造工序", "作業人員"]], use_container_width=True, height=400, hide_index=True)
+                else:
+                    st.info("目前尚無完工紀錄。")
+            except:
+                st.write("完工紀錄讀取中...")
+
+        except:
+            st.error("連線資料庫失敗，請檢查網路。")
+
+    # --- 4. 📝 現場派工作業 ---
     elif menu == "📝 現場派工作業":
         st.header("📝 建立新派工任務")
         with st.form("dispatch_form"):
@@ -161,28 +162,9 @@ else:
                 requests.post(f"{DB_URL}.json", json=log)
                 st.success("任務已發布！")
 
-    # --- 5. 📋 歷史紀錄查詢 (新增完工資料區) ---
+    # --- 5. 📋 歷史紀錄查詢 ---
     elif menu == "📋 歷史紀錄查詢":
-        st.header("📋 歷史紀錄查詢與維護")
-        
-        # A. 顯示已完工的歷史資料
-        st.subheader("✅ 已完工歷史紀錄")
-        try:
-            r_done = requests.get(f"{DONE_URL}.json")
-            done_db = r_done.json()
-            if done_db:
-                df_done = pd.DataFrame(list(done_db.values()))
-                # 這裡顯示完工紀錄表，您可以根據需要調整顯示欄位
-                st.dataframe(df_done[["製令", "製造工序", "作業人員", "實際完工時間"]], use_container_width=True, hide_index=True)
-            else:
-                st.info("目前尚無完工歷史紀錄。")
-        except:
-            st.error("讀取完工紀錄失敗")
-
-        st.markdown("---")
-        
-        # B. 原本的待辦紀錄維護功能 (維持原樣)
-        st.subheader("🛠️ 待辦派工修改/刪除")
+        st.header("📋 待辦紀錄維護")
         try:
             r = requests.get(f"{DB_URL}.json")
             db_data = r.json()
@@ -212,7 +194,7 @@ else:
         except:
             st.write("目前沒有待辦紀錄可操作。")
 
-    # --- 6. ⚙️ 系統內容管理 (維持原樣) ---
+    # --- 6. ⚙️ 系統內容管理 ---
     elif menu == "⚙️ 系統內容管理":
         st.header("⚙️ 選單內容管理")
         with st.form("settings_form"):
