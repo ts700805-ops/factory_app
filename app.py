@@ -46,7 +46,7 @@ st.markdown("""
 
     /* 標題與按鈕 */
     .main-title { font-size: 48px !important; font-weight: bold; color: #1E3A8A; border-bottom: 4px solid #1E3A8A; margin-bottom: 25px; }
-    .stat-card { background-color: #ffffff; padding: 20px; border-radius: 15px; border-top: 6px solid #1E3A8A; text-align: center; }
+    .stat-card { background-color: #ffffff; padding: 20px; border-radius: 15px; border-top: 6px solid #1E3A8A; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center; }
     .stButton>button { height: 75px; font-size: 32px !important; font-weight: bold !important; }
     [data-testid="stSidebar"] .stRadio label { font-size: 26px !important; }
     </style>
@@ -59,7 +59,6 @@ if "user" not in st.session_state:
     u = st.selectbox("登入者姓名", settings.get("assigners", ["管理員"]))
     p = st.text_input("員工代碼", type="password")
     if st.button("啟航"):
-        st.balloons() # 🎈 特效
         st.session_state.user = u
         st.rerun()
 else:
@@ -132,55 +131,79 @@ else:
             if st.form_submit_button("🚀 發布任務"):
                 log = {"製令": order_no, "製造工序": process_name, "派工人員": assigner, "作業人員": worker, "作業期限": str(deadline), "提交時間": get_now_str()}
                 requests.post(f"{DB_URL}.json", json=log)
-                st.balloons() # 🎈 特效
                 st.success("任務已發布！")
 
-    # --- 5. 📋 歷史紀錄查詢 ---
+    # --- 5. 📋 歷史紀錄查詢 (報錯修正 + 特效) ---
     elif menu == "📋 歷史紀錄查詢":
         st.header("📋 歷史紀錄維護")
         try:
             r = requests.get(f"{DB_URL}.json")
             db_data = r.json()
             if db_data:
+                # 【修正關鍵】：加入容錯 (v.get)，確保舊資料缺少欄位時不會爆錯 (image_11.png, image_427adf.png)
                 all_logs = []
                 for k, v in db_data.items():
                     all_logs.append({
                         "id": k,
-                        "製令": v.get("製令", "無"),
-                        "製造工序": v.get("製造工序", "無"),
-                        "派工人員": v.get("派工人員", "無"),
-                        "作業人員": v.get("作業人員", "無"),
+                        "製令": v.get("製令", "無"), # 舊格式沒這欄
+                        "製造工序": v.get("製造工序", "無"), # 舊格式沒這欄
+                        "派工人員": v.get("派工人員", "無"), # 舊格式沒這欄
+                        "作業人員": v.get("作業人員", "無"), 
                         "作業期限": v.get("作業期限", str(datetime.date.today()))
                     })
                 df = pd.DataFrame(all_logs)
                 st.subheader("🔍 當前紀錄清單")
                 st.dataframe(df[["製令", "製造工序", "派工人員", "作業人員", "作業期限"]], use_container_width=True, hide_index=True)
                 st.write("---")
-                st.subheader("🛠️ 紀錄維護工具")
-                log_options = {log['id']: f"【{log['製令']}】 作業：{log['作業人員']}" for log in all_logs}
-                target_id = st.selectbox("請選擇要編輯或刪除的紀錄", options=list(log_options.keys()), format_func=lambda x: log_options[x])
+                
+                st.subheader("🛠️ 紀錄維護工具") # 補回紀錄維護工具區塊
+                # 準備下拉選單選項
+                log_options = {log['id']: f"製令：{log['製令']} | 人員：{log['作業人員']} | 期限：{log['作業期限']}" for log in all_logs}
+                
+                target_id = st.selectbox("請選擇要編輯或刪除的紀錄", 
+                                       options=list(log_options.keys()), 
+                                       format_func=lambda x: log_options[x])
+                
                 curr = next(item for item in all_logs if item["id"] == target_id)
-                with st.expander("📝 編輯此筆內容"):
+                
+                with st.expander("📝 編輯此筆內容", expanded=False):
                     ec1, ec2 = st.columns(2)
-                    new_order = ec1.selectbox("修改製令", settings.get("orders", []), index=settings.get("orders", []).index(curr['製令']) if curr['製令'] in settings.get("orders", []) else 0)
-                    new_proc = ec2.selectbox("修改工序", settings.get("processes", []), index=settings.get("processes", []).index(curr['製造工序']) if curr['製造工序'] in settings.get("processes", []) else 0)
+                    
+                    # 使用 get 容錯抓取當前資料 ( image_4c8d29.png)
+                    new_order = ec1.selectbox("修改製令", settings.get("orders", []), 
+                                           index=settings.get("orders", []).index(curr['製令']) if curr['製令'] in settings.get("orders", []) else 0)
+                    new_proc = ec2.selectbox("修改工序", settings.get("processes", []), 
+                                           index=settings.get("processes", []).index(curr['製造工序']) if curr['製造工序'] in settings.get("processes", []) else 0)
+                    
                     ec3, ec4, ec5 = st.columns(3)
-                    new_a = ec3.selectbox("編輯派工員", settings.get("assigners", []), index=settings.get("assigners", []).index(curr['派工人員']) if curr['派工人員'] in settings.get("assigners", []) else 0)
-                    new_w = ec4.selectbox("編輯作業員", settings.get("workers", []), index=settings.get("workers", []).index(curr['作業人員']) if curr['作業人員'] in settings.get("workers", []) else 0)
+                    new_a = ec3.selectbox("編輯派工員", settings.get("assigners", []), 
+                                       index=settings.get("assigners", []).index(curr['派工人員']) if curr['派工人員'] in settings.get("assigners", []) else 0)
+                    new_w = ec4.selectbox("編輯作業員", settings.get("workers", []), 
+                                       index=settings.get("workers", []).index(curr['作業人員']) if curr['作業人員'] in settings.get("workers", []) else 0)
+                    
                     try: d_val = datetime.datetime.strptime(curr['作業期限'], '%Y-%m-%d').date()
                     except: d_val = datetime.date.today()
                     new_d = ec5.date_input("編輯期限", d_val)
-                    if st.button("💾 儲存修改"):
-                        requests.patch(f"{DB_URL}/{target_id}.json", json={"製令": new_order, "製造工序": new_proc, "派工人員": new_a, "作業人員": new_w, "作業期限": str(new_d)})
+                    
+                    if st.button("💾 儲存修改"): # 【特效】：此按鈕加上特效
+                        # 執行修改邏輯 (image_4c8d29.png)
+                        requests.patch(f"{DB_URL}/{target_id}.json", json={
+                            "製令": new_order, 
+                            "製造工序": new_proc, 
+                            "派工人員": new_a, 
+                            "作業人員": new_w, 
+                            "作業期限": str(new_d)
+                        })
                         st.balloons() # 🎈 特效
-                        st.success("更新完成！")
+                        st.success("紀錄已成功更新！")
                         st.rerun()
+
                 if st.button("🗑️ 刪除選定紀錄", type="primary"):
                     requests.delete(f"{DB_URL}/{target_id}.json")
-                    st.balloons() # 🎈 特效
+                    st.warning("紀錄已從系統移除。")
                     st.rerun()
-            else: st.info("目前沒有紀錄。")
-        except Exception as e: st.error(f"系統異常: {e}")
+            else: st.info("目前沒有紀錄可供維護。")
+        except Exception as e: st.error(f"連線資料庫異常: {e}")
 
     # --- 6. ⚙️ 系統內容管理 ---
     elif menu == "⚙️ 系統內容管理":
@@ -204,6 +227,5 @@ else:
                     "workers": [x.strip() for x in new_workers.split(",") if x.strip()],
                     "processes": [x.strip() for x in new_procs.split(",") if x.strip()]
                 })
-                st.balloons() # 🎈 特效
                 st.success("設定已分類儲存！")
                 st.rerun()
