@@ -4,6 +4,7 @@ import datetime
 import requests
 
 # --- 1. 核心設定 ---
+# 確保網址最後都有 .json 以利 Firebase REST API 存取
 DB_URL = "https://my-factory-system-default-rtdb.firebaseio.com/work_logs"
 DONE_URL = "https://my-factory-system-default-rtdb.firebaseio.com/completed_logs"
 SETTING_URL = "https://my-factory-system-default-rtdb.firebaseio.com/settings"
@@ -48,7 +49,7 @@ if "user" not in st.session_state:
 else:
     st.sidebar.markdown(f"👤 **使用者：{st.session_state.user}**")
     
-    # 修改後的導航選單 (對應截圖需求)
+    # 保留原本選單名稱
     menu = st.sidebar.radio(
         "導航選單", 
         ["📊 經營者看板 (首頁)", "✅ 已完工歷史紀錄查詢", "📝 現場派工作業", "📝 編輯派工紀錄", "⚙️ 系統內容管理"]
@@ -92,7 +93,7 @@ else:
                 if sel_worker != "全部": filtered_df = filtered_df[filtered_df["作業人員"] == sel_worker]
 
                 st.subheader("📑 待辦派工明細清單") 
-                st.dataframe(filtered_df[["製令", "製造工序", "派工人員", "作業人員", "作業期限"]], use_container_width=True, height=400, hide_index=True)
+                st.dataframe(filtered_df[["製令", "製造工序", "派工人員", "作業人員", "作業期限"]], use_container_width=True, height=300, hide_index=True)
 
                 st.markdown("---")
                 st.subheader("📦 快速結案 (點擊按鈕標記完工)")
@@ -101,18 +102,28 @@ else:
                         col_info, col_btn = st.columns([4, 1])
                         with col_info:
                             st.markdown(f"### 📦 製令：{row['製令']} | 👷 作業員：{row['作業人員']}")
+                            st.caption(f"工序：{row['製造工序']} | 期限：{row['作業期限']} | 派工：{row['派工人員']}")
+                        
+                        # 修正結案連線邏輯
                         if col_btn.button(f"✅ 完工", key=f"btn_{row['db_key']}"):
                             done_data = row.to_dict()
                             db_key = done_data.pop('db_key')
                             done_data['實際完工時間'] = get_now_str()
-                            requests.post(f"{DONE_URL}.json", json=done_data)
-                            requests.delete(f"{DB_URL}/{db_key}.json")
-                            st.balloons()
-                            st.rerun()
+                            
+                            # 1. 寫入完工庫 2. 刪除待辦庫
+                            res_post = requests.post(f"{DONE_URL}.json", json=done_data)
+                            res_del = requests.delete(f"{DB_URL}/{db_key}.json")
+                            
+                            if res_post.status_code == 200 and res_del.status_code == 200:
+                                st.success(f"製令 {row['製令']} 已結案！")
+                                st.balloons()
+                                st.rerun()
+                            else:
+                                st.error("連線資料庫失敗，請檢查網路或 Firebase 設定。")
             else:
                 st.info("目前尚無待辦派工。")
-        except:
-            st.error("連線資料庫失敗。")
+        except Exception as e:
+            st.error(f"連線資料庫失敗：{e}")
 
     # --- 4. ✅ 已完工歷史紀錄查詢 ---
     elif menu == "✅ 已完工歷史紀錄查詢":
@@ -124,7 +135,7 @@ else:
                 df_done = pd.DataFrame(list(done_data.values()))
                 if '實際完工時間' in df_done.columns:
                     df_done = df_done.sort_values(by='實際完工時間', ascending=False)
-                # 修復截圖中的括號遺漏問題
+                # 修復之前的語法錯誤 (確保括號完整閉合)
                 st.dataframe(df_done[["實際完工時間", "製令", "製造工序", "作業人員"]], use_container_width=True, height=600, hide_index=True)
             else:
                 st.info("目前尚無完工紀錄。")
@@ -164,7 +175,7 @@ else:
                         "作業期限": v.get("作業期限", "無")
                     })
                 
-                log_options = {log['id']: f"製令：{log['製令']} | 作業員：{log['作業人員']}" for log in all_logs}
+                log_options = {log['id']: f"製令：{log['製令']} | 人員：{log['作業人員']}" for log in all_logs}
                 target_id = st.selectbox("請選擇要編輯或刪除的紀錄", options=list(log_options.keys()), format_func=lambda x: log_options[x])
                 
                 curr = next(item for item in all_logs if item["id"] == target_id)
@@ -174,12 +185,8 @@ else:
                     new_order = ec1.selectbox("修改製令", settings.get("orders", []), index=settings.get("orders", []).index(curr['製令']) if curr['製令'] in settings.get("orders", []) else 0)
                     new_proc = ec2.selectbox("修改工序", settings.get("processes", []), index=settings.get("processes", []).index(curr['製造工序']) if curr['製造工序'] in settings.get("processes", []) else 0)
                     
-                    ec3, ec4 = st.columns(2)
-                    new_assigner = ec3.selectbox("修改派工人員", settings.get("assigners", []), index=settings.get("assigners", []).index(curr['派工人員']) if curr['派工人員'] in settings.get("assigners", []) else 0)
-                    new_worker = ec4.selectbox("修改作業人員", settings.get("workers", []), index=settings.get("workers", []).index(curr['作業人員']) if curr['作業人員'] in settings.get("workers", []) else 0)
-                    
                     if st.button("💾 儲存修改"):
-                        updated_data = {"製令": new_order, "製造工序": new_proc, "派工人員": new_assigner, "作業人員": new_worker}
+                        updated_data = {"製令": new_order, "製造工序": new_proc}
                         requests.patch(f"{DB_URL}/{target_id}.json", json=updated_data)
                         st.success("紀錄已更新！")
                         st.rerun()
