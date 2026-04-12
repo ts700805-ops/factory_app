@@ -27,23 +27,12 @@ st.set_page_config(page_title="超慧科技●神鬼奇航●派工系統", layo
 
 st.markdown("""
     <style>
-    div[data-testid="stDataFrame"] div[role="gridcell"] > div {
-        font-size: 80px !important;
-        line-height: 1.2 !important;
-        font-weight: bold !important;
-    }
-    div[data-testid="stDataFrame"] div[role="columnheader"] span {
-        font-size: 50px !important;
-        font-weight: bold !important;
-    }
-    div[data-testid="stDataFrame"] div[role="row"] {
-        height: 120px !important;
-    }
+    div[data-testid="stDataFrame"] div[role="gridcell"] > div { font-size: 20px !important; font-weight: bold !important; }
+    div[data-testid="stDataFrame"] div[role="columnheader"] span { font-size: 22px !important; font-weight: bold !important; }
     .stSelectbox label { font-size: 26px !important; font-weight: bold !important; }
-    .stSelectbox div[data-baseweb="select"] > div { font-size: 24px !important; height: 60px !important; }
     .main-title { font-size: 48px !important; font-weight: bold; color: #1E3A8A; border-bottom: 4px solid #1E3A8A; margin-bottom: 25px; }
     .stat-card { background-color: #ffffff; padding: 20px; border-radius: 15px; border-top: 6px solid #1E3A8A; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center; }
-    .stButton>button { height: 75px; font-size: 32px !important; font-weight: bold !important; }
+    .stButton>button { height: 60px; font-size: 24px !important; font-weight: bold !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -58,8 +47,12 @@ if "user" not in st.session_state:
         st.rerun()
 else:
     st.sidebar.markdown(f"👤 **使用者：{st.session_state.user}**")
-    # 【修改位置 1】：修改導航選單文字
-    menu = st.sidebar.radio("導航選單", ["📊 經營者看板 (首頁)", "📝 現場派工作業", "📝 編輯派工紀錄", "⚙️ 系統內容管理"])
+    
+    # 修改後的導航選單 (對應截圖需求)
+    menu = st.sidebar.radio(
+        "導航選單", 
+        ["📊 經營者看板 (首頁)", "✅ 已完工歷史紀錄查詢", "📝 現場派工作業", "📝 編輯派工紀錄", "⚙️ 系統內容管理"]
+    )
     
     if st.sidebar.button("登出系統"):
         st.session_state.clear()
@@ -118,25 +111,27 @@ else:
                             st.rerun()
             else:
                 st.info("目前尚無待辦派工。")
-
-            st.markdown("---")
-            st.markdown('<p class="main-title" style="color: #059669; border-bottom: 4px solid #059669;">✅ 已完工歷史紀錄查詢</p>', unsafe_allow_html=True)
-            try:
-                r_done = requests.get(f"{DONE_URL}.json")
-                done_data = r_done.json()
-                if done_data:
-                    df_done = pd.DataFrame(list(done_data.values()))
-                    if '實際完工時間' in df_done.columns:
-                        df_done = df_done.sort_values(by='實際完工時間', ascending=False)
-                    st.dataframe(df_done[["實際完工時間", "製令", "製造工序", "作業人員"]], use_container_width=True, height=400, hide_index=True)
-                else:
-                    st.info("目前尚無完工紀錄。")
-            except:
-                st.write("完工紀錄讀取中...")
         except:
             st.error("連線資料庫失敗。")
 
-    # --- 4. 📝 現場派工作業 ---
+    # --- 4. ✅ 已完工歷史紀錄查詢 ---
+    elif menu == "✅ 已完工歷史紀錄查詢":
+        st.markdown('<p class="main-title" style="color: #059669; border-bottom: 4px solid #059669;">✅ 已完工歷史紀錄查詢</p>', unsafe_allow_html=True)
+        try:
+            r_done = requests.get(f"{DONE_URL}.json")
+            done_data = r_done.json()
+            if done_data:
+                df_done = pd.DataFrame(list(done_data.values()))
+                if '實際完工時間' in df_done.columns:
+                    df_done = df_done.sort_values(by='實際完工時間', ascending=False)
+                # 修復截圖中的括號遺漏問題
+                st.dataframe(df_done[["實際完工時間", "製令", "製造工序", "作業人員"]], use_container_width=True, height=600, hide_index=True)
+            else:
+                st.info("目前尚無完工紀錄。")
+        except:
+            st.error("讀取完工紀錄失敗。")
+
+    # --- 5. 📝 現場派工作業 ---
     elif menu == "📝 現場派工作業":
         st.header("📝 建立新派工任務")
         with st.form("dispatch_form"):
@@ -151,10 +146,9 @@ else:
                 requests.post(f"{DB_URL}.json", json=log)
                 st.success("任務已發布！")
 
-    # --- 5. 📝 編輯派工紀錄 (原本的歷史紀錄查詢) ---
+    # --- 6. 📝 編輯派工紀錄 ---
     elif menu == "📝 編輯派工紀錄":
-        # 【修改位置 2】：修改內部標題文字
-        st.header("📝 編輯派工紀錄")
+        st.header("📝 待辦派工紀錄維護")
         try:
             r = requests.get(f"{DB_URL}.json")
             db_data = r.json()
@@ -185,12 +179,7 @@ else:
                     new_worker = ec4.selectbox("修改作業人員", settings.get("workers", []), index=settings.get("workers", []).index(curr['作業人員']) if curr['作業人員'] in settings.get("workers", []) else 0)
                     
                     if st.button("💾 儲存修改"):
-                        updated_data = {
-                            "製令": new_order, 
-                            "製造工序": new_proc,
-                            "派工人員": new_assigner,
-                            "作業人員": new_worker
-                        }
+                        updated_data = {"製令": new_order, "製造工序": new_proc, "派工人員": new_assigner, "作業人員": new_worker}
                         requests.patch(f"{DB_URL}/{target_id}.json", json=updated_data)
                         st.success("紀錄已更新！")
                         st.rerun()
@@ -203,9 +192,9 @@ else:
             else:
                 st.info("目前沒有待辦紀錄。")
         except:
-            st.write("讀取資料失敗。")
+            st.error("讀取資料失敗。")
 
-    # --- 6. ⚙️ 系統內容管理 ---
+    # --- 7. ⚙️ 系統內容管理 ---
     elif menu == "⚙️ 系統內容管理":
         st.header("⚙️ 選單內容管理")
         with st.form("settings_form"):
