@@ -58,7 +58,8 @@ if "user" not in st.session_state:
         st.rerun()
 else:
     st.sidebar.markdown(f"👤 **使用者：{st.session_state.user}**")
-    menu = st.sidebar.radio("導航選單", ["📊 經營者看板 (首頁)", "📝 現場派工作業", "📋 歷史紀錄查詢", "⚙️ 系統內容管理"])
+    # 【修改位置 1】：修改導航選單文字
+    menu = st.sidebar.radio("導航選單", ["📊 經營者看板 (首頁)", "📝 現場派工作業", "📝 編輯派工紀錄", "⚙️ 系統內容管理"])
     
     if st.sidebar.button("登出系統"):
         st.session_state.clear()
@@ -150,9 +151,10 @@ else:
                 requests.post(f"{DB_URL}.json", json=log)
                 st.success("任務已發布！")
 
-    # --- 5. 📋 歷史紀錄查詢 (修正編輯功能) ---
-    elif menu == "📋 歷史紀錄查詢":
-        st.header("📋 待辦紀錄維護")
+    # --- 5. 📝 編輯派工紀錄 (原本的歷史紀錄查詢) ---
+    elif menu == "📝 編輯派工紀錄":
+        # 【修改位置 2】：修改內部標題文字
+        st.header("📝 編輯派工紀錄")
         try:
             r = requests.get(f"{DB_URL}.json")
             db_data = r.json()
@@ -175,11 +177,9 @@ else:
                 
                 with st.expander("📝 編輯此筆內容", expanded=True):
                     ec1, ec2 = st.columns(2)
-                    # 修改製令與工序
                     new_order = ec1.selectbox("修改製令", settings.get("orders", []), index=settings.get("orders", []).index(curr['製令']) if curr['製令'] in settings.get("orders", []) else 0)
                     new_proc = ec2.selectbox("修改工序", settings.get("processes", []), index=settings.get("processes", []).index(curr['製造工序']) if curr['製造工序'] in settings.get("processes", []) else 0)
                     
-                    # 找回來的：修改派工人員與作業人員
                     ec3, ec4 = st.columns(2)
                     new_assigner = ec3.selectbox("修改派工人員", settings.get("assigners", []), index=settings.get("assigners", []).index(curr['派工人員']) if curr['派工人員'] in settings.get("assigners", []) else 0)
                     new_worker = ec4.selectbox("修改作業人員", settings.get("workers", []), index=settings.get("workers", []).index(curr['作業人員']) if curr['作業人員'] in settings.get("workers", []) else 0)
