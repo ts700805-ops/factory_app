@@ -111,7 +111,7 @@ else:
         except Exception as e:
             st.error(f"系統錯誤：{e}")
 
-    # --- 4. ✅ 已完工歷史紀錄查詢 (修正刪除錯誤) ---
+    # --- 4. ✅ 已完工歷史紀錄查詢 (修正刪除連線錯誤) ---
     elif menu == "✅ 已完工歷史紀錄查詢":
         st.markdown('<p class="main-title" style="color: #059669; border-bottom: 4px solid #059669;">✅ 已完工歷史紀錄查詢</p>', unsafe_allow_html=True)
         try:
@@ -144,14 +144,17 @@ else:
                                 st.success("歷史紀錄已更新！")
                                 st.rerun()
 
-                        # 修正刪除邏輯
+                        # 修正刪除邏輯中的變數與連線問題
                         st.markdown("⚠️ **刪除歷史紀錄**")
-                        del_pass = st.text_input("輸入管理密碼以刪除", type="password", key=f"hist_del_{target_done_key}")
+                        del_h_pass = st.text_input("輸入管理密碼以刪除紀錄", type="password", key=f"h_del_pwd_{target_done_key}")
                         if st.button("🗑️ 確認刪除此筆歷史紀錄", type="primary"):
-                            if del_pass == "1234":
-                                requests.delete(f"{DONE_URL}/{target_done_key}.json")
-                                st.warning("紀錄已從資料庫移除。")
-                                st.rerun()
+                            if del_h_pass == "1234":
+                                del_res = requests.delete(f"{DONE_URL}/{target_done_key}.json")
+                                if del_res.status_code == 200:
+                                    st.warning("紀錄已從資料庫移除。")
+                                    st.rerun()
+                                else:
+                                    st.error("資料庫連線錯誤，無法刪除。")
                             else:
                                 st.error("密碼錯誤，無法刪除！")
                 else: st.info("目前尚無完工紀錄。")
@@ -174,12 +177,12 @@ else:
                 log = {"製令": order_no, "製造工序": process_name, "派工人員": assigner, "作業人員": worker, "協助人員": assistant, "作業期限": str(deadline), "提交時間": get_now_str()}
                 res = requests.post(f"{DB_URL}.json", json=log)
                 if res.status_code == 200:
-                    st.balloons() # 氣球特效
+                    st.balloons() # 確保氣球特效在
                     st.success(f"任務 [{order_no}] 已成功發布！")
                 else:
                     st.error("發布失敗，請檢查資料庫連線。")
 
-    # --- 6. 📝 編輯派工紀錄 ---
+    # --- 6. 📝 編輯派工紀錄 (新增製令與派工人員編輯) ---
     elif menu == "📝 編輯派工紀錄":
         st.header("📝 待辦派工紀錄維護")
         try:
@@ -195,29 +198,16 @@ else:
                     curr = next((i for i in all_logs if i["id"] == target_id), None)
                     if curr:
                         with st.expander("📝 編輯內容", expanded=True):
-                            ec1, ec2 = st.columns(2)
-                            new_worker = ec1.selectbox("修改主要人員", settings.get("workers", []), index=settings.get("workers", []).index(curr.get('作業人員')) if curr.get('作業人員') in settings.get("workers", []) else 0)
-                            new_assist = ec2.selectbox("修改協助人員", ["無"] + settings.get("workers", []), index=(["無"] + settings.get("workers", [])).index(curr.get('協助人員')) if curr.get('協助人員') in (["無"] + settings.get("workers", [])) else 0)
+                            c1, c2 = st.columns(2)
+                            # 新增製令與派工人員修改
+                            edit_order = c1.selectbox("修改製令編號", settings.get("orders", []), index=settings.get("orders", []).index(curr.get('製令')) if curr.get('製令') in settings.get("orders", []) else 0)
+                            edit_assigner = c2.selectbox("修改派工人員", settings.get("assigners", []), index=settings.get("assigners", []).index(curr.get('派工人員')) if curr.get('派工人員') in settings.get("assigners", []) else 0)
+                            
+                            c3, c4 = st.columns(2)
+                            new_worker = c3.selectbox("修改主要人員", settings.get("workers", []), index=settings.get("workers", []).index(curr.get('作業人員')) if curr.get('作業人員') in settings.get("workers", []) else 0)
+                            new_assist = c4.selectbox("修改協助人員", ["無"] + settings.get("workers", []), index=(["無"] + settings.get("workers", [])).index(curr.get('協助人員')) if curr.get('協助人員') in (["無"] + settings.get("workers", [])) else 0)
+                            
                             if st.button("💾 儲存派工修改"):
-                                requests.patch(f"{DB_URL}/{target_id}.json", json={"作業人員": new_worker, "協助人員": new_assist})
-                                st.success("紀錄已更新！")
-                                st.rerun()
-                        if st.button("🗑️ 刪除此筆待辦任務", type="primary"):
-                            requests.delete(f"{DB_URL}/{target_id}.json")
-                            st.rerun()
-            else: st.info("目前沒有待辦紀錄。")
-        except: st.error("讀取資料失敗。")
-
-    # --- 7. ⚙️ 系統內容管理 ---
-    elif menu == "⚙️ 系統內容管理":
-        st.header("⚙️ 選單內容管理")
-        with st.form("settings_form"):
-            new_orders = st.text_area("📦 編輯製令清單 (逗號隔開)", value=",".join(settings.get("orders", [])), height=120)
-            new_workers = st.text_area("👷 編輯人員清單", value=",".join(settings.get("workers", [])), height=100)
-            if st.form_submit_button("✅ 儲存系統設定"):
-                requests.patch(f"{SETTING_URL}.json", json={
-                    "orders": [x.strip() for x in new_orders.split(",") if x.strip()],
-                    "workers": [x.strip() for x in new_workers.split(",") if x.strip()]
-                })
-                st.success("系統設定已儲存！")
-                st.rerun()
+                                patch_data = {
+                                    "製令": edit_order,
+                                    "派
