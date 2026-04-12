@@ -31,10 +31,8 @@ st.markdown("""
     div[data-testid="stDataFrame"] div[role="columnheader"] span { font-size: 22px !important; font-weight: bold !important; }
     .stSelectbox label { font-size: 26px !important; font-weight: bold !important; }
     
-    /* 標題樣式 */
     .main-title { font-size: 36px !important; font-weight: bold; color: #1E3A8A; border-bottom: 4px solid #1E3A8A; margin-bottom: 25px; }
     
-    /* 修改重點：將卡片樣式改小，縮減 padding 與間距，確保手機版同步顯示 */
     .stat-card { 
         background-color: #ffffff; 
         padding: 5px 2px; 
@@ -85,7 +83,6 @@ else:
                     all_logs.append(v)
                 df = pd.DataFrame(all_logs)
 
-                # 使用 columns 並在 CSS 中配合將卡片縮小，使其在手機版也能橫向排列
                 c1, c2 = st.columns(2)
                 with c1: 
                     st.markdown(f'<div class="stat-card">總派件數<br><span class="stat-value">{len(df)}</span> 件</div>', unsafe_allow_html=True)
@@ -127,7 +124,6 @@ else:
                             res_del = requests.delete(f"{DB_URL}/{db_key}.json")
                             if res_post.status_code == 200 and res_del.status_code == 200:
                                 st.success(f"製令 {row['製令']} 已結案！")
-                                st.balloons()
                                 st.rerun()
                             else:
                                 st.error("連線資料庫失敗。")
@@ -167,9 +163,9 @@ else:
                             st.warning("紀錄已成功刪除。")
                             st.rerun()
                         else:
-                            st.error("刪除失敗，請檢查資料庫連線。")
+                            st.error("刪除失敗。")
                     else:
-                        st.error("密碼錯誤，拒絕刪除！")
+                        st.error("密碼錯誤！")
             else:
                 st.info("目前尚無完工紀錄。")
         except:
@@ -190,62 +186,65 @@ else:
                 res = requests.post(f"{DB_URL}.json", json=log)
                 if res.status_code == 200:
                     st.success("任務已發布！")
-                    st.balloons()
                 else:
-                    st.error("發布失敗，請確認網路連線。")
+                    st.error("發布失敗。")
 
-    # --- 6. 📝 編輯派工紀錄 ---
+    # --- 6. 📝 編輯派工紀錄 (修正刪除後讀取失敗的問題) ---
     elif menu == "📝 編輯派工紀錄":
         st.header("📝 待辦派工紀錄維護")
         try:
             r = requests.get(f"{DB_URL}.json")
             db_data = r.json()
+            
             if db_data:
                 all_logs = []
                 for k, v in db_data.items():
-                    all_logs.append({
-                        "id": k, 
-                        "製令": v.get("製令", "無"), 
-                        "製造工序": v.get("製造工序", "無"), 
-                        "派工人員": v.get("派工人員", "無"), 
-                        "作業人員": v.get("作業人員", "無"), 
-                        "作業期限": v.get("作業期限", "無")
-                    })
+                    if v: # 確保資料不是空的
+                        all_logs.append({
+                            "id": k, 
+                            "製令": v.get("製令", "無"), 
+                            "製造工序": v.get("製造工序", "無"), 
+                            "派工人員": v.get("派工人員", "無"), 
+                            "作業人員": v.get("作業人員", "無"), 
+                            "作業期限": v.get("作業期限", "無")
+                        })
                 
-                log_options = {log['id']: f"製令：{log['製令']} | 人員：{log['作業人員']}" for log in all_logs}
-                target_id = st.selectbox("請選擇要編輯或刪除的紀錄", options=list(log_options.keys()), format_func=lambda x: log_options[x])
-                
-                curr = next(item for item in all_logs if item["id"] == target_id)
-                
-                with st.expander("📝 編輯此筆內容", expanded=True):
-                    ec1, ec2 = st.columns(2)
-                    new_order = ec1.selectbox("修改製令", settings.get("orders", []), index=settings.get("orders", []).index(curr['製令']) if curr['製令'] in settings.get("orders", []) else 0)
-                    new_proc = ec2.selectbox("修改工序", settings.get("processes", []), index=settings.get("processes", []).index(curr['製造工序']) if curr['製造工序'] in settings.get("processes", []) else 0)
+                if all_logs:
+                    log_options = {log['id']: f"製令：{log['製令']} | 人員：{log['作業人員']}" for log in all_logs}
+                    target_id = st.selectbox("請選擇要編輯或刪除的紀錄", options=list(log_options.keys()), format_func=lambda x: log_options[x])
                     
-                    ec3, ec4 = st.columns(2)
-                    new_assigner = ec3.selectbox("修改派工人員", settings.get("assigners", []), index=settings.get("assigners", []).index(curr['派工人員']) if curr['派工人員'] in settings.get("assigners", []) else 0)
-                    new_worker = ec4.selectbox("修改作業人員", settings.get("workers", []), index=settings.get("workers", []).index(curr['作業人員']) if curr['作業人員'] in settings.get("workers", []) else 0)
+                    curr = next((item for item in all_logs if item["id"] == target_id), None)
                     
-                    if st.button("💾 儲存修改"):
-                        updated_data = {
-                            "製令": new_order, 
-                            "製造工序": new_proc,
-                            "派工人員": new_assigner,
-                            "作業人員": new_worker
-                        }
-                        requests.patch(f"{DB_URL}/{target_id}.json", json=updated_data)
-                        st.success("紀錄已更新！")
-                        st.rerun()
+                    if curr:
+                        with st.expander("📝 編輯此筆內容", expanded=True):
+                            ec1, ec2 = st.columns(2)
+                            new_order = ec1.selectbox("修改製令", settings.get("orders", []), index=settings.get("orders", []).index(curr['製令']) if curr['製令'] in settings.get("orders", []) else 0)
+                            new_proc = ec2.selectbox("修改工序", settings.get("processes", []), index=settings.get("processes", []).index(curr['製造工序']) if curr['製造工序'] in settings.get("processes", []) else 0)
+                            
+                            ec3, ec4 = st.columns(2)
+                            new_assigner = ec3.selectbox("修改派工人員", settings.get("assigners", []), index=settings.get("assigners", []).index(curr['派工人員']) if curr['派工人員'] in settings.get("assigners", []) else 0)
+                            new_worker = ec4.selectbox("修改作業人員", settings.get("workers", []), index=settings.get("workers", []).index(curr['作業人員']) if curr['作業人員'] in settings.get("workers", []) else 0)
+                            
+                            if st.button("💾 儲存修改"):
+                                updated_data = {"製令": new_order, "製造工序": new_proc, "派工人員": new_assigner, "作業人員": new_worker}
+                                requests.patch(f"{DB_URL}/{target_id}.json", json=updated_data)
+                                st.success("紀錄已更新！")
+                                st.rerun()
 
-                st.markdown("---")
-                if st.button("🗑️ 刪除選定紀錄", type="primary"):
-                    requests.delete(f"{DB_URL}/{target_id}.json")
-                    st.warning("紀錄已刪除。")
-                    st.rerun()
+                        st.markdown("---")
+                        if st.button("🗑️ 刪除選定紀錄", type="primary"):
+                            del_res = requests.delete(f"{DB_URL}/{target_id}.json")
+                            if del_res.status_code == 200:
+                                st.warning("紀錄已刪除。")
+                                st.rerun()
+                            else:
+                                st.error("刪除失敗。")
+                else:
+                    st.info("目前沒有待辦紀錄。")
             else:
                 st.info("目前沒有待辦紀錄。")
-        except:
-            st.error("讀取資料失敗。")
+        except Exception as e:
+            st.error(f"讀取資料失敗：{e}")
 
     # --- 7. ⚙️ 系統內容管理 ---
     elif menu == "⚙️ 系統內容管理":
