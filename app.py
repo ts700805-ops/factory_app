@@ -4,7 +4,6 @@ import datetime
 import requests
 
 # --- 1. 核心設定 ---
-# 確保網址最後都有 .json 以利 Firebase REST API 存取
 DB_URL = "https://my-factory-system-default-rtdb.firebaseio.com/work_logs"
 DONE_URL = "https://my-factory-system-default-rtdb.firebaseio.com/completed_logs"
 SETTING_URL = "https://my-factory-system-default-rtdb.firebaseio.com/settings"
@@ -49,7 +48,6 @@ if "user" not in st.session_state:
 else:
     st.sidebar.markdown(f"👤 **使用者：{st.session_state.user}**")
     
-    # 保留原本選單名稱
     menu = st.sidebar.radio(
         "導航選單", 
         ["📊 經營者看板 (首頁)", "✅ 已完工歷史紀錄查詢", "📝 現場派工作業", "📝 編輯派工紀錄", "⚙️ 系統內容管理"]
@@ -104,39 +102,60 @@ else:
                             st.markdown(f"### 📦 製令：{row['製令']} | 👷 作業員：{row['作業人員']}")
                             st.caption(f"工序：{row['製造工序']} | 期限：{row['作業期限']} | 派工：{row['派工人員']}")
                         
-                        # 修正結案連線邏輯
                         if col_btn.button(f"✅ 完工", key=f"btn_{row['db_key']}"):
                             done_data = row.to_dict()
                             db_key = done_data.pop('db_key')
                             done_data['實際完工時間'] = get_now_str()
-                            
-                            # 1. 寫入完工庫 2. 刪除待辦庫
                             res_post = requests.post(f"{DONE_URL}.json", json=done_data)
                             res_del = requests.delete(f"{DB_URL}/{db_key}.json")
-                            
                             if res_post.status_code == 200 and res_del.status_code == 200:
                                 st.success(f"製令 {row['製令']} 已結案！")
                                 st.balloons()
                                 st.rerun()
                             else:
-                                st.error("連線資料庫失敗，請檢查網路或 Firebase 設定。")
+                                st.error("連線資料庫失敗。")
             else:
                 st.info("目前尚無待辦派工。")
         except Exception as e:
             st.error(f"連線資料庫失敗：{e}")
 
-    # --- 4. ✅ 已完工歷史紀錄查詢 ---
+    # --- 4. ✅ 已完工歷史紀錄查詢 (加入刪除功能) ---
     elif menu == "✅ 已完工歷史紀錄查詢":
         st.markdown('<p class="main-title" style="color: #059669; border-bottom: 4px solid #059669;">✅ 已完工歷史紀錄查詢</p>', unsafe_allow_html=True)
         try:
             r_done = requests.get(f"{DONE_URL}.json")
             done_data = r_done.json()
             if done_data:
-                df_done = pd.DataFrame(list(done_data.values()))
+                # 建立列表並保留 Firebase 的 Key
+                done_list = []
+                for k, v in done_data.items():
+                    v['done_key'] = k
+                    done_list.append(v)
+                
+                df_done = pd.DataFrame(done_list)
                 if '實際完工時間' in df_done.columns:
                     df_done = df_done.sort_values(by='實際完工時間', ascending=False)
-                # 修復之前的語法錯誤 (確保括號完整閉合)
-                st.dataframe(df_done[["實際完工時間", "製令", "製造工序", "作業人員"]], use_container_width=True, height=600, hide_index=True)
+                
+                st.dataframe(df_done[["實際完工時間", "製令", "製造工序", "作業人員"]], use_container_width=True, height=400, hide_index=True)
+                
+                # 新增刪除功能區塊
+                st.markdown("---")
+                st.subheader("🗑️ 歷史紀錄維護 (刪除)")
+                delete_options = {row['done_key']: f"[{row.get('實際完工時間', '未知')}] 製令:{row['製令']} - {row['作業人員']}" for _, row in df_done.iterrows()}
+                target_del_key = st.selectbox("選擇要刪除的紀錄", options=list(delete_options.keys()), format_func=lambda x: delete_options[x])
+                
+                # 密碼驗證與刪除按鈕
+                del_pass = st.text_input("輸入管理密碼以刪除", type="password", key="del_pass_history")
+                if st.button("🗑️ 確認刪除此筆紀錄", type="primary"):
+                    if del_pass == "1234":
+                        res = requests.delete(f"{DONE_URL}/{target_del_key}.json")
+                        if res.status_code == 200:
+                            st.warning("紀錄已成功刪除。")
+                            st.rerun()
+                        else:
+                            st.error("刪除失敗，請檢查資料庫連線。")
+                    else:
+                        st.error("密碼錯誤，拒絕刪除！")
             else:
                 st.info("目前尚無完工紀錄。")
         except:
