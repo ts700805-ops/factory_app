@@ -149,10 +149,10 @@ else:
                         if st.button("🗑️ 確認刪除此筆歷史紀錄", type="primary"):
                             if del_h_pass == "1234":
                                 requests.delete(f"{DONE_URL}/{target_done_key}.json")
-                                st.warning("紀錄已移除。")
+                                st.warning("紀錄已從資料庫移除。")
                                 st.rerun()
                             else:
-                                st.error("密碼錯誤！")
+                                st.error("密碼錯誤，無法刪除！")
                 else: st.info("目前尚無完工紀錄。")
             else: st.info("目前尚無完工紀錄。")
         except Exception as e: st.error(f"連線錯誤：{e}")
@@ -173,10 +173,10 @@ else:
                 log = {"製令": order_no, "製造工序": process_name, "派工人員": assigner, "作業人員": worker, "協助人員": assistant, "作業期限": str(deadline), "提交時間": get_now_str()}
                 res = requests.post(f"{DB_URL}.json", json=log)
                 if res.status_code == 200:
-                    st.balloons() # 保留氣球特效
+                    st.balloons() # 確保氣球特效在
                     st.success(f"任務 [{order_no}] 已成功發布！")
                 else:
-                    st.error("發布失敗。")
+                    st.error("發布失敗，請檢查網路連線。")
 
     # --- 6. 📝 編輯派工紀錄 (新增製令與派工人員編輯) ---
     elif menu == "📝 編輯派工紀錄":
@@ -210,16 +210,22 @@ else:
                                     "作業人員": new_worker, 
                                     "協助人員": new_assist
                                 }
-                                requests.patch(f"{DB_URL}/{target_id}.json", json=patch_data)
-                                st.success("紀錄已更新！")
-                                st.rerun()
+                                # 修復讀取失敗：確保 Patch 成功後再跳轉
+                                res_patch = requests.patch(f"{DB_URL}/{target_id}.json", json=patch_data)
+                                if res_patch.status_code == 200:
+                                    st.success("紀錄已成功更新！")
+                                    st.rerun()
+                                else:
+                                    st.error("儲存失敗，請檢查資料庫連線。")
                         
                         st.markdown("---")
                         if st.button("🗑️ 刪除此筆待辦任務", type="primary"):
                             requests.delete(f"{DB_URL}/{target_id}.json")
                             st.rerun()
+                else: st.info("目前沒有待辦紀錄。")
             else: st.info("目前沒有待辦紀錄。")
-        except: st.error("讀取失敗。")
+        except Exception as e: 
+            st.error(f"讀取資料失敗：{e}") # 修復錯誤顯示問題
 
     # --- 7. ⚙️ 系統內容管理 ---
     elif menu == "⚙️ 系統內容管理":
@@ -227,7 +233,7 @@ else:
         with st.form("settings_form"):
             new_orders = st.text_area("📦 編輯製令清單 (逗號隔開)", value=",".join(settings.get("orders", [])), height=120)
             new_assigners = st.text_area("🚩 編輯派工人員清單", value=",".join(settings.get("assigners", [])), height=100)
-            new_workers = st.text_area("👷 編輯作業人員清單", value=",".join(settings.get("workers", [])), height=100)
+            new_workers = st.text_area("👷 編輯人員清單", value=",".join(settings.get("workers", [])), height=100)
             if st.form_submit_button("✅ 儲存系統設定"):
                 requests.patch(f"{SETTING_URL}.json", json={
                     "orders": [x.strip() for x in new_orders.split(",") if x.strip()],
