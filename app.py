@@ -30,8 +30,22 @@ st.markdown("""
     div[data-testid="stDataFrame"] div[role="gridcell"] > div { font-size: 20px !important; font-weight: bold !important; }
     div[data-testid="stDataFrame"] div[role="columnheader"] span { font-size: 22px !important; font-weight: bold !important; }
     .stSelectbox label { font-size: 26px !important; font-weight: bold !important; }
-    .main-title { font-size: 48px !important; font-weight: bold; color: #1E3A8A; border-bottom: 4px solid #1E3A8A; margin-bottom: 25px; }
-    .stat-card { background-color: #ffffff; padding: 20px; border-radius: 15px; border-top: 6px solid #1E3A8A; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center; }
+    
+    /* 紅色框框：標題修改 */
+    .main-title { font-size: 36px !important; font-weight: bold; color: #1E3A8A; border-bottom: 4px solid #1E3A8A; margin-bottom: 25px; }
+    
+    /* 綠色框框：卡片改小，適合手機顯示 */
+    .stat-card { 
+        background-color: #ffffff; 
+        padding: 10px; 
+        border-radius: 12px; 
+        border-top: 5px solid #1E3A8A; 
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1); 
+        text-align: center;
+        font-size: 18px !important; /* 標題字體縮小 */
+    }
+    .stat-value { font-size: 40px !important; font-weight: bold; color: #1E3A8A; } /* 數值字體縮小 */
+    
     .stButton>button { height: 60px; font-size: 24px !important; font-weight: bold !important; }
     </style>
 """, unsafe_allow_html=True)
@@ -59,7 +73,8 @@ else:
 
     # --- 3. 📊 經營者看板 (首頁) ---
     if menu == "📊 經營者看板 (首頁)":
-        st.markdown('<p class="main-title">📊 派工執行實況看板</p>', unsafe_allow_html=True)
+        # 修改標題名稱
+        st.markdown('<p class="main-title">📊 超慧科技現場派工看板</p>', unsafe_allow_html=True)
         try:
             r = requests.get(f"{DB_URL}.json")
             data = r.json()
@@ -70,11 +85,12 @@ else:
                     all_logs.append(v)
                 df = pd.DataFrame(all_logs)
 
+                # 修改卡片內的字體大小樣式
                 c1, c2 = st.columns(2)
-                with c1: st.markdown(f'<div class="stat-card">總派件數<br><span style="font-size:65px; font-weight:bold; color:#1E3A8A;">{len(df)}</span> 件</div>', unsafe_allow_html=True)
+                with c1: st.markdown(f'<div class="stat-card">總派件數<br><span class="stat-value">{len(df)}</span> 件</div>', unsafe_allow_html=True)
                 with c2:
                     worker_count = df['作業人員'].nunique() if not df.empty else 0
-                    st.markdown(f'<div class="stat-card">動員人力<br><span style="font-size:65px; font-weight:bold; color:#1E3A8A;">{worker_count}</span> 人</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="stat-card">動員人力<br><span class="stat-value">{worker_count}</span> 人</div>', unsafe_allow_html=True)
                 
                 st.subheader("🔍 快速篩選資料") 
                 with st.expander("點擊展開篩選選單", expanded=True):
@@ -119,14 +135,13 @@ else:
         except Exception as e:
             st.error(f"連線資料庫失敗：{e}")
 
-    # --- 4. ✅ 已完工歷史紀錄查詢 (加入刪除功能) ---
+    # --- 4. ✅ 已完工歷史紀錄查詢 ---
     elif menu == "✅ 已完工歷史紀錄查詢":
         st.markdown('<p class="main-title" style="color: #059669; border-bottom: 4px solid #059669;">✅ 已完工歷史紀錄查詢</p>', unsafe_allow_html=True)
         try:
             r_done = requests.get(f"{DONE_URL}.json")
             done_data = r_done.json()
             if done_data:
-                # 建立列表並保留 Firebase 的 Key
                 done_list = []
                 for k, v in done_data.items():
                     v['done_key'] = k
@@ -138,13 +153,11 @@ else:
                 
                 st.dataframe(df_done[["實際完工時間", "製令", "製造工序", "作業人員"]], use_container_width=True, height=400, hide_index=True)
                 
-                # 新增刪除功能區塊
                 st.markdown("---")
                 st.subheader("🗑️ 歷史紀錄維護 (刪除)")
                 delete_options = {row['done_key']: f"[{row.get('實際完工時間', '未知')}] 製令:{row['製令']} - {row['作業人員']}" for _, row in df_done.iterrows()}
                 target_del_key = st.selectbox("選擇要刪除的紀錄", options=list(delete_options.keys()), format_func=lambda x: delete_options[x])
                 
-                # 密碼驗證與刪除按鈕
                 del_pass = st.text_input("輸入管理密碼以刪除", type="password", key="del_pass_history")
                 if st.button("🗑️ 確認刪除此筆紀錄", type="primary"):
                     if del_pass == "1234":
