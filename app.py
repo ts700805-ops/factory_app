@@ -14,7 +14,7 @@ def get_now_str():
 
 def get_settings():
     try:
-        r = requests.get(f"{SETTING_URL}.json")
+        r = requests.get(f"{SETTING_URL}.json", timeout=5)
         data = r.json()
         if not data: 
             return {"orders": [], "assigners": ["管理員"], "workers": ["人員"], "processes": ["預設工序"]}
@@ -22,7 +22,7 @@ def get_settings():
     except:
         return {"orders": [], "assigners": ["管理員"], "workers": ["人員"], "processes": ["預設工序"]}
 
-# --- 2. 頁面配置 (修正看板統計卡片在手機看不到中文字的問題) ---
+# --- 2. 頁面配置 ---
 st.set_page_config(page_title="超慧科技●神鬼奇航●派工系統", layout="wide")
 
 st.markdown("""
@@ -32,7 +32,6 @@ st.markdown("""
     .stSelectbox label { font-size: 26px !important; font-weight: bold !important; }
     .main-title { font-size: 36px !important; font-weight: bold; color: #1E3A8A; border-bottom: 4px solid #1E3A8A; margin-bottom: 25px; }
     
-    /* 修正統計卡片：調整 padding 與字體大小確保手機版中文字不消失 */
     .stat-card { 
         background-color: #ffffff; 
         padding: 8px 2px; 
@@ -49,7 +48,6 @@ st.markdown("""
     
     .stButton>button { height: 60px; font-size: 24px !important; font-weight: bold !important; }
 
-    /* 手機版微調 */
     @media (max-width: 640px) {
         .stat-label { font-size: 14px !important; }
         .stat-value { font-size: 24px !important; }
@@ -83,28 +81,18 @@ else:
             if data:
                 all_logs = []
                 for k, v in data.items():
-                    v['db_key'] = k
-                    all_logs.append(v)
+                    if v:
+                        v['db_key'] = k
+                        all_logs.append(v)
                 df = pd.DataFrame(all_logs).fillna("無")
                 
-                # 修改統計卡片 HTML 結構以適應手機顯示
                 c1, c2 = st.columns(2)
                 with c1: 
-                    st.markdown(f'''
-                        <div class="stat-card">
-                            <span class="stat-label">總派件數</span><br>
-                            <span class="stat-value">{len(df)}</span> <span class="stat-unit">件</span>
-                        </div>
-                    ''', unsafe_allow_html=True)
+                    st.markdown(f'''<div class="stat-card"><span class="stat-label">總派件數</span><br><span class="stat-value">{len(df)}</span> <span class="stat-unit">件</span></div>''', unsafe_allow_html=True)
                 with c2:
                     all_workers = pd.concat([df['作業人員'], df.get('協助人員', pd.Series(['無']*len(df)))])
                     worker_count = all_workers[all_workers != "無"].nunique() if not df.empty else 0
-                    st.markdown(f'''
-                        <div class="stat-card">
-                            <span class="stat-label">動員人力</span><br>
-                            <span class="stat-value">{worker_count}</span> <span class="stat-unit">人</span>
-                        </div>
-                    ''', unsafe_allow_html=True)
+                    st.markdown(f'''<div class="stat-card"><span class="stat-label">動員人力</span><br><span class="stat-value">{worker_count}</span> <span class="stat-unit">人</span></div>''', unsafe_allow_html=True)
                 
                 with st.expander("🔍 快速篩選資料", expanded=True):
                     f1, f2, f3, f4 = st.columns(4)
@@ -145,7 +133,7 @@ else:
         except Exception as e:
             st.error(f"系統錯誤：{e}")
 
-    # --- 4. ✅ 已完工歷史紀錄查詢 (保持不變) ---
+    # --- 4. ✅ 已完工歷史紀錄查詢 ---
     elif menu == "✅ 已完工歷史紀錄查詢":
         st.markdown('<p class="main-title" style="color: #059669; border-bottom: 4px solid #059669;">✅ 已完工歷史紀錄查詢</p>', unsafe_allow_html=True)
         try:
@@ -191,7 +179,7 @@ else:
             else: st.info("目前尚無完工紀錄。")
         except Exception as e: st.error(f"連線錯誤：{e}")
 
-    # --- 5. 📝 現場派工作業 (保持不變) ---
+    # --- 5. 📝 現場派工作業 (保持氣球特效) ---
     elif menu == "📝 現場派工作業":
         st.header("📝 建立新派工任務")
         with st.form("dispatch_form", clear_on_submit=True):
@@ -212,7 +200,7 @@ else:
                 else:
                     st.error("發布失敗。")
 
-    # --- 6. 📝 編輯派工紀錄 (保持派工人員與製令編輯功能) ---
+    # --- 6. 📝 編輯派工紀錄 (修正錯誤，保持功能) ---
     elif menu == "📝 編輯派工紀錄":
         st.header("📝 待辦派工紀錄維護")
         try:
@@ -222,10 +210,12 @@ else:
                 all_logs = []
                 for k, v in db_data.items():
                     if v: v['id'] = k; all_logs.append(v)
+                
                 if all_logs:
-                    log_options = {log['id']: f"製令：{log.get('製令')} | 主要：{log.get('作業人員')}" for log in all_logs}
+                    log_options = {log['id']: f"製令：{log.get('製令', '無')} | 主要：{log.get('作業人員', '無')}" for log in all_logs}
                     target_id = st.selectbox("選擇欲修改的派工紀錄", options=list(log_options.keys()), format_func=lambda x: log_options[x])
                     curr = next((i for i in all_logs if i["id"] == target_id), None)
+                    
                     if curr:
                         with st.expander("📝 編輯內容", expanded=True):
                             c1, c2 = st.columns(2)
@@ -237,20 +227,31 @@ else:
                             new_worker = c3.selectbox("修改主要人員", settings.get("workers", []), index=settings.get("workers", []).index(curr.get('作業人員')) if curr.get('作業人員') in settings.get("workers", []) else 0)
                             new_assist = c4.selectbox("修改協助人員", ["無"] + settings.get("workers", []), index=(["無"] + settings.get("workers", [])).index(curr.get('協助人員')) if curr.get('協助人員') in (["無"] + settings.get("workers", [])) else 0)
                             
+                            # 修正儲存邏輯
                             if st.button("💾 儲存派工修改"):
                                 patch_data = {"製令": edit_order, "派工人員": edit_assigner, "作業人員": new_worker, "協助人員": new_assist}
-                                requests.patch(f"{DB_URL}/{target_id}.json", json=patch_data)
-                                st.success("紀錄已更新！")
-                                st.rerun()
+                                update_res = requests.patch(f"{DB_URL}/{target_id}.json", json=patch_data)
+                                if update_res.status_code == 200:
+                                    st.success("紀錄已更新！")
+                                    st.rerun()
+                                else:
+                                    st.error("儲存失敗，請檢查網路。")
                         
                         st.markdown("---")
+                        # 修正刪除邏輯
                         if st.button("🗑️ 刪除此筆待辦任務", type="primary"):
-                            requests.delete(f"{DB_URL}/{target_id}.json")
-                            st.rerun()
+                            del_res = requests.delete(f"{DB_URL}/{target_id}.json")
+                            if del_res.status_code == 200:
+                                st.warning("任務已刪除。")
+                                st.rerun()
+                            else:
+                                st.error("刪除失敗。")
+                else: st.info("目前沒有待辦紀錄。")
             else: st.info("目前沒有待辦紀錄。")
-        except: st.error("讀取失敗。")
+        except Exception as e: 
+            st.error(f"讀取失敗：{e}")
 
-    # --- 7. ⚙️ 系統內容管理 (保持不變) ---
+    # --- 7. ⚙️ 系統內容管理 ---
     elif menu == "⚙️ 系統內容管理":
         st.header("⚙️ 選單內容管理")
         with st.form("settings_form"):
