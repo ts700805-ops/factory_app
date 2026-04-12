@@ -31,10 +31,8 @@ st.markdown("""
     div[data-testid="stDataFrame"] div[role="columnheader"] span { font-size: 22px !important; font-weight: bold !important; }
     .stSelectbox label { font-size: 26px !important; font-weight: bold !important; }
     
-    /* 紅色框框：標題修改 */
     .main-title { font-size: 36px !important; font-weight: bold; color: #1E3A8A; border-bottom: 4px solid #1E3A8A; margin-bottom: 25px; }
     
-    /* 綠色框框：卡片改小，適合手機顯示 */
     .stat-card { 
         background-color: #ffffff; 
         padding: 10px; 
@@ -42,9 +40,9 @@ st.markdown("""
         border-top: 5px solid #1E3A8A; 
         box-shadow: 0 2px 6px rgba(0,0,0,0.1); 
         text-align: center;
-        font-size: 18px !important; /* 標題字體縮小 */
+        font-size: 18px !important;
     }
-    .stat-value { font-size: 40px !important; font-weight: bold; color: #1E3A8A; } /* 數值字體縮小 */
+    .stat-value { font-size: 40px !important; font-weight: bold; color: #1E3A8A; }
     
     .stButton>button { height: 60px; font-size: 24px !important; font-weight: bold !important; }
     </style>
@@ -73,7 +71,6 @@ else:
 
     # --- 3. 📊 經營者看板 (首頁) ---
     if menu == "📊 經營者看板 (首頁)":
-        # 修改標題名稱
         st.markdown('<p class="main-title">📊 超慧科技現場派工看板</p>', unsafe_allow_html=True)
         try:
             r = requests.get(f"{DB_URL}.json")
@@ -85,7 +82,6 @@ else:
                     all_logs.append(v)
                 df = pd.DataFrame(all_logs)
 
-                # 修改卡片內的字體大小樣式
                 c1, c2 = st.columns(2)
                 with c1: st.markdown(f'<div class="stat-card">總派件數<br><span class="stat-value">{len(df)}</span> 件</div>', unsafe_allow_html=True)
                 with c2:
@@ -158,95 +154,4 @@ else:
                 delete_options = {row['done_key']: f"[{row.get('實際完工時間', '未知')}] 製令:{row['製令']} - {row['作業人員']}" for _, row in df_done.iterrows()}
                 target_del_key = st.selectbox("選擇要刪除的紀錄", options=list(delete_options.keys()), format_func=lambda x: delete_options[x])
                 
-                del_pass = st.text_input("輸入管理密碼以刪除", type="password", key="del_pass_history")
-                if st.button("🗑️ 確認刪除此筆紀錄", type="primary"):
-                    if del_pass == "1234":
-                        res = requests.delete(f"{DONE_URL}/{target_del_key}.json")
-                        if res.status_code == 200:
-                            st.warning("紀錄已成功刪除。")
-                            st.rerun()
-                        else:
-                            st.error("刪除失敗，請檢查資料庫連線。")
-                    else:
-                        st.error("密碼錯誤，拒絕刪除！")
-            else:
-                st.info("目前尚無完工紀錄。")
-        except:
-            st.error("讀取完工紀錄失敗。")
-
-    # --- 5. 📝 現場派工作業 ---
-    elif menu == "📝 現場派工作業":
-        st.header("📝 建立新派工任務")
-        with st.form("dispatch_form"):
-            order_no = st.selectbox("📦 選擇製令編號", settings.get("orders", []))
-            process_name = st.selectbox("⚙️ 選擇製造工序", settings.get("processes", []))
-            c1, c2 = st.columns(2)
-            assigner = c1.selectbox("🚩 派工人員", settings.get("assigners", []), index=settings.get("assigners", []).index(st.session_state.user) if st.session_state.user in settings.get("assigners", []) else 0)
-            worker = c2.selectbox("👷 作業人員", settings.get("workers", []))
-            deadline = st.date_input("⏳ 作業期限", datetime.date.today() + datetime.timedelta(days=1))
-            if st.form_submit_button("🚀 發布任務"):
-                log = {"製令": order_no, "製造工序": process_name, "派工人員": assigner, "作業人員": worker, "作業期限": str(deadline), "提交時間": get_now_str()}
-                requests.post(f"{DB_URL}.json", json=log)
-                st.success("任務已發布！")
-
-    # --- 6. 📝 編輯派工紀錄 ---
-    elif menu == "📝 編輯派工紀錄":
-        st.header("📝 待辦派工紀錄維護")
-        try:
-            r = requests.get(f"{DB_URL}.json")
-            db_data = r.json()
-            if db_data:
-                all_logs = []
-                for k, v in db_data.items():
-                    all_logs.append({
-                        "id": k, 
-                        "製令": v.get("製令", "無"), 
-                        "製造工序": v.get("製造工序", "無"), 
-                        "派工人員": v.get("派工人員", "無"), 
-                        "作業人員": v.get("作業人員", "無"), 
-                        "作業期限": v.get("作業期限", "無")
-                    })
-                
-                log_options = {log['id']: f"製令：{log['製令']} | 人員：{log['作業人員']}" for log in all_logs}
-                target_id = st.selectbox("請選擇要編輯或刪除的紀錄", options=list(log_options.keys()), format_func=lambda x: log_options[x])
-                
-                curr = next(item for item in all_logs if item["id"] == target_id)
-                
-                with st.expander("📝 編輯此筆內容", expanded=True):
-                    ec1, ec2 = st.columns(2)
-                    new_order = ec1.selectbox("修改製令", settings.get("orders", []), index=settings.get("orders", []).index(curr['製令']) if curr['製令'] in settings.get("orders", []) else 0)
-                    new_proc = ec2.selectbox("修改工序", settings.get("processes", []), index=settings.get("processes", []).index(curr['製造工序']) if curr['製造工序'] in settings.get("processes", []) else 0)
-                    
-                    if st.button("💾 儲存修改"):
-                        updated_data = {"製令": new_order, "製造工序": new_proc}
-                        requests.patch(f"{DB_URL}/{target_id}.json", json=updated_data)
-                        st.success("紀錄已更新！")
-                        st.rerun()
-
-                st.markdown("---")
-                if st.button("🗑️ 刪除選定紀錄", type="primary"):
-                    requests.delete(f"{DB_URL}/{target_id}.json")
-                    st.warning("紀錄已刪除。")
-                    st.rerun()
-            else:
-                st.info("目前沒有待辦紀錄。")
-        except:
-            st.error("讀取資料失敗。")
-
-    # --- 7. ⚙️ 系統內容管理 ---
-    elif menu == "⚙️ 系統內容管理":
-        st.header("⚙️ 選單內容管理")
-        with st.form("settings_form"):
-            new_orders = st.text_area("📦 編輯製令清單 (請用逗號隔開)", value=",".join(settings.get("orders", [])), height=120)
-            new_assigners = st.text_area("🚩 編輯管理人員清單", value=",".join(settings.get("assigners", [])), height=100)
-            new_workers = st.text_area("👷 編輯執行人員清單", value=",".join(settings.get("workers", [])), height=100)
-            new_procs = st.text_area("⚙️ 編輯工序清單", value=",".join(settings.get("processes", [])), height=100)
-            if st.form_submit_button("✅ 儲存並更新所有設定"):
-                requests.patch(f"{SETTING_URL}.json", json={
-                    "orders": [x.strip() for x in new_orders.split(",") if x.strip()],
-                    "assigners": [x.strip() for x in new_assigners.split(",") if x.strip()],
-                    "workers": [x.strip() for x in new_workers.split(",") if x.strip()],
-                    "processes": [x.strip() for x in new_procs.split(",") if x.strip()]
-                })
-                st.success("設定已更新！")
-                st.rerun()
+                del_pass = st.text_input("輸入管理
