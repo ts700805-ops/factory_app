@@ -184,15 +184,14 @@ else:
             deadline = st.date_input("⏳ 作業期限", datetime.date.today() + datetime.timedelta(days=1))
             if st.form_submit_button("🚀 發布任務"):
                 log = {"製令": order_no, "製造工序": process_name, "派工人員": assigner, "作業人員": worker, "作業期限": str(deadline), "提交時間": get_now_str()}
-                # 執行發布
                 res = requests.post(f"{DB_URL}.json", json=log)
                 if res.status_code == 200:
                     st.success("任務已發布！")
-                    st.balloons()  # <--- 修正處：加回發布成功的特效
+                    st.balloons()
                 else:
                     st.error("發布失敗，請確認網路連線。")
 
-    # --- 6. 📝 編輯派工紀錄 ---
+    # --- 6. 📝 編輯派工紀錄 (修改點：補上人員編輯) ---
     elif menu == "📝 編輯派工紀錄":
         st.header("📝 待辦派工紀錄維護")
         try:
@@ -220,8 +219,18 @@ else:
                     new_order = ec1.selectbox("修改製令", settings.get("orders", []), index=settings.get("orders", []).index(curr['製令']) if curr['製令'] in settings.get("orders", []) else 0)
                     new_proc = ec2.selectbox("修改工序", settings.get("processes", []), index=settings.get("processes", []).index(curr['製造工序']) if curr['製造工序'] in settings.get("processes", []) else 0)
                     
+                    ec3, ec4 = st.columns(2)
+                    # 補上派工人員與作業人員的編輯
+                    new_assigner = ec3.selectbox("修改派工人員", settings.get("assigners", []), index=settings.get("assigners", []).index(curr['派工人員']) if curr['派工人員'] in settings.get("assigners", []) else 0)
+                    new_worker = ec4.selectbox("修改作業人員", settings.get("workers", []), index=settings.get("workers", []).index(curr['作業人員']) if curr['作業人員'] in settings.get("workers", []) else 0)
+                    
                     if st.button("💾 儲存修改"):
-                        updated_data = {"製令": new_order, "製造工序": new_proc}
+                        updated_data = {
+                            "製令": new_order, 
+                            "製造工序": new_proc,
+                            "派工人員": new_assigner,
+                            "作業人員": new_worker
+                        }
                         requests.patch(f"{DB_URL}/{target_id}.json", json=updated_data)
                         st.success("紀錄已更新！")
                         st.rerun()
