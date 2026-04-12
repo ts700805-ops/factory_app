@@ -184,10 +184,11 @@ else:
             deadline = st.date_input("⏳ 作業期限", datetime.date.today() + datetime.timedelta(days=1))
             if st.form_submit_button("🚀 發布任務"):
                 log = {"製令": order_no, "製造工序": process_name, "派工人員": assigner, "作業人員": worker, "作業期限": str(deadline), "提交時間": get_now_str()}
+                # 執行發布
                 res = requests.post(f"{DB_URL}.json", json=log)
                 if res.status_code == 200:
                     st.success("任務已發布！")
-                    st.balloons()  # 🎈 這裡幫您加回氣球特效了
+                    st.balloons()  # <--- 修正處：加回發布成功的特效
                 else:
                     st.error("發布失敗，請確認網路連線。")
 
