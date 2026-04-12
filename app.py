@@ -124,6 +124,7 @@ else:
                             res_del = requests.delete(f"{DB_URL}/{db_key}.json")
                             if res_post.status_code == 200 and res_del.status_code == 200:
                                 st.success(f"製令 {row['製令']} 已結案！")
+                                st.balloons() # 首頁完工特效保留
                                 st.rerun()
                             else:
                                 st.error("連線資料庫失敗。")
@@ -132,46 +133,51 @@ else:
         except Exception as e:
             st.error(f"連線資料庫失敗：{e}")
 
-    # --- 4. ✅ 已完工歷史紀錄查詢 ---
+    # --- 4. ✅ 已完工歷史紀錄查詢 (修正刪除後讀取失敗) ---
     elif menu == "✅ 已完工歷史紀錄查詢":
         st.markdown('<p class="main-title" style="color: #059669; border-bottom: 4px solid #059669;">✅ 已完工歷史紀錄查詢</p>', unsafe_allow_html=True)
         try:
             r_done = requests.get(f"{DONE_URL}.json")
             done_data = r_done.json()
+            
             if done_data:
                 done_list = []
                 for k, v in done_data.items():
-                    v['done_key'] = k
-                    done_list.append(v)
+                    if v:
+                        v['done_key'] = k
+                        done_list.append(v)
                 
-                df_done = pd.DataFrame(done_list)
-                if '實際完工時間' in df_done.columns:
-                    df_done = df_done.sort_values(by='實際完工時間', ascending=False)
-                
-                st.dataframe(df_done[["實際完工時間", "製令", "製造工序", "作業人員"]], use_container_width=True, height=400, hide_index=True)
-                
-                st.markdown("---")
-                st.subheader("🗑️ 歷史紀錄維護 (刪除)")
-                delete_options = {row['done_key']: f"[{row.get('實際完工時間', '未知')}] 製令:{row['製令']} - {row['作業人員']}" for _, row in df_done.iterrows()}
-                target_del_key = st.selectbox("選擇要刪除的紀錄", options=list(delete_options.keys()), format_func=lambda x: delete_options[x])
-                
-                del_pass = st.text_input("輸入管理密碼以刪除", type="password", key="del_pass_history")
-                if st.button("🗑️ 確認刪除此筆紀錄", type="primary"):
-                    if del_pass == "1234":
-                        res = requests.delete(f"{DONE_URL}/{target_del_key}.json")
-                        if res.status_code == 200:
-                            st.warning("紀錄已成功刪除。")
-                            st.rerun()
+                if done_list:
+                    df_done = pd.DataFrame(done_list)
+                    if '實際完工時間' in df_done.columns:
+                        df_done = df_done.sort_values(by='實際完工時間', ascending=False)
+                    
+                    st.dataframe(df_done[["實際完工時間", "製令", "製造工序", "作業人員"]], use_container_width=True, height=400, hide_index=True)
+                    
+                    st.markdown("---")
+                    st.subheader("🗑️ 歷史紀錄維護 (刪除)")
+                    delete_options = {row['done_key']: f"[{row.get('實際完工時間', '未知')}] 製令:{row['製令']} - {row['作業人員']}" for _, row in df_done.iterrows()}
+                    target_del_key = st.selectbox("選擇要刪除的紀錄", options=list(delete_options.keys()), format_func=lambda x: delete_options[x])
+                    
+                    del_pass = st.text_input("輸入管理密碼以刪除", type="password", key="del_pass_history")
+                    if st.button("🗑️ 確認刪除此筆紀錄", type="primary"):
+                        if del_pass == "1234":
+                            res = requests.delete(f"{DONE_URL}/{target_del_key}.json")
+                            if res.status_code == 200:
+                                st.warning("紀錄已成功刪除。")
+                                st.rerun() # 刪除後立即刷新，防止讀取到舊 key
+                            else:
+                                st.error("刪除失敗。")
                         else:
-                            st.error("刪除失敗。")
-                    else:
-                        st.error("密碼錯誤！")
+                            st.error("密碼錯誤！")
+                else:
+                    st.info("目前尚無完工紀錄。")
             else:
                 st.info("目前尚無完工紀錄。")
-        except:
-            st.error("讀取完工紀錄失敗。")
+        except Exception as e:
+            st.error(f"讀取完工紀錄失敗：{e}")
 
-    # --- 5. 📝 現場派工作業 ---
+    # --- 5. 📝 現場派工作業 (補回氣球特效) ---
     elif menu == "📝 現場派工作業":
         st.header("📝 建立新派工任務")
         with st.form("dispatch_form"):
@@ -186,20 +192,20 @@ else:
                 res = requests.post(f"{DB_URL}.json", json=log)
                 if res.status_code == 200:
                     st.success("任務已發布！")
+                    st.balloons() # 重新補回氣球特效
                 else:
                     st.error("發布失敗。")
 
-    # --- 6. 📝 編輯派工紀錄 (修正刪除後讀取失敗的問題) ---
+    # --- 6. 📝 編輯派工紀錄 ---
     elif menu == "📝 編輯派工紀錄":
         st.header("📝 待辦派工紀錄維護")
         try:
             r = requests.get(f"{DB_URL}.json")
             db_data = r.json()
-            
             if db_data:
                 all_logs = []
                 for k, v in db_data.items():
-                    if v: # 確保資料不是空的
+                    if v:
                         all_logs.append({
                             "id": k, 
                             "製令": v.get("製令", "無"), 
@@ -212,7 +218,6 @@ else:
                 if all_logs:
                     log_options = {log['id']: f"製令：{log['製令']} | 人員：{log['作業人員']}" for log in all_logs}
                     target_id = st.selectbox("請選擇要編輯或刪除的紀錄", options=list(log_options.keys()), format_func=lambda x: log_options[x])
-                    
                     curr = next((item for item in all_logs if item["id"] == target_id), None)
                     
                     if curr:
