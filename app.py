@@ -31,20 +31,21 @@ st.markdown("""
     div[data-testid="stDataFrame"] div[role="columnheader"] span { font-size: 22px !important; font-weight: bold !important; }
     .stSelectbox label { font-size: 26px !important; font-weight: bold !important; }
     
-    /* 紅色框框：標題修改 */
+    /* 標題樣式 */
     .main-title { font-size: 36px !important; font-weight: bold; color: #1E3A8A; border-bottom: 4px solid #1E3A8A; margin-bottom: 25px; }
     
-    /* 綠色框框：卡片改小，適合手機顯示 */
+    /* 修改重點：將卡片樣式改小，縮減 padding 與間距，確保手機版同步顯示 */
     .stat-card { 
         background-color: #ffffff; 
-        padding: 10px; 
-        border-radius: 12px; 
-        border-top: 5px solid #1E3A8A; 
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1); 
+        padding: 5px 2px; 
+        border-radius: 10px; 
+        border-top: 4px solid #1E3A8A; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
         text-align: center;
-        font-size: 18px !important; 
+        font-size: 16px !important; 
+        margin-bottom: 5px;
     }
-    .stat-value { font-size: 40px !important; font-weight: bold; color: #1E3A8A; }
+    .stat-value { font-size: 32px !important; font-weight: bold; color: #1E3A8A; line-height: 1.2; }
     
     .stButton>button { height: 60px; font-size: 24px !important; font-weight: bold !important; }
     </style>
@@ -84,8 +85,10 @@ else:
                     all_logs.append(v)
                 df = pd.DataFrame(all_logs)
 
+                # 使用 columns 並在 CSS 中配合將卡片縮小，使其在手機版也能橫向排列
                 c1, c2 = st.columns(2)
-                with c1: st.markdown(f'<div class="stat-card">總派件數<br><span class="stat-value">{len(df)}</span> 件</div>', unsafe_allow_html=True)
+                with c1: 
+                    st.markdown(f'<div class="stat-card">總派件數<br><span class="stat-value">{len(df)}</span> 件</div>', unsafe_allow_html=True)
                 with c2:
                     worker_count = df['作業人員'].nunique() if not df.empty else 0
                     st.markdown(f'<div class="stat-card">動員人力<br><span class="stat-value">{worker_count}</span> 人</div>', unsafe_allow_html=True)
@@ -191,7 +194,7 @@ else:
                 else:
                     st.error("發布失敗，請確認網路連線。")
 
-    # --- 6. 📝 編輯派工紀錄 (修改點：補上人員編輯) ---
+    # --- 6. 📝 編輯派工紀錄 ---
     elif menu == "📝 編輯派工紀錄":
         st.header("📝 待辦派工紀錄維護")
         try:
@@ -220,7 +223,6 @@ else:
                     new_proc = ec2.selectbox("修改工序", settings.get("processes", []), index=settings.get("processes", []).index(curr['製造工序']) if curr['製造工序'] in settings.get("processes", []) else 0)
                     
                     ec3, ec4 = st.columns(2)
-                    # 補上派工人員與作業人員的編輯
                     new_assigner = ec3.selectbox("修改派工人員", settings.get("assigners", []), index=settings.get("assigners", []).index(curr['派工人員']) if curr['派工人員'] in settings.get("assigners", []) else 0)
                     new_worker = ec4.selectbox("修改作業人員", settings.get("workers", []), index=settings.get("workers", []).index(curr['作業人員']) if curr['作業人員'] in settings.get("workers", []) else 0)
                     
