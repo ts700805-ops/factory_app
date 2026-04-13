@@ -18,7 +18,6 @@ def get_settings():
         data = r.json()
         if not data: 
             return {"orders": [], "assigners": ["管理員"], "worker_map": {}, "processes": ["預設工序"]}
-        # 確保資料結構相容
         if "worker_map" not in data: data["worker_map"] = {}
         return data
     except:
@@ -161,7 +160,6 @@ else:
                     if curr_done:
                         with st.expander("📝 編輯完工資訊"):
                             ec1, ec2 = st.columns(2)
-                            # 歷史編輯獲取該派工人員名下的作業員，若無則顯示全部
                             p_assigner = curr_done.get('派工人員')
                             p_worker_list = settings.get("worker_map", {}).get(p_assigner, [])
                             
@@ -185,7 +183,7 @@ else:
             else: st.info("目前尚無完工紀錄。")
         except Exception as e: st.error(f"連線錯誤：{e}")
 
-    # --- 5. 📝 現場派工作業 (根據派工人員顯示作業人員) ---
+    # --- 5. 📝 現場派工作業 ---
     elif menu == "📝 現場派工作業":
         st.header("📝 建立新派工任務")
         with st.form("dispatch_form", clear_on_submit=True):
@@ -193,10 +191,11 @@ else:
             process_name = st.selectbox("⚙️ 選擇製造工序", settings.get("processes", []))
             
             c1, c2, c3 = st.columns(3)
-            # 獲取當前派工人員
-            assigner = c1.selectbox("🚩 派工人員", settings.get("assigners", []), index=settings.get("assigners", []).index(st.session_state.user) if st.session_state.user in settings.get("assigners", []) else 0)
+            # 指定預設為「陳德文」
+            assigner_list = settings.get("assigners", [])
+            default_index = assigner_list.index("陳德文") if "陳德文" in assigner_list else 0
+            assigner = c1.selectbox("🚩 派工人員", assigner_list, index=default_index)
             
-            # 關鍵修改：從 worker_map 獲取該派工員專屬的作業員
             my_workers = settings.get("worker_map", {}).get(assigner, [])
             
             worker = c2.selectbox("👷 主要人員", my_workers)
@@ -215,7 +214,7 @@ else:
                     else:
                         st.error("發布失敗。")
 
-    # --- 6. 📝 編輯派工紀錄 ---
+    # --- 6. 📝 編輯派工紀錄 (保留派工人員與製令編輯功能) ---
     elif menu == "📝 編輯派工紀錄":
         st.header("📝 待辦派工紀錄維護")
         try:
@@ -234,10 +233,10 @@ else:
                     if curr:
                         with st.expander("📝 編輯內容", expanded=True):
                             c1, c2 = st.columns(2)
+                            # 保留製令與派工人員編輯
                             edit_order = c1.selectbox("修改製令編號", settings.get("orders", []), index=settings.get("orders", []).index(curr.get('製令')) if curr.get('製令') in settings.get("orders", []) else 0)
                             edit_assigner = c2.selectbox("修改派工人員", settings.get("assigners", []), index=settings.get("assigners", []).index(curr.get('派工人員')) if curr.get('派工人員') in settings.get("assigners", []) else 0)
                             
-                            # 編輯時同樣連動該派工員的作業員
                             edit_worker_list = settings.get("worker_map", {}).get(edit_assigner, [])
                             
                             c3, c4 = st.columns(2)
@@ -266,11 +265,9 @@ else:
         except Exception as e: 
             st.error(f"讀取失敗：{e}")
 
-    # --- 7. ⚙️ 系統內容管理 (配置獨立作業人員) ---
+    # --- 7. ⚙️ 系統內容管理 ---
     elif menu == "⚙️ 系統內容管理":
         st.header("⚙️ 選單內容管理")
-        
-        # 1. 管理製令與派工員清單
         with st.form("basic_settings"):
             st.subheader("1. 基礎名單管理")
             new_orders = st.text_area("📦 編輯製令清單 (逗號隔開)", value=",".join(settings.get("orders", [])), height=100)
@@ -279,28 +276,21 @@ else:
                 settings["orders"] = [x.strip() for x in new_orders.split(",") if x.strip()]
                 settings["assigners"] = [x.strip() for x in new_assigners.split(",") if x.strip()]
                 requests.patch(f"{SETTING_URL}.json", json={"orders": settings["orders"], "assigners": settings["assigners"]})
-                st.success("名單已儲存，請繼續下方作業人員設定。")
+                st.success("名單已儲存。")
                 st.rerun()
 
         st.markdown("---")
-        
-        # 2. 核心功能：針對每個派工員設定作業人員
         st.subheader("2. 作業人員獨立配置")
         target_assigner = st.selectbox("請選擇派工人員進行配置", settings.get("assigners", []))
-        
-        # 取得該員目前的作業員對應
         worker_map = settings.get("worker_map", {})
         current_workers = worker_map.get(target_assigner, [])
         
         with st.form("worker_config"):
             worker_input = st.text_area(f"👷 編輯『{target_assigner}』的作業人員清單 (逗號隔開)", 
                                        value=",".join(current_workers), height=150)
-            st.info(f"提示：若『{target_assigner}』也能擔任自己的作業員，請將其名字也填入上方。")
-            
             if st.form_submit_button(f"💾 儲存 {target_assigner} 的作業員配置"):
                 new_worker_list = [x.strip() for x in worker_input.split(",") if x.strip()]
                 worker_map[target_assigner] = new_worker_list
-                
                 requests.patch(f"{SETTING_URL}.json", json={"worker_map": worker_map})
                 st.success(f"已更新 {target_assigner} 的專屬作業人員名單！")
                 st.rerun()
