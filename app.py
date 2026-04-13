@@ -73,7 +73,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 📊 經營者看板 (首頁) ---
+    # --- 3. 📊 經營者看板 (首頁) - 已新增協助人員與作業期限篩選 ---
     if menu == "📊 經營者看板 (首頁)":
         st.markdown('<p class="main-title">📊 超慧科技現場派工看板</p>', unsafe_allow_html=True)
         try:
@@ -96,17 +96,25 @@ else:
                     st.markdown(f'''<div class="stat-card"><span class="stat-label">動員人力</span><br><span class="stat-value">{worker_count}</span> <span class="stat-unit">人</span></div>''', unsafe_allow_html=True)
                 
                 with st.expander("🔍 快速篩選資料", expanded=True):
-                    f1, f2, f3, f4 = st.columns(4)
+                    f1, f2, f3 = st.columns(3)
                     sel_order = f1.selectbox("按製令篩選", ["全部"] + sorted(df["製令"].unique().tolist()))
                     sel_process = f2.selectbox("按工序篩選", ["全部"] + sorted(df["製造工序"].unique().tolist()))
                     sel_assigner = f3.selectbox("按派工員篩選", ["全部"] + sorted(df["派工人員"].unique().tolist()))
+                    
+                    f4, f5, f6 = st.columns(3)
                     sel_worker = f4.selectbox("按作業員篩選", ["全部"] + sorted(df["作業人員"].unique().tolist()))
+                    # 新增：按協助人員篩選
+                    sel_assistant = f5.selectbox("按協助人員篩選", ["全部"] + sorted(df["協助人員"].unique().tolist()))
+                    # 新增：按作業期限篩選
+                    sel_deadline = f6.selectbox("按作業期限篩選", ["全部"] + sorted(df["作業期限"].unique().tolist()))
 
                 filtered_df = df.copy()
                 if sel_order != "全部": filtered_df = filtered_df[filtered_df["製令"] == sel_order]
                 if sel_process != "全部": filtered_df = filtered_df[filtered_df["製造工序"] == sel_process]
                 if sel_assigner != "全部": filtered_df = filtered_df[filtered_df["派工人員"] == sel_assigner]
                 if sel_worker != "全部": filtered_df = filtered_df[filtered_df["作業人員"] == sel_worker]
+                if sel_assistant != "全部": filtered_df = filtered_df[filtered_df["協助人員"] == sel_assistant]
+                if sel_deadline != "全部": filtered_df = filtered_df[filtered_df["作業期限"] == sel_deadline]
 
                 st.subheader("📑 待辦派工明細清單") 
                 display_cols = ["製令", "製造工序", "派工人員", "作業人員", "協助人員", "作業期限"]
@@ -183,20 +191,17 @@ else:
             else: st.info("目前尚無完工紀錄。")
         except Exception as e: st.error(f"連線錯誤：{e}")
 
-    # --- 5. 📝 現場派工作業 (關鍵修改：移除 Form 以達成自動切換) ---
+    # --- 5. 📝 現場派工作業 (保持邏輯，氣球特效保留) ---
     elif menu == "📝 現場派工作業":
         st.header("📝 建立新派工任務")
         
-        # 移除 st.form 封裝，讓 selectbox 可以即時觸發頁面刷新
         order_no = st.selectbox("📦 選擇製令編號", settings.get("orders", []))
         process_name = st.selectbox("⚙️ 選擇製造工序", settings.get("processes", []))
         
         c1, c2, c3 = st.columns(3)
-        # 選擇派工員時，頁面會重新跑一遍，下方 my_workers 就會跟著變
         assign_list = settings.get("assigners", [])
         assigner = c1.selectbox("🚩 派工人員", assign_list, index=assign_list.index(st.session_state.user) if st.session_state.user in assign_list else 0)
         
-        # 根據上面的 assigner 即時過濾作業員
         my_workers = settings.get("worker_map", {}).get(assigner, [])
         
         worker = c2.selectbox("👷 主要人員", my_workers)
@@ -215,7 +220,7 @@ else:
                 else:
                     st.error("發布失敗。")
 
-    # --- 6. 📝 編輯派工紀錄 (保留製令與派工人員編輯) ---
+    # --- 6. 📝 編輯派工紀錄 (保持製令與派工人員編輯邏輯) ---
     elif menu == "📝 編輯派工紀錄":
         st.header("📝 待辦派工紀錄維護")
         try:
@@ -236,7 +241,7 @@ else:
                             c1, c2 = st.columns(2)
                             # 保留製令修改
                             edit_order = c1.selectbox("修改製令編號", settings.get("orders", []), index=settings.get("orders", []).index(curr.get('製令')) if curr.get('製令') in settings.get("orders", []) else 0)
-                            # 保留派工人員修改，且修改後作業員名單會連動
+                            # 保留派工人員修改
                             edit_assigner = c2.selectbox("修改派工人員", settings.get("assigners", []), index=settings.get("assigners", []).index(curr.get('派工人員')) if curr.get('派工人員') in settings.get("assigners", []) else 0)
                             
                             edit_worker_list = settings.get("worker_map", {}).get(edit_assigner, [])
