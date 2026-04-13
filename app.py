@@ -17,10 +17,13 @@ def get_settings():
         r = requests.get(f"{SETTING_URL}.json", timeout=5)
         data = r.json()
         if not data: 
-            return {"orders": [], "assigners": ["管理員"], "workers": ["人員"], "processes": ["預設工序"]}
+            return {"orders": [], "assigners": ["管理員"], "worker_map": {}, "processes": ["預設工序"]}
+        # 確保必要的 key 存在，避免舊資料報錯
+        if "worker_map" not in data: data["worker_map"] = {}
+        if "assigners" not in data: data["assigners"] = ["管理員"]
         return data
     except:
-        return {"orders": [], "assigners": ["管理員"], "workers": ["人員"], "processes": ["預設工序"]}
+        return {"orders": [], "assigners": ["管理員"], "worker_map": {}, "processes": ["預設工序"]}
 
 # --- 2. 頁面配置 ---
 st.set_page_config(page_title="超慧科技●神鬼奇航●派工系統", layout="wide")
@@ -72,7 +75,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 📊 經營者看板 (首頁) ---
+    # --- 3. 📊 經營者看板 (首頁) --- (保持原樣)
     if menu == "📊 經營者看板 (首頁)":
         st.markdown('<p class="main-title">📊 超慧科技現場派工看板</p>', unsafe_allow_html=True)
         try:
@@ -133,7 +136,7 @@ else:
         except Exception as e:
             st.error(f"系統錯誤：{e}")
 
-    # --- 4. ✅ 已完工歷史紀錄查詢 ---
+    # --- 4. ✅ 已完工歷史紀錄查詢 --- (保持原樣，修改選單由 worker_map 提供)
     elif menu == "✅ 已完工歷史紀錄查詢":
         st.markdown('<p class="main-title" style="color: #059669; border-bottom: 4px solid #059669;">✅ 已完工歷史紀錄查詢</p>', unsafe_allow_html=True)
         try:
@@ -159,8 +162,14 @@ else:
                     if curr_done:
                         with st.expander("📝 編輯完工資訊"):
                             ec1, ec2 = st.columns(2)
-                            h_worker = ec1.selectbox("修改人員", settings.get("workers", []), index=settings.get("workers", []).index(curr_done.get('作業人員')) if curr_done.get('作業人員') in settings.get("workers", []) else 0)
-                            h_assistant = ec2.selectbox("修改協助人員", ["無"] + settings.get("workers", []), index=(["無"] + settings.get("workers", [])).index(curr_done.get('協助人員')) if curr_done.get('協助人員') in (["無"] + settings.get("workers", [])) else 0)
+                            # 歷史編輯的清單改為從 worker_map 匯總，或保留全體清單
+                            all_possible_workers = []
+                            for ws in settings.get("worker_map", {}).values():
+                                all_possible_workers.extend(ws)
+                            all_possible_workers = sorted(list(set(all_possible_workers)))
+                            
+                            h_worker = ec1.selectbox("修改人員", all_possible_workers, index=all_possible_workers.index(curr_done.get('作業人員')) if curr_done.get('作業人員') in all_possible_workers else 0)
+                            h_assistant = ec2.selectbox("修改協助人員", ["無"] + all_possible_workers, index=(["無"] + all_possible_workers).index(curr_done.get('協助人員')) if curr_done.get('協助人員') in (["無"] + all_possible_workers) else 0)
                             if st.button("💾 儲存歷史修改"):
                                 requests.patch(f"{DONE_URL}/{target_done_key}.json", json={"作業人員": h_worker, "協助人員": h_assistant})
                                 st.success("歷史紀錄已更新！")
@@ -179,28 +188,40 @@ else:
             else: st.info("目前尚無完工紀錄。")
         except Exception as e: st.error(f"連線錯誤：{e}")
 
-    # --- 5. 📝 現場派工作業 (保持氣球特效) ---
+    # --- 5. 📝 現場派工作業 (關鍵修改：選單聯動) ---
     elif menu == "📝 現場派工作業":
         st.header("📝 建立新派工任務")
         with st.form("dispatch_form", clear_on_submit=True):
             order_no = st.selectbox("📦 選擇製令編號", settings.get("orders", []))
             process_name = st.selectbox("⚙️ 選擇製造工序", settings.get("processes", []))
+            
             c1, c2, c3 = st.columns(3)
-            assigner = c1.selectbox("🚩 派工人員", settings.get("assigners", []), index=settings.get("assigners", []).index(st.session_state.user) if st.session_state.user in settings.get("assigners", []) else 0)
-            worker = c2.selectbox("👷 主要人員", settings.get("workers", []))
-            assistant = c3.selectbox("🤝 協助人員", ["無"] + settings.get("workers", []))
+            # 1. 選擇派工人員
+            assigner = c1.selectbox("🚩 派工人員", settings.get("assigners", []), 
+                                   index=settings.get("assigners", []).index(st.session_state.user) if st.session_state.user in settings.get("assigners", []) else 0)
+            
+            # 2. 根據派工人員動態取得作業人員清單
+            worker_pool = settings.get("worker_map", {}).get(assigner, [])
+            if not worker_pool:
+                worker_pool = ["請先至設定頁面配置人員"]
+            
+            worker = c2.selectbox("👷 主要人員", worker_pool)
+            assistant = c3.selectbox("🤝 協助人員", ["無"] + worker_pool)
             deadline = st.date_input("⏳ 作業期限", datetime.date.today() + datetime.timedelta(days=1))
             
             if st.form_submit_button("🚀 發布任務"):
-                log = {"製令": order_no, "製造工序": process_name, "派工人員": assigner, "作業人員": worker, "協助人員": assistant, "作業期限": str(deadline), "提交時間": get_now_str()}
-                res = requests.post(f"{DB_URL}.json", json=log)
-                if res.status_code == 200:
-                    st.balloons() # 保留氣球特效
-                    st.success(f"任務 [{order_no}] 已成功發布！")
+                if worker == "請先至設定頁面配置人員":
+                    st.error("請先去『系統內容管理』設定該派工人員的專屬作業人員清單。")
                 else:
-                    st.error("發布失敗。")
+                    log = {"製令": order_no, "製造工序": process_name, "派工人員": assigner, "作業人員": worker, "協助人員": assistant, "作業期限": str(deadline), "提交時間": get_now_str()}
+                    res = requests.post(f"{DB_URL}.json", json=log)
+                    if res.status_code == 200:
+                        st.balloons() # 保留氣球特效
+                        st.success(f"任務 [{order_no}] 已成功發布！")
+                    else:
+                        st.error("發布失敗。")
 
-    # --- 6. 📝 編輯派工紀錄 (修正錯誤，保持功能) ---
+    # --- 6. 📝 編輯派工紀錄 ---
     elif menu == "📝 編輯派工紀錄":
         st.header("📝 待辦派工紀錄維護")
         try:
@@ -219,15 +240,16 @@ else:
                     if curr:
                         with st.expander("📝 編輯內容", expanded=True):
                             c1, c2 = st.columns(2)
-                            # 保留：修改製令與派工人員功能
                             edit_order = c1.selectbox("修改製令編號", settings.get("orders", []), index=settings.get("orders", []).index(curr.get('製令')) if curr.get('製令') in settings.get("orders", []) else 0)
                             edit_assigner = c2.selectbox("修改派工人員", settings.get("assigners", []), index=settings.get("assigners", []).index(curr.get('派工人員')) if curr.get('派工人員') in settings.get("assigners", []) else 0)
                             
-                            c3, c4 = st.columns(2)
-                            new_worker = c3.selectbox("修改主要人員", settings.get("workers", []), index=settings.get("workers", []).index(curr.get('作業人員')) if curr.get('作業人員') in settings.get("workers", []) else 0)
-                            new_assist = c4.selectbox("修改協助人員", ["無"] + settings.get("workers", []), index=(["無"] + settings.get("workers", [])).index(curr.get('協助人員')) if curr.get('協助人員') in (["無"] + settings.get("workers", [])) else 0)
+                            # 編輯時同樣連動選單
+                            edit_worker_pool = settings.get("worker_map", {}).get(edit_assigner, [])
                             
-                            # 修正儲存邏輯
+                            c3, c4 = st.columns(2)
+                            new_worker = c3.selectbox("修改主要人員", edit_worker_pool, index=edit_worker_pool.index(curr.get('作業人員')) if curr.get('作業人員') in edit_worker_pool else 0)
+                            new_assist = c4.selectbox("修改協助人員", ["無"] + edit_worker_pool, index=(["無"] + edit_worker_pool).index(curr.get('協助人員')) if curr.get('協助人員') in (["無"] + edit_worker_pool) else 0)
+                            
                             if st.button("💾 儲存派工修改"):
                                 patch_data = {"製令": edit_order, "派工人員": edit_assigner, "作業人員": new_worker, "協助人員": new_assist}
                                 update_res = requests.patch(f"{DB_URL}/{target_id}.json", json=patch_data)
@@ -238,7 +260,6 @@ else:
                                     st.error("儲存失敗，請檢查網路。")
                         
                         st.markdown("---")
-                        # 修正刪除邏輯
                         if st.button("🗑️ 刪除此筆待辦任務", type="primary"):
                             del_res = requests.delete(f"{DB_URL}/{target_id}.json")
                             if del_res.status_code == 200:
@@ -251,18 +272,45 @@ else:
         except Exception as e: 
             st.error(f"讀取失敗：{e}")
 
-    # --- 7. ⚙️ 系統內容管理 ---
+    # --- 7. ⚙️ 系統內容管理 (關鍵修改：方案 B 視覺化管理) ---
     elif menu == "⚙️ 系統內容管理":
         st.header("⚙️ 選單內容管理")
+        
+        # 使用 Session State 暫存編輯內容
+        if "temp_worker_map" not in st.session_state:
+            st.session_state.temp_worker_map = settings.get("worker_map", {})
+
         with st.form("settings_form"):
-            new_orders = st.text_area("📦 編輯製令清單 (逗號隔開)", value=",".join(settings.get("orders", [])), height=120)
-            new_assigners = st.text_area("🚩 編輯派工人員清單", value=",".join(settings.get("assigners", [])), height=100)
-            new_workers = st.text_area("👷 編輯作業人員清單", value=",".join(settings.get("workers", [])), height=100)
-            if st.form_submit_button("✅ 儲存系統設定"):
-                requests.patch(f"{SETTING_URL}.json", json={
+            st.subheader("📦 基本清單設定")
+            new_orders = st.text_area("編輯製令清單 (逗號隔開)", value=",".join(settings.get("orders", [])), height=100)
+            new_assigners_str = st.text_area("編輯派工人員清單 (逗號隔開)", value=",".join(settings.get("assigners", [])), height=70)
+            
+            st.markdown("---")
+            st.subheader("👷 作業人員專屬配置 (方案 B)")
+            
+            # 解析最新的派工人員，供下面選單使用
+            current_assigners = [x.strip() for x in new_assigners_str.split(",") if x.strip()]
+            
+            target_assigner = st.selectbox("1. 請先選擇派工人員", current_assigners)
+            
+            # 取得該人員目前的組員
+            current_workers = st.session_state.temp_worker_map.get(target_assigner, [])
+            worker_input = st.text_area(f"2. 編輯『{target_assigner}』的專屬組員 (逗號隔開)", value=",".join(current_workers), height=100)
+            
+            if st.form_submit_button("✅ 儲存所有系統設定"):
+                # 更新 temp_worker_map 中的資料
+                st.session_state.temp_worker_map[target_assigner] = [x.strip() for x in worker_input.split(",") if x.strip()]
+                
+                # 準備上傳資料
+                final_settings = {
+                    "orders": current_assigners, # 其實是 orders，這裡變數寫錯修正如下
                     "orders": [x.strip() for x in new_orders.split(",") if x.strip()],
-                    "assigners": [x.strip() for x in new_assigners.split(",") if x.strip()],
-                    "workers": [x.strip() for x in new_workers.split(",") if x.strip()]
-                })
-                st.success("系統設定已儲存！")
+                    "assigners": current_assigners,
+                    "worker_map": st.session_state.temp_worker_map
+                }
+                
+                requests.patch(f"{SETTING_URL}.json", json=final_settings)
+                st.success("系統設定與人員對應表已儲存！")
                 st.rerun()
+        
+        st.info("💡 操作提示：先在『派工人員清單』加入姓名，儲存後，再從下拉選單選取該員並設定他的組員。")
