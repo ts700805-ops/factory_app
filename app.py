@@ -68,6 +68,32 @@ if "user" not in st.session_state:
         st.rerun()
 else:
     st.sidebar.markdown(f"👤 **使用者：{st.session_state.user}**")
+    
+    # --- 【修改處】將快速結案按鈕建置在左側側邊欄 ---
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📦 側邊快速結案")
+    try:
+        r_side = requests.get(f"{DB_URL}.json")
+        side_data = r_side.json()
+        if side_data:
+            for k, v in side_data.items():
+                if v:
+                    # 在側邊欄建立簡單的結案按鈕
+                    btn_label = f"✅ {v.get('製令')} - {v.get('作業人員')}"
+                    if st.sidebar.button(btn_label, key=f"side_btn_{k}"):
+                        done_data = v.copy()
+                        done_data['實際完工時間'] = get_now_str()
+                        final_data = {key: (val if pd.notna(val) else "無") for key, val in done_data.items()}
+                        requests.post(f"{DONE_URL}.json", json=final_data)
+                        requests.delete(f"{DB_URL}/{k}.json")
+                        st.balloons()
+                        st.rerun()
+        else:
+            st.sidebar.caption("暫無待辦派工")
+    except:
+        pass
+    st.sidebar.markdown("---")
+
     menu = st.sidebar.radio("導航選單", ["📊 經營者看板 (首頁)", "✅ 已完工歷史紀錄查詢", "📝 現場派工作業", "📝 編輯派工紀錄", "⚙️ 系統內容管理"])
     if st.sidebar.button("登出系統"):
         st.session_state.clear()
@@ -119,7 +145,7 @@ else:
                 st.dataframe(filtered_df[[c for c in display_cols if c in filtered_df.columns]], use_container_width=True, height=300, hide_index=True)
 
                 st.markdown("---")
-                st.subheader("📦 快速結案 (點擊按鈕標記完工)")
+                st.subheader("📦 快速結案 (下方按鈕同步保留)")
                 for index, row in filtered_df.iterrows():
                     with st.container():
                         col_info, col_btn = st.columns([4, 1])
