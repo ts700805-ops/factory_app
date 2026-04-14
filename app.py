@@ -16,9 +16,10 @@ def get_settings():
     try:
         r = requests.get(f"{SETTING_URL}.json", timeout=5)
         data = r.json()
-        if not data: 
+        if not data:
             return {"orders": [], "assigners": ["管理員"], "worker_map": {}, "processes": ["預設工序"]}
-        if "worker_map" not in data: data["worker_map"] = {}
+        if "worker_map" not in data:
+            data["worker_map"] = {}
         return data
     except:
         return {"orders": [], "assigners": ["管理員"], "worker_map": {}, "processes": ["預設工序"]}
@@ -28,24 +29,21 @@ st.set_page_config(page_title="超慧科技●神鬼奇航●派工系統", layo
 
 st.markdown("""
     <style>
-    /* 全域字體優化 */
     .stApp { background-color: #f4f7f9; }
     .main-title { font-size: 36px !important; font-weight: bold; color: #1E3A8A; border-bottom: 4px solid #1E3A8A; margin-bottom: 25px; }
-    
-    /* 看板數字卡片 */
-    .stat-card { 
-        background-color: #ffffff; 
-        padding: 15px; 
-        border-radius: 12px; 
-        border-top: 5px solid #1E3A8A; 
-        box-shadow: 0 4px 10px rgba(0,0,0,0.08); 
-        text-align: center; 
+
+    .stat-card {
+        background-color: #ffffff;
+        padding: 15px;
+        border-radius: 12px;
+        border-top: 5px solid #1E3A8A;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+        text-align: center;
         margin-bottom: 10px;
     }
     .stat-label { font-size: 18px !important; color: #555; font-weight: bold; }
     .stat-value { font-size: 32px !important; font-weight: 800; color: #1E3A8A; }
 
-    /* 待辦任務卡片式設計 */
     .task-card {
         background: white;
         padding: 20px;
@@ -62,7 +60,6 @@ st.markdown("""
     .task-info { font-size: 18px; color: #334155; margin: 5px 0; }
     .task-footer { font-size: 14px; color: #64748b; margin-top: 10px; font-style: italic; }
 
-    /* 按鈕樣式 */
     .stButton>button { border-radius: 8px; font-weight: bold !important; }
     </style>
 """, unsafe_allow_html=True)
@@ -83,7 +80,6 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 📊 經營者看板 (首頁) ---
     if menu == "📊 經營者看板 (首頁)":
         st.markdown('<p class="main-title">📊 超慧科技現場派工看板</p>', unsafe_allow_html=True)
         try:
@@ -92,38 +88,45 @@ else:
             if data:
                 all_logs = []
                 for k, v in data.items():
-                    if v: v['db_key'] = k; all_logs.append(v)
+                    if v:
+                        v['db_key'] = k
+                        all_logs.append(v)
                 df = pd.DataFrame(all_logs).fillna("無")
-                
+
                 c1, c2 = st.columns(2)
-                with c1: 
+                with c1:
                     st.markdown(f'''<div class="stat-card"><span class="stat-label">待處理總量</span><br><span class="stat-value">{len(df)}</span> <span style="font-size:20px">件</span></div>''', unsafe_allow_html=True)
                 with c2:
                     all_workers = pd.concat([df['作業人員'], df.get('協助人員', pd.Series(['無']*len(df)))])
                     worker_count = all_workers[all_workers != "無"].nunique() if not df.empty else 0
                     st.markdown(f'''<div class="stat-card"><span class="stat-label">目前動員人數</span><br><span class="stat-value">{worker_count}</span> <span style="font-size:20px">人</span></div>''', unsafe_allow_html=True)
-                
+
                 with st.expander("🔍 快速篩選資料", expanded=False):
                     f1, f2, f3 = st.columns(3)
                     sel_order = f1.selectbox("按製令篩選", ["全部"] + sorted(df["製令"].unique().tolist()))
                     sel_process = f2.selectbox("按工序篩選", ["全部"] + sorted(df["製造工序"].unique().tolist()))
                     sel_assigner = f3.selectbox("按派工員篩選", ["全部"] + sorted(df["派工人員"].unique().tolist()))
-                    
+
                     f4, f5, f6 = st.columns(3)
                     sel_worker = f4.selectbox("按作業員篩選", ["全部"] + sorted(df["作業人員"].unique().tolist()))
                     sel_assistant = f5.selectbox("按協助人員篩選", ["全部"] + sorted(df["協助人員"].unique().tolist()))
                     sel_deadline = f6.selectbox("按作業期限篩選", ["全部"] + sorted(df["作業期限"].unique().tolist()))
 
                 filtered_df = df.copy()
-                if sel_order != "全部": filtered_df = filtered_df[filtered_df["製令"] == sel_order]
-                if sel_process != "全部": filtered_df = filtered_df[filtered_df["製造工序"] == sel_process]
-                if sel_assigner != "全部": filtered_df = filtered_df[filtered_df["派工人員"] == sel_assigner]
-                if sel_worker != "全部": filtered_df = filtered_df[filtered_df["作業人員"] == sel_worker]
-                if sel_assistant != "全部": filtered_df = filtered_df[filtered_df["協助人員"] == sel_assistant]
-                if sel_deadline != "全部": filtered_df = filtered_df[filtered_df["作業期限"] == sel_deadline]
+                if sel_order != "全部":
+                    filtered_df = filtered_df[filtered_df["製令"] == sel_order]
+                if sel_process != "全部":
+                    filtered_df = filtered_df[filtered_df["製造工序"] == sel_process]
+                if sel_assigner != "全部":
+                    filtered_df = filtered_df[filtered_df["派工人員"] == sel_assigner]
+                if sel_worker != "全部":
+                    filtered_df = filtered_df[filtered_df["作業人員"] == sel_worker]
+                if sel_assistant != "全部":
+                    filtered_df = filtered_df[filtered_df["協助人員"] == sel_assistant]
+                if sel_deadline != "全部":
+                    filtered_df = filtered_df[filtered_df["作業期限"] == sel_deadline]
 
                 st.markdown("---")
-                # 【修改重點：標題名稱變更】
                 st.subheader("📦 轉角遇到愛任務")
 
                 for index, row in filtered_df.iterrows():
@@ -134,11 +137,16 @@ else:
                             <span class="task-badge">{row['製造工序']}</span>
                         </div>
                         <div class="task-info">👷 主手人員：<b>{row['作業人員']}</b></div>
-                        <div class="task-info">🤝 協助人員：{row.get('協助人員', '無')}</div>
+                        <div class="task-info" style="display:flex; justify-content:space-between; align-items:center;">
+                            <span>🤝 協助人員：{row.get('協助人員', '無')}</span>
+                            <span style="background-color:#fef3c7; padding:3px 10px; border-radius:999px; font-size:14px;">
+                                前置作業
+                            </span>
+                        </div>
                         <div class="task-footer">⏳ 作業期限：{row['作業期限']} | 🚩 派工員：{row['派工人員']}</div>
                     </div>
                     """, unsafe_allow_html=True)
-                    
+
                     if st.button(f"✅ 完成這筆紀錄 ({row['製令']})", key=f"btn_{row['db_key']}", use_container_width=True):
                         done_data = row.to_dict()
                         db_key = done_data.pop('db_key')
@@ -153,7 +161,6 @@ else:
         except Exception as e:
             st.error(f"系統錯誤：{e}")
 
-    # --- 4. 其餘功能保持不變 ---
     elif menu == "✅ 已完工歷史紀錄查詢":
         st.markdown('<p class="main-title" style="color: #059669; border-bottom: 4px solid #059669;">✅ 已完工歷史紀錄查詢</p>', unsafe_allow_html=True)
         try:
@@ -162,19 +169,21 @@ else:
             if done_data:
                 done_list = []
                 for k, v in done_data.items():
-                    if v: v['done_key'] = k; done_list.append(v)
+                    if v:
+                        v['done_key'] = k
+                        done_list.append(v)
                 if done_list:
                     df_done = pd.DataFrame(done_list).fillna("無")
                     if '實際完工時間' in df_done.columns:
                         df_done = df_done.sort_values(by='實際完工時間', ascending=False)
                     hist_display_cols = ["實際完工時間", "製令", "製造工序", "作業人員", "協助人員"]
                     st.dataframe(df_done[[c for c in hist_display_cols if c in df_done.columns]], use_container_width=True, height=300, hide_index=True)
-                    
+
                     st.markdown("---")
                     st.subheader("🛠️ 歷史紀錄管理 (編輯 / 刪除)")
                     hist_options = {row['done_key']: f"[{row.get('實際完工時間', '無')}] {row['製令']} - {row['作業人員']}" for _, row in df_done.iterrows()}
                     target_done_key = st.selectbox("請選擇要編輯或刪除的完工紀錄", options=list(hist_options.keys()), format_func=lambda x: hist_options[x])
-                    
+
                     curr_done = next((item for item in done_list if item["done_key"] == target_done_key), None)
                     if curr_done:
                         with st.expander("📝 編輯完工資訊"):
@@ -195,10 +204,14 @@ else:
                                 requests.delete(f"{DONE_URL}/{target_done_key}.json")
                                 st.warning("紀錄已移除。")
                                 st.rerun()
-                            else: st.error("密碼錯誤！")
-                else: st.info("目前尚無完工紀錄。")
-            else: st.info("目前尚無完工紀錄。")
-        except Exception as e: st.error(f"連線錯誤：{e}")
+                            else:
+                                st.error("密碼錯誤！")
+                else:
+                    st.info("目前尚無完工紀錄。")
+            else:
+                st.info("目前尚無完工紀錄。")
+        except Exception as e:
+            st.error(f"連線錯誤：{e}")
 
     elif menu == "📝 現場派工作業":
         st.header("📝 建立新派工任務")
@@ -211,14 +224,16 @@ else:
         worker = c2.selectbox("👷 主要人員", my_workers)
         assistant = c3.selectbox("🤝 協助人員", ["無"] + my_workers)
         deadline = st.date_input("⏳ 作業期限", datetime.date.today() + datetime.timedelta(days=1))
-        
+
         if st.button("🚀 發布任務"):
-            if not worker: st.error("請先配置作業人員。")
+            if not worker:
+                st.error("請先配置作業人員。")
             else:
                 log = {"製令": order_no, "製造工序": process_name, "派工人員": assigner, "作業人員": worker, "協助人員": assistant, "作業期限": str(deadline), "提交時間": get_now_str()}
                 res = requests.post(f"{DB_URL}.json", json=log)
                 if res.status_code == 200:
-                    st.balloons(); st.success(f"任務 [{order_no}] 已發布！")
+                    st.balloons()
+                    st.success(f"任務 [{order_no}] 已發布！")
 
     elif menu == "📝 編輯派工紀錄":
         st.header("📝 待辦派工紀錄維護")
@@ -236,19 +251,23 @@ else:
                         edit_order = c1.selectbox("修改製令", settings.get("orders", []), index=settings.get("orders", []).index(curr.get('製令')) if curr.get('製令') in settings.get("orders", []) else 0)
                         edit_proc = c2.selectbox("修改工序", settings.get("processes", []), index=settings.get("processes", []).index(curr.get('製造工序')) if curr.get('製造工序') in settings.get("processes", []) else 0)
                         edit_assigner = c3.selectbox("修改派工員", settings.get("assigners", []), index=settings.get("assigners", []).index(curr.get('派工人員')) if curr.get('派工人員') in settings.get("assigners", []) else 0)
-                        
+
                         edit_worker_list = settings.get("worker_map", {}).get(edit_assigner, [])
                         c4, c5 = st.columns(2)
                         new_worker = c4.selectbox("修改主手", edit_worker_list, index=edit_worker_list.index(curr.get('作業人員')) if curr.get('作業人員') in edit_worker_list else 0)
                         new_assist = c5.selectbox("修改助手", ["無"] + edit_worker_list, index=(["無"] + edit_worker_list).index(curr.get('協助人員')) if curr.get('協助人員') in (["無"] + edit_worker_list) else 0)
-                        
+
                         if st.button("💾 儲存修改"):
                             requests.patch(f"{DB_URL}/{target_id}.json", json={"製令": edit_order, "製造工序": edit_proc, "派工人員": edit_assigner, "作業人員": new_worker, "協助人員": new_assist})
-                            st.success("更新成功！"); st.rerun()
+                            st.success("更新成功！")
+                            st.rerun()
                     if st.button("🗑️ 刪除此待辦", type="primary"):
-                        requests.delete(f"{DB_URL}/{target_id}.json"); st.rerun()
-            else: st.info("無待辦紀錄。")
-        except: st.error("讀取錯誤")
+                        requests.delete(f"{DB_URL}/{target_id}.json")
+                        st.rerun()
+            else:
+                st.info("無待辦紀錄。")
+        except:
+            st.error("讀取錯誤")
 
     elif menu == "⚙️ 系統內容管理":
         st.header("⚙️ 選單內容管理")
@@ -263,7 +282,7 @@ else:
                     "processes": [x.strip() for x in new_processes.split(",") if x.strip()]
                 })
                 st.rerun()
-        
+
         st.markdown("---")
         target_assigner = st.selectbox("請選擇派工人員配置手下：", settings.get("assigners", []))
         with st.form("worker_config"):
