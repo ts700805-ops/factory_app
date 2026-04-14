@@ -23,7 +23,7 @@ def get_settings():
     except:
         return {"orders": [], "assigners": ["管理員"], "worker_map": {}, "processes": ["預設工序"]}
 
-# --- 2. 頁面配置與 CSS 樣式 (更新為質感 UI) ---
+# --- 2. 頁面配置與 CSS 樣式 ---
 st.set_page_config(page_title="超慧科技●神鬼奇航●派工系統", layout="wide")
 
 st.markdown("""
@@ -82,7 +82,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 📊 經營者看板 (首頁 - 全新質感 UI) ---
+    # --- 3. 📊 經營者看板 (首頁) ---
     if menu == "📊 經營者看板 (首頁)":
         st.markdown('<p class="main-title">📊 超慧科技現場派工看板</p>', unsafe_allow_html=True)
         try:
@@ -96,7 +96,6 @@ else:
                         all_logs.append(v)
                 df = pd.DataFrame(all_logs).fillna("無")
                 
-                # 數據摘要卡片
                 c1, c2 = st.columns(2)
                 with c1: st.markdown(f'<div class="stat-card"><span class="stat-label">總派件數</span><br><span class="stat-value">{len(df)} 件</span></div>', unsafe_allow_html=True)
                 with c2: 
@@ -104,7 +103,6 @@ else:
                     worker_count = all_workers[all_workers != "無"].nunique() if not df.empty else 0
                     st.markdown(f'<div class="stat-card"><span class="stat-label">動員人力</span><br><span class="stat-value">{worker_count} 人</span></div>', unsafe_allow_html=True)
                 
-                # 篩選區
                 with st.expander("🔍 快速篩選資料", expanded=False):
                     f1, f2, f3 = st.columns(3)
                     sel_order = f1.selectbox("按製令篩選", ["全部"] + sorted(df["製令"].unique().tolist()))
@@ -124,13 +122,11 @@ else:
                 if sel_assistant != "全部": filtered_df = filtered_df[filtered_df["協助人員"] == sel_assistant]
                 if sel_date != "全部": filtered_df = filtered_df[filtered_df["作業期限"] == sel_date]
 
-                # 精緻清單顯示
                 st.subheader("📑 待辦派工明細清單")
                 if filtered_df.empty:
                     st.info("查無符合條件之資料。")
                 else:
                     for _, row in filtered_df.iterrows():
-                        # 注意這裡：位置已經交換，且標題改為派工日期
                         st.markdown(f"""
                         <div class="list-row">
                             <div class="list-item" style="flex: 1.5;">
@@ -160,21 +156,32 @@ else:
                         </div>
                         """, unsafe_allow_html=True)
                         
-                        # 保留快速結案按鈕功能
-                        if st.button(f"✅ 完工 (製令:{row['製令']})", key=f"btn_{row['db_key']}"):
-                            done_data = row.to_dict()
-                            db_key = done_data.pop('db_key')
-                            done_data['實際完工時間'] = get_now_str()
-                            requests.post(f"{DONE_URL}.json", json=done_data)
-                            requests.delete(f"{DB_URL}/{db_key}.json")
-                            st.balloons()
-                            st.rerun()
+                        # --- 修改部分：按鈕並排 ---
+                        btn_c1, btn_c2, btn_c3 = st.columns([1, 1, 4])
+                        with btn_c1:
+                            if st.button(f"✅ 完工 (製令:{row['製令']})", key=f"done_{row['db_key']}"):
+                                done_data = row.to_dict()
+                                db_key = done_data.pop('db_key')
+                                done_data['實際完工時間'] = get_now_str()
+                                requests.post(f"{DONE_URL}.json", json=done_data)
+                                requests.delete(f"{DB_URL}/{db_key}.json")
+                                st.balloons()
+                                st.rerun()
+                        
+                        with btn_c2:
+                            if st.button(f"📝 編輯 (製令:{row['製令']})", key=f"edit_{row['db_key']}"):
+                                # 點擊後跳轉到編輯頁面並記錄選中的 ID
+                                st.session_state.target_edit_id = row['db_key']
+                                # 切換導航選單 (透過 st.sidebar 邏輯或是直接跳轉)
+                                # 這裡直接讓用戶知道去「編輯派工紀錄」選單
+                                st.info(f"請點擊左側「📝 編輯派工紀錄」來修改此筆資料。")
+
             else:
                 st.info("目前尚無待辦派工。")
         except Exception as e:
             st.error(f"系統錯誤：{e}")
 
-    # --- 4. ✅ 已完工歷史紀錄查詢 (保持功能) ---
+    # --- 4. ✅ 已完工歷史紀錄查詢 ---
     elif menu == "✅ 已完工歷史紀錄查詢":
         st.markdown('<p class="main-title">✅ 已完工歷史紀錄查詢</p>', unsafe_allow_html=True)
         try:
@@ -187,7 +194,7 @@ else:
                 st.dataframe(df_done, use_container_width=True, hide_index=True)
         except: st.error("無紀錄")
 
-    # --- 5. 📝 現場派工作業 (保持氣球特效) ---
+    # --- 5. 📝 現場派工作業 ---
     elif menu == "📝 現場派工作業":
         st.markdown('<p class="main-title">📝 建立新派工任務</p>', unsafe_allow_html=True)
         
@@ -201,7 +208,6 @@ else:
         my_workers = settings.get("worker_map", {}).get(assigner, [])
         worker = c2.selectbox("👷 主要人員", my_workers)
         assistant = c3.selectbox("🤝 協助人員", ["無"] + my_workers)
-        # 更名為派工日期
         deadline = st.date_input("📅 派工日期", datetime.date.today() + datetime.timedelta(days=1))
         
         if st.button("🚀 發布任務"):
@@ -209,10 +215,10 @@ else:
             else:
                 log = {"製令": order_no, "製造工序": process_name, "派工人員": assigner, "作業人員": worker, "協助人員": assistant, "作業期限": str(deadline), "提交時間": get_now_str()}
                 requests.post(f"{DB_URL}.json", json=log)
-                st.balloons() # 氣球特效保留
+                st.balloons() 
                 st.success(f"任務 [{order_no}] 已成功發布！")
 
-    # --- 6. 📝 編輯派工紀錄 (保持派工員與製令編輯) ---
+    # --- 6. 📝 編輯派工紀錄 ---
     elif menu == "📝 編輯派工紀錄":
         st.markdown('<p class="main-title">📝 待辦紀錄編輯維護</p>', unsafe_allow_html=True)
         try:
@@ -221,7 +227,13 @@ else:
             if db_data:
                 logs = [{"id": k, **v} for k, v in db_data.items() if v]
                 log_opts = {l['id']: f"{l['製令']} - {l['作業人員']}" for l in logs}
-                target_id = st.selectbox("選擇紀錄", options=list(log_opts.keys()), format_func=lambda x: log_opts[x])
+                
+                # 若從首頁過來，自動帶入選取的 ID
+                default_idx = 0
+                if "target_edit_id" in st.session_state and st.session_state.target_edit_id in log_opts:
+                    default_idx = list(log_opts.keys()).index(st.session_state.target_edit_id)
+                
+                target_id = st.selectbox("選擇紀錄", options=list(log_opts.keys()), index=default_idx, format_func=lambda x: log_opts[x])
                 curr = next(l for l in logs if l['id'] == target_id)
                 
                 with st.form("edit_form"):
@@ -233,13 +245,14 @@ else:
                     if st.form_submit_button("💾 儲存修改"):
                         requests.patch(f"{DB_URL}/{target_id}.json", json={"製令": e_order, "派工人員": e_assigner, "作業人員": e_worker})
                         st.success("修改成功")
+                        if "target_edit_id" in st.session_state: del st.session_state.target_edit_id
                         st.rerun()
                 if st.button("🗑️ 刪除任務", type="primary"):
                     requests.delete(f"{DB_URL}/{target_id}.json"); st.rerun()
             else: st.info("無待辦紀錄。")
         except: st.error("讀取失敗")
 
-    # --- 7. ⚙️ 系統內容管理 (保持功能) ---
+    # --- 7. ⚙️ 系統內容管理 ---
     elif menu == "⚙️ 系統內容管理":
         st.markdown('<p class="main-title">⚙️ 系統內容管理</p>', unsafe_allow_html=True)
         with st.form("sys_config"):
