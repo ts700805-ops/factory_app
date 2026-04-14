@@ -126,18 +126,29 @@ else:
                 # 【修改重點：標題名稱變更】
                 st.subheader("📦 轉角遇到愛任務")
 
-                for index, row in filtered_df.iterrows():
-                    st.markdown(f"""
-                    <div class="task-card">
-                        <div class="task-header">
-                            <span class="task-order">📦 製令：{row['製令']}</span>
-                            <span class="task-badge">{row['製造工序']}</span>
-                        </div>
-                        <div class="task-info">👷 主手人員：<b>{row['作業人員']}</b></div>
-                        <div class="task-info">🤝 協助人員：{row.get('協助人員', '無')}</div>
-                        <div class="task-footer">⏳ 作業期限：{row['作業期限']} | 🚩 派工員：{row['派工人員']}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+              for index, row in filtered_df.iterrows():
+    st.markdown(f"""
+    <div class="task-card">
+        <div class="task-header">
+            <span class="task-order">📦 製令：{row['製令']}</span>
+            <span class="task-badge">{row['製造工序']}</span>
+        </div>
+        <div class="task-info">👷 主手人員：<b>{row['作業人員']}</b></div>
+
+        <!-- 協助人員 + 前置作業 置於同一行，左右兩側 -->
+        <div class="task-info" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>🤝 協助人員：{row.get('協助人員', '無')}</span>
+            <span style="background-color:#fef3c7; padding:3px 10px; border-radius:999px; font-size:14px;">
+                前置作業
+            </span>
+        </div>
+
+        <!-- 作業期限與派工員維持同一行，靠左顯示 -->
+        <div class="task-footer">
+            ⏳ 作業期限：{row['作業期限']} | 🚩 派工員：{row['派工人員']}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
                     
                     if st.button(f"✅ 完成這筆紀錄 ({row['製令']})", key=f"btn_{row['db_key']}", use_container_width=True):
                         done_data = row.to_dict()
