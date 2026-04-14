@@ -278,4 +278,7 @@ else:
             
             with st.form("worker_config"):
                 worker_input = st.text_area(f"👷 編輯『{target_assigner}』的作業員 (逗號隔開)", value=",".join(current_workers), height=200)
-                if st.form_submit_button(f"💾 儲存 {target_assigner} 的
+                if st.form_submit_button(f"💾 儲存 {target_assigner} 的配置"):
+                    worker_map[target_assigner] = [x.strip() for x in worker_input.split(",") if x.strip()]
+                    requests.patch(f"{SETTING_URL}.json", json={"worker_map": worker_map})
+                    st.rerun()
