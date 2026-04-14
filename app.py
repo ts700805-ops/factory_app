@@ -75,12 +75,12 @@ if "user" not in st.session_state:
         st.rerun()
 else:
     st.sidebar.markdown(f"👤 **使用者：{st.session_state.user}**")
-    menu = st.sidebar.radio("導航選單", ["📊 經營者看板 (首頁)", "✅ 已完工歷史紀錄查詢", "📝 現場派工作業", "📝 編輯派工紀錄", "⚙️ 系統內容管理"])
+    menu = st.sidebar.radio("導航選單", ["📊 控制塔台 (首頁)", "✅ 已完工歷史紀錄查詢", "📝 現場派工作業", "📝 編輯派工紀錄", "⚙️ 系統內容管理"])
     if st.sidebar.button("登出系統"):
         st.session_state.clear()
         st.rerun()
 
-    if menu == "📊 經營者看板 (首頁)":
+    if menu == "📊 控制塔台 (首頁)":
         st.markdown('<p class="main-title">📊 超慧科技現場派工看板</p>', unsafe_allow_html=True)
         try:
             r = requests.get(f"{DB_URL}.json")
