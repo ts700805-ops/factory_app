@@ -127,7 +127,7 @@ else:
                     filtered_df = filtered_df[filtered_df["作業期限"] == sel_deadline]
 
                 st.markdown("---")
-                st.subheader("📦 轉角遇到愛德文與志偉💗" )
+                st.subheader("📦 轉角遇到💗德文與志偉💗" )
 
                 for index, row in filtered_df.iterrows():
                     st.markdown(f"""
