@@ -218,7 +218,7 @@ else:
                 else:
                     st.error("發布失敗。")
 
-    # --- 6. 📝 編輯派工紀錄 (新增修改工序) ---
+    # --- 6. 📝 編輯派工紀錄 (新增修改工序與作業期限) ---
     elif menu == "📝 編輯派工紀錄":
         st.header("📝 待辦派工紀錄維護")
         try:
@@ -236,12 +236,12 @@ else:
                     
                     if curr:
                         with st.expander("📝 編輯內容", expanded=True):
-                            c1, c2, c3 = st.columns(3) # 改為三欄以放入工序
+                            c1, c2, c3 = st.columns(3)
                             
                             # 1. 保留製令修改
                             edit_order = c1.selectbox("修改製令編號", settings.get("orders", []), index=settings.get("orders", []).index(curr.get('製令')) if curr.get('製令') in settings.get("orders", []) else 0)
                             
-                            # 2. 【新增】製造工序修改
+                            # 2. 保留工序修改
                             edit_process = c2.selectbox("修改製造工序", settings.get("processes", []), index=settings.get("processes", []).index(curr.get('製造工序')) if curr.get('製造工序') in settings.get("processes", []) else 0)
                             
                             # 3. 保留派工人員修改
@@ -250,17 +250,25 @@ else:
                             # 重新獲取對應派工員的人員名單
                             edit_worker_list = settings.get("worker_map", {}).get(edit_assigner, [])
                             
-                            c4, c5 = st.columns(2)
+                            c4, c5, c6 = st.columns(3) # 調整為三欄以放入期限
                             new_worker = c4.selectbox("修改主要人員", edit_worker_list, index=edit_worker_list.index(curr.get('作業人員')) if curr.get('作業人員') in edit_worker_list else 0)
                             new_assist = c5.selectbox("修改協助人員", ["無"] + edit_worker_list, index=(["無"] + edit_worker_list).index(curr.get('協助人員')) if curr.get('協助人員') in (["無"] + edit_worker_list) else 0)
+                            
+                            # --- 【新增】作業期限修改功能 ---
+                            try:
+                                curr_deadline_val = datetime.datetime.strptime(curr.get('作業期限', str(datetime.date.today())), '%Y-%m-%d').date()
+                            except:
+                                curr_deadline_val = datetime.date.today()
+                            new_deadline = c6.date_input("修改作業期限", curr_deadline_val)
                             
                             if st.button("💾 儲存派工修改"):
                                 patch_data = {
                                     "製令": edit_order, 
-                                    "製造工序": edit_process, # 寫入資料庫
+                                    "製造工序": edit_process, 
                                     "派工人員": edit_assigner, 
                                     "作業人員": new_worker, 
-                                    "協助人員": new_assist
+                                    "協助人員": new_assist,
+                                    "作業期限": str(new_deadline) # 寫入新的日期
                                 }
                                 update_res = requests.patch(f"{DB_URL}/{target_id}.json", json=patch_data)
                                 if update_res.status_code == 200:
