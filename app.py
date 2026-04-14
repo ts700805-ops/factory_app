@@ -83,7 +83,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 📊 經營者看板 (首頁 - 優化顯示版) ---
+    # --- 3. 📊 經營者看板 (首頁) ---
     if menu == "📊 經營者看板 (首頁)":
         st.markdown('<p class="main-title">📊 超慧科技現場派工看板</p>', unsafe_allow_html=True)
         try:
@@ -95,7 +95,6 @@ else:
                     if v: v['db_key'] = k; all_logs.append(v)
                 df = pd.DataFrame(all_logs).fillna("無")
                 
-                # 上方概況
                 c1, c2 = st.columns(2)
                 with c1: 
                     st.markdown(f'''<div class="stat-card"><span class="stat-label">待處理總量</span><br><span class="stat-value">{len(df)}</span> <span style="font-size:20px">件</span></div>''', unsafe_allow_html=True)
@@ -104,7 +103,6 @@ else:
                     worker_count = all_workers[all_workers != "無"].nunique() if not df.empty else 0
                     st.markdown(f'''<div class="stat-card"><span class="stat-label">目前動員人數</span><br><span class="stat-value">{worker_count}</span> <span style="font-size:20px">人</span></div>''', unsafe_allow_html=True)
                 
-                # 篩選區 (完整保留所有篩選邏輯)
                 with st.expander("🔍 快速篩選資料", expanded=False):
                     f1, f2, f3 = st.columns(3)
                     sel_order = f1.selectbox("按製令篩選", ["全部"] + sorted(df["製令"].unique().tolist()))
@@ -125,11 +123,10 @@ else:
                 if sel_deadline != "全部": filtered_df = filtered_df[filtered_df["作業期限"] == sel_deadline]
 
                 st.markdown("---")
-                st.subheader("📦 待辦派工任務清單")
+                # 【修改重點：標題名稱變更】
+                st.subheader("📦 轉角遇到愛任務")
 
-                # 改用卡片式顯示，取代單調的 dataframe
                 for index, row in filtered_df.iterrows():
-                    # 卡片本體
                     st.markdown(f"""
                     <div class="task-card">
                         <div class="task-header">
@@ -142,7 +139,6 @@ else:
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # 完工按鈕 (緊跟在卡片下方)
                     if st.button(f"✅ 完成這筆紀錄 ({row['製令']})", key=f"btn_{row['db_key']}", use_container_width=True):
                         done_data = row.to_dict()
                         db_key = done_data.pop('db_key')
@@ -153,11 +149,11 @@ else:
                         st.balloons()
                         st.rerun()
             else:
-                st.info("目前尚無待辦派工任務。")
+                st.info("目前尚無任務。")
         except Exception as e:
             st.error(f"系統錯誤：{e}")
 
-    # --- 4. ✅ 已完工歷史紀錄查詢 (保持不動) ---
+    # --- 4. 其餘功能保持不變 ---
     elif menu == "✅ 已完工歷史紀錄查詢":
         st.markdown('<p class="main-title" style="color: #059669; border-bottom: 4px solid #059669;">✅ 已完工歷史紀錄查詢</p>', unsafe_allow_html=True)
         try:
@@ -204,7 +200,6 @@ else:
             else: st.info("目前尚無完工紀錄。")
         except Exception as e: st.error(f"連線錯誤：{e}")
 
-    # --- 5. 📝 現場派工作業 (保持不動) ---
     elif menu == "📝 現場派工作業":
         st.header("📝 建立新派工任務")
         order_no = st.selectbox("📦 選擇製令編號", settings.get("orders", []))
@@ -225,7 +220,6 @@ else:
                 if res.status_code == 200:
                     st.balloons(); st.success(f"任務 [{order_no}] 已發布！")
 
-    # --- 6. 📝 編輯派工紀錄 (保持不動) ---
     elif menu == "📝 編輯派工紀錄":
         st.header("📝 待辦派工紀錄維護")
         try:
@@ -256,7 +250,6 @@ else:
             else: st.info("無待辦紀錄。")
         except: st.error("讀取錯誤")
 
-    # --- 7. ⚙️ 系統內容管理 (保持不動) ---
     elif menu == "⚙️ 系統內容管理":
         st.header("⚙️ 選單內容管理")
         with st.form("basic_settings"):
