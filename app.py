@@ -68,10 +68,8 @@ if "user" not in st.session_state:
         st.rerun()
 else:
     st.sidebar.markdown(f"👤 **使用者：{st.session_state.user}**")
-    
-    # 【修改】導航選單移至登出按鈕上方
-    menu = st.sidebar.radio("導航選單", ["📊 經營者看板 (首頁)", "✅ 已完工歷史紀錄查詢", "📝 現場派工作業", "📝 編輯派工紀錄", "⚙️ 系統內容管理"])
-    
+    # --- 修改點：新增「✅ 快速結案作業」選單 ---
+    menu = st.sidebar.radio("導航選單", ["📊 經營者看板 (首頁)", "✅ 快速結案作業", "✅ 已完工歷史紀錄查詢", "📝 現場派工作業", "📝 編輯派工紀錄", "⚙️ 系統內容管理"])
     if st.sidebar.button("登出系統"):
         st.session_state.clear()
         st.rerun()
@@ -121,31 +119,47 @@ else:
                 display_cols = ["製令", "製造工序", "派工人員", "作業人員", "協助人員", "作業期限"]
                 st.dataframe(filtered_df[[c for c in display_cols if c in filtered_df.columns]], use_container_width=True, height=300, hide_index=True)
 
-                st.markdown("---")
-                st.subheader("📦 快速結案") # 標題簡化
-                for index, row in filtered_df.iterrows():
+            else:
+                st.info("目前尚無待辦派工。")
+        except Exception as e:
+            st.error(f"系統錯誤：{e}")
+
+    # --- 4. ✅ 快速結案作業 (新增頁面) ---
+    elif menu == "✅ 快速結案作業":
+        st.markdown('<p class="main-title">✅ 現場快速結案中心</p>', unsafe_allow_html=True)
+        try:
+            r = requests.get(f"{DB_URL}.json")
+            data = r.json()
+            if data:
+                all_logs = []
+                for k, v in data.items():
+                    if v:
+                        v['db_key'] = k
+                        all_logs.append(v)
+                df = pd.DataFrame(all_logs).fillna("無")
+
+                st.subheader("📦 待辦清單 (點擊按鈕標記完工)")
+                for index, row in df.iterrows():
                     with st.container():
-                        # 【修改】僅保留左側完工按鈕，不保留同步等其他按鈕
-                        col_btn, col_info = st.columns([1, 4]) 
+                        col_info, col_btn = st.columns([4, 1])
                         with col_info:
                             st.markdown(f"### 📦 製令：{row['製令']} | 👷 作業員：{row['作業人員']} | 🤝 協助：{row.get('協助人員', '無')}")
                             st.caption(f"工序：{row['製造工序']} | 期限：{row['作業期限']} | 派工：{row['派工人員']}")
-                        
-                        if col_btn.button(f"✅ 完工", key=f"btn_{row['db_key']}"):
+                        if col_btn.button(f"✅ 完工", key=f"done_page_{row['db_key']}"):
                             done_data = row.to_dict()
                             db_key = done_data.pop('db_key')
                             done_data['實際完工時間'] = get_now_str()
                             final_data = {k: (v if pd.notna(v) else "無") for k, v in done_data.items()}
                             requests.post(f"{DONE_URL}.json", json=final_data)
                             requests.delete(f"{DB_URL}/{db_key}.json")
-                            st.balloons() # 氣球特效保留
+                            st.balloons()
                             st.rerun()
             else:
-                st.info("目前尚無待辦派工。")
+                st.info("目前尚無待辦派工，無需結案。")
         except Exception as e:
-            st.error(f"系統錯誤：{e}")
+            st.error(f"連線錯誤：{e}")
 
-    # --- 4. ✅ 已完工歷史紀錄查詢 ---
+    # --- 5. ✅ 已完工歷史紀錄查詢 ---
     elif menu == "✅ 已完工歷史紀錄查詢":
         st.markdown('<p class="main-title" style="color: #059669; border-bottom: 4px solid #059669;">✅ 已完工歷史紀錄查詢</p>', unsafe_allow_html=True)
         try:
@@ -194,7 +208,7 @@ else:
             else: st.info("目前尚無完工紀錄。")
         except Exception as e: st.error(f"連線錯誤：{e}")
 
-    # --- 5. 📝 現場派工作業 ---
+    # --- 6. 📝 現場派工作業 ---
     elif menu == "📝 現場派工作業":
         st.header("📝 建立新派工任務")
         
@@ -218,12 +232,12 @@ else:
                 log = {"製令": order_no, "製造工序": process_name, "派工人員": assigner, "作業人員": worker, "協助人員": assistant, "作業期限": str(deadline), "提交時間": get_now_str()}
                 res = requests.post(f"{DB_URL}.json", json=log)
                 if res.status_code == 200:
-                    st.balloons() # 氣球特效保留
+                    st.balloons()
                     st.success(f"任務 [{order_no}] 已成功發布！")
                 else:
                     st.error("發布失敗。")
 
-    # --- 6. 📝 編輯派工紀錄 ---
+    # --- 7. 📝 編輯派工紀錄 ---
     elif menu == "📝 編輯派工紀錄":
         st.header("📝 待辦派工紀錄維護")
         try:
@@ -243,35 +257,23 @@ else:
                         with st.expander("📝 編輯內容", expanded=True):
                             c1, c2, c3 = st.columns(3)
                             
-                            # 1. 保留製令修改
                             edit_order = c1.selectbox("修改製令編號", settings.get("orders", []), index=settings.get("orders", []).index(curr.get('製令')) if curr.get('製令') in settings.get("orders", []) else 0)
-                            
-                            # 2. 保留工序修改
                             edit_process = c2.selectbox("修改製造工序", settings.get("processes", []), index=settings.get("processes", []).index(curr.get('製造工序')) if curr.get('製造工序') in settings.get("processes", []) else 0)
-                            
-                            # 3. 保留派工人員修改
                             edit_assigner = c3.selectbox("修改派工人員", settings.get("assigners", []), index=settings.get("assigners", []).index(curr.get('派工人員')) if curr.get('派工人員') in settings.get("assigners", []) else 0)
                             
                             edit_worker_list = settings.get("worker_map", {}).get(edit_assigner, [])
                             
-                            c4, c5, c6 = st.columns(3)
+                            c4, c5 = st.columns(2)
                             new_worker = c4.selectbox("修改主要人員", edit_worker_list, index=edit_worker_list.index(curr.get('作業人員')) if curr.get('作業人員') in edit_worker_list else 0)
                             new_assist = c5.selectbox("修改協助人員", ["無"] + edit_worker_list, index=(["無"] + edit_worker_list).index(curr.get('協助人員')) if curr.get('協助人員') in (["無"] + edit_worker_list) else 0)
-                            
-                            try:
-                                curr_deadline_val = datetime.datetime.strptime(curr.get('作業期限', str(datetime.date.today())), '%Y-%m-%d').date()
-                            except:
-                                curr_deadline_val = datetime.date.today()
-                            new_deadline = c6.date_input("修改作業期限", curr_deadline_val)
                             
                             if st.button("💾 儲存派工修改"):
                                 patch_data = {
                                     "製令": edit_order, 
-                                    "製造工序": edit_process, 
+                                    "製造工序": edit_process,
                                     "派工人員": edit_assigner, 
                                     "作業人員": new_worker, 
-                                    "協助人員": new_assist,
-                                    "作業期限": str(new_deadline)
+                                    "協助人員": new_assist
                                 }
                                 update_res = requests.patch(f"{DB_URL}/{target_id}.json", json=patch_data)
                                 if update_res.status_code == 200:
@@ -285,7 +287,7 @@ else:
             else: st.info("目前沒有待辦紀錄。")
         except Exception as e: st.error(f"讀取失敗：{e}")
 
-    # --- 7. ⚙️ 系統內容管理 ---
+    # --- 8. ⚙️ 系統內容管理 ---
     elif menu == "⚙️ 系統內容管理":
         st.header("⚙️ 選單內容管理")
         with st.form("basic_settings"):
