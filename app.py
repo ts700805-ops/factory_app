@@ -126,16 +126,19 @@ else:
                 # 【修改重點：標題名稱變更】
                 st.subheader("📦 轉角遇到愛任務")
 
-                for index, row in filtered_df.iterrows():
+              for index, row in filtered_df.iterrows():
+                    # --- 任務卡片樣式修改：標籤移至右側，人員資訊集中 ---
                     st.markdown(f"""
                     <div class="task-card">
-                        <div class="task-header">
+                        <div class="task-header" style="display: flex; justify-content: space-between; align-items: center;">
                             <span class="task-order">📦 製令：{row['製令']}</span>
                             <span class="task-badge">{row['製造工序']}</span>
                         </div>
                         <div class="task-info">👷 主手人員：<b>{row['作業人員']}</b></div>
                         <div class="task-info">🤝 協助人員：{row.get('協助人員', '無')}</div>
-                        <div class="task-footer">⏳ 作業期限：{row['作業期限']} | 🚩 派工員：{row['派工人員']}</div>
+                        <div class="task-footer" style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #eee; font-style: normal;">
+                            ⏳ 作業期限：{row['作業期限']} | 🚩 派工員：{row['派工人員']}
+                        </div>
                     </div>
                     """, unsafe_allow_html=True)
                     
