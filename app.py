@@ -73,7 +73,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 📊 經營者看板 (首頁) - 已新增協助人員與作業期限篩選 ---
+    # --- 3. 📊 經營者看板 (首頁) ---
     if menu == "📊 經營者看板 (首頁)":
         st.markdown('<p class="main-title">📊 超慧科技現場派工看板</p>', unsafe_allow_html=True)
         try:
@@ -103,9 +103,7 @@ else:
                     
                     f4, f5, f6 = st.columns(3)
                     sel_worker = f4.selectbox("按作業員篩選", ["全部"] + sorted(df["作業人員"].unique().tolist()))
-                    # 新增：按協助人員篩選
                     sel_assistant = f5.selectbox("按協助人員篩選", ["全部"] + sorted(df["協助人員"].unique().tolist()))
-                    # 新增：按作業期限篩選
                     sel_deadline = f6.selectbox("按作業期限篩選", ["全部"] + sorted(df["作業期限"].unique().tolist()))
 
                 filtered_df = df.copy()
@@ -142,7 +140,7 @@ else:
         except Exception as e:
             st.error(f"系統錯誤：{e}")
 
-    # --- 4. ✅ 已完工歷史紀錄查詢 (保持不變) ---
+    # --- 4. ✅ 已完工歷史紀錄查詢 ---
     elif menu == "✅ 已完工歷史紀錄查詢":
         st.markdown('<p class="main-title" style="color: #059669; border-bottom: 4px solid #059669;">✅ 已完工歷史紀錄查詢</p>', unsafe_allow_html=True)
         try:
@@ -191,7 +189,7 @@ else:
             else: st.info("目前尚無完工紀錄。")
         except Exception as e: st.error(f"連線錯誤：{e}")
 
-    # --- 5. 📝 現場派工作業 (保持邏輯，氣球特效保留) ---
+    # --- 5. 📝 現場派工作業 ---
     elif menu == "📝 現場派工作業":
         st.header("📝 建立新派工任務")
         
@@ -215,12 +213,12 @@ else:
                 log = {"製令": order_no, "製造工序": process_name, "派工人員": assigner, "作業人員": worker, "協助人員": assistant, "作業期限": str(deadline), "提交時間": get_now_str()}
                 res = requests.post(f"{DB_URL}.json", json=log)
                 if res.status_code == 200:
-                    st.balloons() # 特效保留
+                    st.balloons()
                     st.success(f"任務 [{order_no}] 已成功發布！")
                 else:
                     st.error("發布失敗。")
 
-    # --- 6. 📝 編輯派工紀錄 (保持製令與派工人員編輯邏輯) ---
+    # --- 6. 📝 編輯派工紀錄 (新增修改工序) ---
     elif menu == "📝 編輯派工紀錄":
         st.header("📝 待辦派工紀錄維護")
         try:
@@ -238,20 +236,32 @@ else:
                     
                     if curr:
                         with st.expander("📝 編輯內容", expanded=True):
-                            c1, c2 = st.columns(2)
-                            # 保留製令修改
-                            edit_order = c1.selectbox("修改製令編號", settings.get("orders", []), index=settings.get("orders", []).index(curr.get('製令')) if curr.get('製令') in settings.get("orders", []) else 0)
-                            # 保留派工人員修改
-                            edit_assigner = c2.selectbox("修改派工人員", settings.get("assigners", []), index=settings.get("assigners", []).index(curr.get('派工人員')) if curr.get('派工人員') in settings.get("assigners", []) else 0)
+                            c1, c2, c3 = st.columns(3) # 改為三欄以放入工序
                             
+                            # 1. 保留製令修改
+                            edit_order = c1.selectbox("修改製令編號", settings.get("orders", []), index=settings.get("orders", []).index(curr.get('製令')) if curr.get('製令') in settings.get("orders", []) else 0)
+                            
+                            # 2. 【新增】製造工序修改
+                            edit_process = c2.selectbox("修改製造工序", settings.get("processes", []), index=settings.get("processes", []).index(curr.get('製造工序')) if curr.get('製造工序') in settings.get("processes", []) else 0)
+                            
+                            # 3. 保留派工人員修改
+                            edit_assigner = c3.selectbox("修改派工人員", settings.get("assigners", []), index=settings.get("assigners", []).index(curr.get('派工人員')) if curr.get('派工人員') in settings.get("assigners", []) else 0)
+                            
+                            # 重新獲取對應派工員的人員名單
                             edit_worker_list = settings.get("worker_map", {}).get(edit_assigner, [])
                             
-                            c3, c4 = st.columns(2)
-                            new_worker = c3.selectbox("修改主要人員", edit_worker_list, index=edit_worker_list.index(curr.get('作業人員')) if curr.get('作業人員') in edit_worker_list else 0)
-                            new_assist = c4.selectbox("修改協助人員", ["無"] + edit_worker_list, index=(["無"] + edit_worker_list).index(curr.get('協助人員')) if curr.get('協助人員') in (["無"] + edit_worker_list) else 0)
+                            c4, c5 = st.columns(2)
+                            new_worker = c4.selectbox("修改主要人員", edit_worker_list, index=edit_worker_list.index(curr.get('作業人員')) if curr.get('作業人員') in edit_worker_list else 0)
+                            new_assist = c5.selectbox("修改協助人員", ["無"] + edit_worker_list, index=(["無"] + edit_worker_list).index(curr.get('協助人員')) if curr.get('協助人員') in (["無"] + edit_worker_list) else 0)
                             
                             if st.button("💾 儲存派工修改"):
-                                patch_data = {"製令": edit_order, "派工人員": edit_assigner, "作業人員": new_worker, "協助人員": new_assist}
+                                patch_data = {
+                                    "製令": edit_order, 
+                                    "製造工序": edit_process, # 寫入資料庫
+                                    "派工人員": edit_assigner, 
+                                    "作業人員": new_worker, 
+                                    "協助人員": new_assist
+                                }
                                 update_res = requests.patch(f"{DB_URL}/{target_id}.json", json=patch_data)
                                 if update_res.status_code == 200:
                                     st.success("紀錄已更新！")
@@ -264,16 +274,22 @@ else:
             else: st.info("目前沒有待辦紀錄。")
         except Exception as e: st.error(f"讀取失敗：{e}")
 
-    # --- 7. ⚙️ 系統內容管理 (保持不變) ---
+    # --- 7. ⚙️ 系統內容管理 ---
     elif menu == "⚙️ 系統內容管理":
         st.header("⚙️ 選單內容管理")
         with st.form("basic_settings"):
             new_orders = st.text_area("📦 編輯製令清單", value=",".join(settings.get("orders", [])), height=100)
             new_assigners = st.text_area("🚩 編輯派工人員清單", value=",".join(settings.get("assigners", [])), height=100)
+            new_processes = st.text_area("⚙️ 編輯製造工序清單", value=",".join(settings.get("processes", ["預設工序"])), height=100)
             if st.form_submit_button("💾 儲存名單"):
                 settings["orders"] = [x.strip() for x in new_orders.split(",") if x.strip()]
                 settings["assigners"] = [x.strip() for x in new_assigners.split(",") if x.strip()]
-                requests.patch(f"{SETTING_URL}.json", json={"orders": settings["orders"], "assigners": settings["assigners"]})
+                settings["processes"] = [x.strip() for x in new_processes.split(",") if x.strip()]
+                requests.patch(f"{SETTING_URL}.json", json={
+                    "orders": settings["orders"], 
+                    "assigners": settings["assigners"],
+                    "processes": settings["processes"]
+                })
                 st.rerun()
 
         st.markdown("---")
