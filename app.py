@@ -69,32 +69,9 @@ if "user" not in st.session_state:
 else:
     st.sidebar.markdown(f"👤 **使用者：{st.session_state.user}**")
     
-    # --- 【修改處】將快速結案按鈕建置在左側側邊欄 ---
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("📦 側邊快速結案")
-    try:
-        r_side = requests.get(f"{DB_URL}.json")
-        side_data = r_side.json()
-        if side_data:
-            for k, v in side_data.items():
-                if v:
-                    # 在側邊欄建立簡單的結案按鈕
-                    btn_label = f"✅ {v.get('製令')} - {v.get('作業人員')}"
-                    if st.sidebar.button(btn_label, key=f"side_btn_{k}"):
-                        done_data = v.copy()
-                        done_data['實際完工時間'] = get_now_str()
-                        final_data = {key: (val if pd.notna(val) else "無") for key, val in done_data.items()}
-                        requests.post(f"{DONE_URL}.json", json=final_data)
-                        requests.delete(f"{DB_URL}/{k}.json")
-                        st.balloons()
-                        st.rerun()
-        else:
-            st.sidebar.caption("暫無待辦派工")
-    except:
-        pass
-    st.sidebar.markdown("---")
-
+    # 【修改】導航選單移至登出按鈕上方
     menu = st.sidebar.radio("導航選單", ["📊 經營者看板 (首頁)", "✅ 已完工歷史紀錄查詢", "📝 現場派工作業", "📝 編輯派工紀錄", "⚙️ 系統內容管理"])
+    
     if st.sidebar.button("登出系統"):
         st.session_state.clear()
         st.rerun()
@@ -145,13 +122,15 @@ else:
                 st.dataframe(filtered_df[[c for c in display_cols if c in filtered_df.columns]], use_container_width=True, height=300, hide_index=True)
 
                 st.markdown("---")
-                st.subheader("📦 快速結案 (下方按鈕同步保留)")
+                st.subheader("📦 快速結案") # 標題簡化
                 for index, row in filtered_df.iterrows():
                     with st.container():
-                        col_info, col_btn = st.columns([4, 1])
+                        # 【修改】僅保留左側完工按鈕，不保留同步等其他按鈕
+                        col_btn, col_info = st.columns([1, 4]) 
                         with col_info:
                             st.markdown(f"### 📦 製令：{row['製令']} | 👷 作業員：{row['作業人員']} | 🤝 協助：{row.get('協助人員', '無')}")
                             st.caption(f"工序：{row['製造工序']} | 期限：{row['作業期限']} | 派工：{row['派工人員']}")
+                        
                         if col_btn.button(f"✅ 完工", key=f"btn_{row['db_key']}"):
                             done_data = row.to_dict()
                             db_key = done_data.pop('db_key')
@@ -159,7 +138,7 @@ else:
                             final_data = {k: (v if pd.notna(v) else "無") for k, v in done_data.items()}
                             requests.post(f"{DONE_URL}.json", json=final_data)
                             requests.delete(f"{DB_URL}/{db_key}.json")
-                            st.balloons()
+                            st.balloons() # 氣球特效保留
                             st.rerun()
             else:
                 st.info("目前尚無待辦派工。")
@@ -239,12 +218,12 @@ else:
                 log = {"製令": order_no, "製造工序": process_name, "派工人員": assigner, "作業人員": worker, "協助人員": assistant, "作業期限": str(deadline), "提交時間": get_now_str()}
                 res = requests.post(f"{DB_URL}.json", json=log)
                 if res.status_code == 200:
-                    st.balloons()
+                    st.balloons() # 氣球特效保留
                     st.success(f"任務 [{order_no}] 已成功發布！")
                 else:
                     st.error("發布失敗。")
 
-    # --- 6. 📝 編輯派工紀錄 (新增修改工序與作業期限) ---
+    # --- 6. 📝 編輯派工紀錄 ---
     elif menu == "📝 編輯派工紀錄":
         st.header("📝 待辦派工紀錄維護")
         try:
@@ -273,14 +252,12 @@ else:
                             # 3. 保留派工人員修改
                             edit_assigner = c3.selectbox("修改派工人員", settings.get("assigners", []), index=settings.get("assigners", []).index(curr.get('派工人員')) if curr.get('派工人員') in settings.get("assigners", []) else 0)
                             
-                            # 重新獲取對應派工員的人員名單
                             edit_worker_list = settings.get("worker_map", {}).get(edit_assigner, [])
                             
-                            c4, c5, c6 = st.columns(3) # 調整為三欄以放入期限
+                            c4, c5, c6 = st.columns(3)
                             new_worker = c4.selectbox("修改主要人員", edit_worker_list, index=edit_worker_list.index(curr.get('作業人員')) if curr.get('作業人員') in edit_worker_list else 0)
                             new_assist = c5.selectbox("修改協助人員", ["無"] + edit_worker_list, index=(["無"] + edit_worker_list).index(curr.get('協助人員')) if curr.get('協助人員') in (["無"] + edit_worker_list) else 0)
                             
-                            # --- 【新增】作業期限修改功能 ---
                             try:
                                 curr_deadline_val = datetime.datetime.strptime(curr.get('作業期限', str(datetime.date.today())), '%Y-%m-%d').date()
                             except:
@@ -294,7 +271,7 @@ else:
                                     "派工人員": edit_assigner, 
                                     "作業人員": new_worker, 
                                     "協助人員": new_assist,
-                                    "作業期限": str(new_deadline) # 寫入新的日期
+                                    "作業期限": str(new_deadline)
                                 }
                                 update_res = requests.patch(f"{DB_URL}/{target_id}.json", json=patch_data)
                                 if update_res.status_code == 200:
