@@ -141,7 +141,7 @@ else:
                             <div style="flex:1 1 220px;">🤝 協助人員：{row.get('協助人員', '無')}</div>
                             <div style="flex:2 1 320px;">⏳ 作業期限：{row['作業期限']} | 🚩 派工員：{row['派工人員']}</div>
                             <div style="flex:0 0 auto; background:#fef3c7; color:#92400e; padding:4px 12px; border-radius:999px; font-size:14px; font-weight:700;">
-                        
+                                超慧科技
                             </div>
                         </div>
                     </div>
