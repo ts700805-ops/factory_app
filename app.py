@@ -70,12 +70,12 @@ if "user" not in st.session_state:
     st.title("⚓ 神鬼奇航●控制塔台登入")
     u = st.selectbox("登入者姓名", settings.get("assigners", ["管理員"]))
     p = st.text_input("員工代碼", type="password")
-    if st.button("啟航"):
+    if st.button("我愛德文★志偉愛我"):
         st.session_state.user = u
         st.rerun()
 else:
     st.sidebar.markdown(f"👤 **使用者：{st.session_state.user}**")
-    menu = st.sidebar.radio("導航選單", ["📊 控制塔台 (首頁)", "✅ 已完工歷史紀錄查詢", "📝 現場派工作業", "📝 編輯派工紀錄", "⚙️ 系統內容管理"])
+    menu = st.sidebar.radio("導航選單", ["📊 控制塔台 (首頁)", "✅ 已完工歷史紀錄查詢", "📝 愛的派工作業中心", "📝 編輯派工紀錄", "⚙️ 系統內容管理"])
     if st.sidebar.button("登出系統"):
         st.session_state.clear()
         st.rerun()
