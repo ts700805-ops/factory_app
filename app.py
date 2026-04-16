@@ -213,7 +213,7 @@ else:
         except Exception as e:
             st.error(f"連線錯誤：{e}")
 
-    elif menu == "📝 現場派工作業":
+    elif menu == "💖 愛的派工作業中心":
         st.header("📝 建立新派工任務")
         order_no = st.selectbox("📦 選擇製令編號", settings.get("orders", []))
         process_name = st.selectbox("⚙️ 選擇製造工序", settings.get("processes", []))
