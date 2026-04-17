@@ -35,7 +35,7 @@ def get_settings():
     except Exception:
         return default_settings
 
-# --- 2. 頁面配置與極致強化 CSS (重新設計看板字體與標題) ---
+# --- 2. 頁面配置與強化 CSS ---
 st.set_page_config(page_title="超慧科技●製造部●派工系統", layout="wide")
 
 st.markdown("""
@@ -51,7 +51,7 @@ st.markdown("""
         text-align: center;
     }
 
-    /* 邊框強化：深色高對比 */
+    /* 邊框強化 */
     .stTextInput input, .stSelectbox div[data-baseweb="select"], .stTextArea textarea {
         border: 3px solid #334155 !important; 
         border-radius: 8px !important;
@@ -79,7 +79,7 @@ st.markdown("""
         border-radius: 14px 14px 0 0;
     }
 
-    /* 看板格位字體大幅強化 */
+    /* 看板格位字體 */
     .compact-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -95,22 +95,22 @@ st.markdown("""
         display: flex;
         flex-direction: column;
         justify-content: center;
-        transition: all 0.2s;
     }
-    .compact-box:hover { border-color: #3b82f6; background: #f0f9ff; }
     
     .p-name { font-size: 14px; font-weight: 700; color: #475569; margin-bottom: 6px; }
-    
-    /* 人員名字字體加大加粗 */
-    .p-worker { 
-        font-size: 18px !important; 
-        font-weight: 900 !important; 
-        color: #000000 !important; 
+    .p-worker { font-size: 18px !important; font-weight: 900 !important; color: #000000 !important; }
+
+    /* 搜尋區塊背景 */
+    .search-box {
+        background-color: #e2e8f0;
+        padding: 20px;
+        border-radius: 12px;
+        margin-bottom: 25px;
+        border: 2px solid #334155;
     }
 
-    /* 側邊欄與標籤 */
     label p {
-        font-size: 20px !important;
+        font-size: 18px !important;
         font-weight: 800 !important;
         color: #1e293b !important;
     }
@@ -136,9 +136,18 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 📊 看板 (字體加大版) ---
+    # --- 3. 📊 生產看板 (新增搜尋功能) ---
     if menu == "📊 生產看板":
         st.markdown('<p class="main-title">📊 超慧科技●生產進度看板</p>', unsafe_allow_html=True)
+        
+        # 🟢 新增：搜尋區塊
+        with st.container():
+            st.markdown('<div class="search-box">', unsafe_allow_html=True)
+            col_s1, col_s2 = st.columns(2)
+            search_order = col_s1.selectbox("🔍 搜尋製令 (可輸入關鍵字)", ["全部"] + sorted(order_list))
+            search_staff = col_s2.selectbox("👤 搜尋參與人員 (可輸入關鍵字)", ["全部"] + sorted(all_staff))
+            st.markdown('</div>', unsafe_allow_html=True)
+
         try:
             r = requests.get(f"{DB_URL}.json", timeout=5)
             data = r.json()
@@ -147,8 +156,25 @@ else:
                 if all_logs:
                     df = pd.DataFrame(all_logs)
                     unique_orders = df["製令"].unique()
+                    
+                    # 開始過濾顯示內容
+                    display_count = 0
                     for order in unique_orders:
+                        # 1. 製令過濾
+                        if search_order != "全部" and search_order != order:
+                            continue
+                        
                         order_df = df[df["製令"] == order]
+                        
+                        # 2. 人員過濾 (檢查該製令內任一工序是否包含此人)
+                        if search_staff != "全部":
+                            # 檢查人員1到人員5是否有選中者
+                            staff_cols = [f"人員{i}" for i in range(1, 6)]
+                            is_present = order_df[staff_cols].apply(lambda row: search_staff in row.values, axis=1).any()
+                            if not is_present:
+                                continue
+
+                        display_count += 1
                         st.markdown(f'<div class="order-card"><div class="order-header">📦 製令編號：{order}</div><div class="compact-grid">', unsafe_allow_html=True)
                         for proc in process_list:
                             matched = order_df[order_df["製造工序"] == proc]
@@ -161,10 +187,13 @@ else:
                                 worker_html = '<div class="p-worker" style="color:#cbd5e1;">-</div>'
                             st.markdown(f'<div class="compact-box"><div class="p-name">{proc}</div>{worker_html}</div>', unsafe_allow_html=True)
                         st.markdown('</div></div>', unsafe_allow_html=True)
+                    
+                    if display_count == 0:
+                        st.info("查無符合條件的製令資料。")
         except:
             st.error("看板資料讀取異常")
 
-    # --- 4. 📝 任務派發 (人員1 改為 主要人員) ---
+    # --- 4. 📝 任務派發 ---
     elif menu == "📝 派工錄入":
         st.markdown('<p class="main-title">📝 派發新任務</p>', unsafe_allow_html=True)
         with st.form("new_dispatch"):
@@ -175,7 +204,6 @@ else:
             st.write("---")
             st.markdown("### 👥 作業人員配置")
             pc = st.columns(5)
-            # 將 人員1 改名為 主要人員
             ws = []
             ws.append(pc[0].selectbox("主要人員", all_staff, key="nw0"))
             for i in range(1, 5):
@@ -209,7 +237,6 @@ else:
                     st.markdown('<div class="order-card">', unsafe_allow_html=True)
                     new_p = st.selectbox("工序", process_list, index=process_list.index(curr['製造工序']) if curr['製造工序'] in process_list else 0)
                     ec = st.columns(5)
-                    # 編輯區也同步改名顯示
                     nw = []
                     nw.append(ec[0].selectbox("主要人員", all_staff, index=all_staff.index(curr.get('人員1')) if curr.get('人員1') in all_staff else 0, key="e0"))
                     for i in range(1, 5):
