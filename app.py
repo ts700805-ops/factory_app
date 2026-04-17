@@ -4,7 +4,7 @@ import datetime
 import requests
 import json
 
-# --- 1. 基礎資料與通訊設定 ---
+# --- 1. 核心設定與資料庫 ---
 DB_BASE_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
 DB_URL = f"{DB_BASE_URL}/work_logs"
 SETTING_URL = f"{DB_BASE_URL}/settings"
@@ -17,137 +17,136 @@ def get_settings():
     default_settings = {
         "all_staff": ["管理員", "徐梓翔", "陳德文"], 
         "processes": ["骨架作業", "前置作業", "配電作業", "模組作業", "水平調整", "通電作業", "IPQC表單查檢", "S.T作業", "收機清潔", "包機作業", "異常", "欠料", "PACKING", "前置作業(門板組立)"],
-        "order_list": ["001", "002"],
+        "order_list": ["26M0041-01", "26M0041-02", "26M0051-01"],
         "assigners": ["管理員"]
     }
     try:
         r = requests.get(f"{SETTING_URL}.json", timeout=5)
         if r.status_code == 200:
             data = r.json()
-            if data and isinstance(data, dict):
-                return data
+            if data: return data
         return default_settings
-    except Exception:
+    except:
         return default_settings
 
-# --- 2. 介面樣式優化 (看板專屬) ---
-st.set_page_config(page_title="超慧科技●製造部●派工系統", layout="wide")
+# --- 2. 介面樣式修正 (鎖死標題專用) ---
+st.set_page_config(page_title="超慧科技公佈欄", layout="wide")
 
 st.markdown("""
     <style>
-    .stApp { background-color: #f8fafc; }
-    
-    /* 製令卡片主體：固定高度，不准捲動 */
-    .order-card {
-        background: white;
+    /* 全局背景 */
+    .stApp { background-color: #f1f5f9; }
+
+    /* 每個製令的獨立卡片外框 */
+    .order-card-container {
+        background: #ffffff;
         border-radius: 12px;
-        margin-bottom: 30px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
         border: 2px solid #cbd5e1;
-        height: 600px;
-        width: 100%;
-        overflow: hidden; 
+        box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+        margin-bottom: 25px;
+        height: 650px;           /* 固定整個卡片高度 */
         display: flex;
-        flex-direction: column;
+        flex-direction: column;  /* 垂直排列標題與內容 */
+        overflow: hidden;        /* 外框禁止捲動 */
     }
 
-    /* 🟢 標題區：完全獨立於捲動區之外 */
-    .order-header {
-        background: #1e40af;
-        color: #ffffff;
+    /* 🔵 絕對固定的藍色標題列 */
+    .sticky-header {
+        background-color: #1e40af;
+        color: white;
         padding: 15px 20px;
         font-size: 22px;
         font-weight: 900;
-        height: 65px;
+        height: 65px;            /* 固定高度 */
+        flex-shrink: 0;          /* 強制不准被擠壓 */
         display: flex;
         align-items: center;
-        flex-shrink: 0; /* 標題絕不縮小 */
         border-bottom: 4px solid #1e3a8a;
+        z-index: 99;
     }
 
-    /* 🟢 內容捲動區：只有這裡會動 */
-    .scroll-container {
-        flex-grow: 1;
+    /* 🟢 唯一允許捲動的內容區 */
+    .scrollable-body {
+        flex-grow: 1;            /* 自動佔滿剩餘空間 */
         overflow-y: auto !important; /* 強制垂直捲動 */
         padding: 15px;
         background: #ffffff;
     }
 
-    /* 工序區塊樣式 */
-    .proc-box {
-        background: #ffffff;
-        padding: 12px;
-        border-radius: 8px;
+    /* 工序小方塊 */
+    .process-item {
+        background: #f8fafc;
         border: 2px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 12px;
         margin-bottom: 12px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-    }
-    
-    .p-label { 
-        font-size: 14px; 
-        font-weight: 800; 
-        color: #1e40af; 
-        margin-bottom: 6px;
-        border-bottom: 1px solid #f1f5f9;
-        width: 100%;
         text-align: center;
     }
-
-    .main-worker {
-        font-size: 19px !important;
-        font-weight: 900 !important;
-        color: #000000 !important;
+    .process-title {
+        color: #1e40af;
+        font-weight: 800;
+        font-size: 14px;
+        border-bottom: 1px solid #e2e8f0;
+        margin-bottom: 8px;
+        padding-bottom: 4px;
     }
-    
-    .sub-worker-tag {
-        font-size: 13px;
-        color: #64748b;
-        background: #f1f5f9;
-        padding: 2px 6px;
-        border-radius: 4px;
-        margin: 2px;
+    .main-name {
+        font-size: 20px !important;
+        font-weight: 900;
+        color: #000;
+        margin-bottom: 5px;
+    }
+    .sub-name-tag {
         display: inline-block;
+        background: #e2e8f0;
+        color: #475569;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        margin: 2px;
+        font-weight: 600;
     }
 
-    .search-panel {
+    /* 搜尋列樣式 */
+    .search-bar {
         background: white;
         padding: 20px;
-        border-radius: 10px;
+        border-radius: 12px;
         border: 2px solid #1e40af;
         margin-bottom: 25px;
     }
     </style>
 """, unsafe_allow_html=True)
 
+# --- 3. 邏輯處理 ---
 settings = get_settings()
 all_staff = settings["all_staff"]
 process_list = settings["processes"]
 order_list = settings["order_list"]
 
 if "user" not in st.session_state:
-    st.title("⚓ 超慧科技 - 系統登入")
-    u = st.selectbox("👤 請選擇您的姓名", all_staff)
-    if st.button("確認登入"):
+    st.title("🔐 超慧科技 - 系統登入")
+    u = st.selectbox("請選擇您的姓名", all_staff)
+    if st.button("確認進入公佈欄"):
         st.session_state.user = u
         st.rerun()
 else:
-    st.sidebar.markdown(f"👤 **使用者：{st.session_state.user}**")
-    menu = st.sidebar.radio("功能導航", ["📊 生產看板", "📝 派工錄入", "📝 紀錄編輯", "⚙️ 系統設定"])
+    st.sidebar.markdown(f"👤 **目前使用者：{st.session_state.user}**")
+    menu = st.sidebar.radio("功能導航", ["📊 超慧科技公佈欄", "📝 任務派發", "⚙️ 基礎設定"])
     if st.sidebar.button("登出系統"):
         st.session_state.clear()
         st.rerun()
 
-    # --- 📊 生產看板 (獨立捲動修正版) ---
-    if menu == "📊 生產看板":
-        st.markdown(f'<h1 style="text-align:center; color:#1e40af; font-weight:900;">📊 生產進度看板</h1>', unsafe_allow_html=True)
+    # --- 📊 超慧科技公佈欄 ---
+    if menu == "📊 超慧科技公佈欄":
+        st.markdown('<h1 style="text-align:center; color:#1e40af; font-weight:900;">📢 超慧科技公佈欄</h1>', unsafe_allow_html=True)
         
+        # 搜尋功能
         with st.container():
-            st.markdown('<div class="search-panel">', unsafe_allow_html=True)
-            s1, s2 = st.columns(2)
-            search_o = s1.selectbox("🔍 搜尋製令", ["全部項目"] + sorted(order_list))
-            search_p = s2.selectbox("👤 搜尋參與人員", ["全部人員"] + sorted(all_staff))
+            st.markdown('<div class="search-bar">', unsafe_allow_html=True)
+            col1, col2 = st.columns(2)
+            s_order = col1.selectbox("🔍 搜尋製令", ["全部"] + sorted(order_list))
+            s_staff = col2.selectbox("👤 搜尋人員", ["全部"] + sorted(all_staff))
             st.markdown('</div>', unsafe_allow_html=True)
 
         try:
@@ -157,105 +156,82 @@ else:
                 all_logs = [dict(v, id=k) for k, v in data.items() if v and isinstance(v, dict)]
                 df = pd.DataFrame(all_logs)
                 
+                # 過濾邏輯
                 unique_orders = df["製令"].unique()
                 filtered = []
                 for o in unique_orders:
-                    if search_o != "全部項目" and search_o != o: continue
+                    if s_order != "全部" and s_order != o: continue
                     o_df = df[df["製令"] == o]
-                    if search_p != "全部人員":
-                        cols_to_check = [f"人員{i}" for i in range(1, 6)]
-                        if not o_df[cols_to_check].apply(lambda x: search_p in x.values, axis=1).any(): continue
+                    if s_staff != "全部":
+                        cols_check = [f"人員{i}" for i in range(1, 6)]
+                        if not o_df[cols_check].apply(lambda x: s_staff in x.values, axis=1).any(): continue
                     filtered.append(o)
 
-                display_cols = st.columns(3)
+                # 顯示三欄佈局
+                cols = st.columns(3)
                 for idx, o_id in enumerate(filtered):
                     o_df = df[df["製令"] == o_id]
-                    with display_cols[idx % 3]:
-                        # 🟢 物理隔離結構：Header 在外，scroll-container 在內
+                    with cols[idx % 3]:
+                        # 🟢 核心修正結構：Header 與 Scrollable-Body 分離
                         st.markdown(f'''
-                            <div class="order-card">
-                                <div class="order-header">📦 製令：{o_id}</div>
-                                <div class="scroll-container">
+                            <div class="order-card-container">
+                                <div class="sticky-header">📦 製令：{o_id}</div>
+                                <div class="scrollable-body">
                         ''', unsafe_allow_html=True)
                         
-                        for p in process_list:
-                            match = o_df[o_df["製造工序"] == p]
+                        for proc in process_list:
+                            match = o_df[o_df["製造工序"] == proc]
                             if not match.empty:
                                 row = match.iloc[0]
-                                w1 = row.get("人員1", "-")
-                                subs = [row.get(f"人員{i}") for i in range(2, 6) if row.get(f"人員{i}") not in ["NA", None, ""]]
-                                subs_html = "".join([f'<span class="sub-worker-tag">{s}</span>' for s in subs])
-                                box_html = f'<div class="main-worker"><span style="color:#1e40af; font-size:12px;">主</span> {w1}</div>' + subs_html
+                                main_w = row.get("人員1", "-")
+                                sub_ws = [row.get(f"人員{i}") for i in range(2, 6) if row.get(f"人員{i}") not in ["NA", None, ""]]
+                                
+                                sub_tags = "".join([f'<span class="sub-name-tag">{s}</span>' for s in sub_ws])
+                                content_html = f'<div class="main-name"><span style="color:#1e40af;font-size:12px;">主</span> {main_w}</div>{sub_tags}'
                             else:
-                                box_html = '<div style="color:#cbd5e1; font-size:13px; margin-top:10px;">尚未派工</div>'
+                                content_html = '<div style="color:#cbd5e1; font-size:13px; margin-top:5px;">(未派工)</div>'
                             
                             st.markdown(f'''
-                                <div class="proc-box">
-                                    <div class="p-label">{p}</div>
-                                    {box_html}
+                                <div class="process-item">
+                                    <div class="process-title">{proc}</div>
+                                    {content_html}
                                 </div>
                             ''', unsafe_allow_html=True)
                         
                         st.markdown('</div></div>', unsafe_allow_html=True)
         except:
-            st.error("資料獲取失敗，請檢查網路連線")
+            st.error("連線資料庫失敗")
 
-    # --- 📝 派工錄入 ---
-    elif menu == "📝 派工錄入":
-        st.markdown('<h2 style="color:#1e40af;">📝 派發新任務</h2>', unsafe_allow_html=True)
-        with st.form("new_task"):
+    # --- 📝 任務派發 ---
+    elif menu == "📝 任務派發":
+        st.markdown('<h2 style="color:#1e40af;">📝 新增派工任務</h2>', unsafe_allow_html=True)
+        with st.form("dispatch_form"):
             c1, c2 = st.columns(2)
-            o_no = c1.selectbox("📦 選擇製令", order_list)
-            p_name = c2.selectbox("⚙️ 選擇工序流程", process_list)
+            target_o = c1.selectbox("製令編號", order_list)
+            target_p = c2.selectbox("作業工序", process_list)
             st.write("---")
             pc = st.columns(5)
-            ws = [pc[0].selectbox("主要人員1", all_staff, key="nw0")]
-            for i in range(1, 5):
-                ws.append(pc[i].selectbox(f"人員 {i+1}", all_staff, key=f"nw{i}"))
-            if st.form_submit_button("🚀 發布任務"):
-                log = {"製令": o_no, "製造工序": p_name, "人員1": ws[0], "人員2": ws[1], "人員3": ws[2], "人員4": ws[3], "人員5": ws[4], "提交時間": get_now_str()}
+            ws = [pc[i].selectbox(f"人員 {i+1}", all_staff, key=f"ws{i}") for i in range(5)]
+            if st.form_submit_button("🚀 發布至公佈欄"):
+                log = {"製令": target_o, "製造工序": target_p, "人員1": ws[0], "人員2": ws[1], "人員3": ws[2], "人員4": ws[3], "人員5": ws[4], "提交時間": get_now_str()}
                 requests.post(f"{DB_URL}.json", data=json.dumps(log))
-                st.success(f"✅ 製令 {o_no} 已更新")
+                st.success("任務已同步至看板！")
                 st.rerun()
 
-    # --- 📝 紀錄編輯 ---
-    elif menu == "📝 紀錄編輯":
-        st.markdown('<h2 style="color:#1e40af;">📝 修改現有紀錄</h2>', unsafe_allow_html=True)
-        r = requests.get(f"{DB_URL}.json")
-        db_data = r.json()
-        if db_data:
-            all_logs = [dict(v, id=k) for k, v in db_data.items() if v and isinstance(v, dict)]
-            opts = {l['id']: f"[{l.get('製令')}] {l.get('製造工序')}" for l in all_logs}
-            tid = st.selectbox("🔍 選擇要修改的紀錄", options=list(opts.keys()), format_func=lambda x: opts[x])
-            curr = next((i for i in all_logs if i["id"] == tid), None)
-            if curr:
-                with st.form("edit_task"):
-                    new_p = st.selectbox("工序", process_list, index=process_list.index(curr['製造工序']) if curr['製造工序'] in process_list else 0)
-                    ec = st.columns(5)
-                    nw = [ec[0].selectbox("主要人員", all_staff, index=all_staff.index(curr.get('人員1')) if curr.get('人員1') in all_staff else 0, key="e0")]
-                    for i in range(1, 5):
-                        nw.append(ec[i].selectbox(f"人員 {i+1}", all_staff, index=all_staff.index(curr.get(f'人員{i+1}')) if curr.get(f'人員{i+1}') in all_staff else 0, key=f"e{i}"))
-                    
-                    if st.form_submit_button("💾 儲存修改"):
-                        upd = {"製造工序": new_p, "人員1": nw[0], "人員2": nw[1], "人員3": nw[2], "人員4": nw[3], "人員5": nw[4]}
-                        requests.patch(f"{DB_URL}/{tid}.json", data=json.dumps(upd))
-                        st.success("修改成功")
-                        st.rerun()
-
-    # --- ⚙️ 系統設定 ---
-    elif menu == "⚙️ 系統設定":
-        st.markdown('<h2 style="color:#1e40af;">⚙️ 系統後台設定</h2>', unsafe_allow_html=True)
-        with st.form("sys_cfg"):
-            new_orders = st.text_area("製令清單 (半形逗號隔開)：", value=",".join(order_list))
-            new_staff = st.text_area("人員名單：", value=",".join(all_staff))
-            new_procs = st.text_area("工序流程：", value=",".join(process_list))
-            if st.form_submit_button("💾 儲存並同步資料庫"):
+    # --- ⚙️ 基礎設定 ---
+    elif menu == "⚙️ 基礎設定":
+        st.markdown('<h2 style="color:#1e40af;">⚙️ 系統基礎資料管理</h2>', unsafe_allow_html=True)
+        with st.form("sys_setting"):
+            o_input = st.text_area("製令清單 (逗號隔開)：", value=",".join(order_list))
+            s_input = st.text_area("人員清單：", value=",".join(all_staff))
+            p_input = st.text_area("工序流程：", value=",".join(process_list))
+            if st.form_submit_button("💾 儲存設定"):
                 new_data = {
-                    "order_list": [x.strip() for x in new_orders.split(",") if x.strip()],
-                    "all_staff": [x.strip() for x in new_staff.split(",") if x.strip()],
-                    "processes": [x.strip() for x in new_procs.split(",") if x.strip()],
+                    "order_list": [x.strip() for x in o_input.split(",") if x.strip()],
+                    "all_staff": [x.strip() for x in s_input.split(",") if x.strip()],
+                    "processes": [x.strip() for x in p_input.split(",") if x.strip()],
                     "assigners": settings.get("assigners", ["管理員"])
                 }
                 requests.put(f"{SETTING_URL}.json", data=json.dumps(new_data))
-                st.success("✅ 資料庫設定已更新")
+                st.success("設定已更新至資料庫")
                 st.rerun()
