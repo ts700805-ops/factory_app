@@ -56,11 +56,68 @@ st.markdown("""
         border: 3px solid #334155 !important; 
         border-radius: 8px !important;
         background-color: #ffffff !important;
-        color: #000000 !important;
-        font-weight: 600 !important;
     }
 
-    /* 看板卡片設計 */
+    /* 看板格位重新設計 */
+    .compact-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 12px;
+    }
+    .compact-box {
+        background: #ffffff;
+        padding: 10px;
+        border-radius: 10px;
+        border: 2px solid #cbd5e1;
+        min-height: 110px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .p-name { 
+        font-size: 14px; 
+        font-weight: 800; 
+        color: #1e40af; 
+        margin-bottom: 8px;
+        border-bottom: 1px solid #e2e8f0;
+        width: 100%;
+        text-align: center;
+    }
+    
+    /* 主要人員樣式 */
+    .leader-tag {
+        background: #dbeafe;
+        color: #1e40af;
+        font-size: 11px;
+        padding: 1px 4px;
+        border-radius: 4px;
+        margin-right: 4px;
+        border: 1px solid #1e40af;
+    }
+    .main-worker-name {
+        font-size: 18px !important;
+        font-weight: 900 !important;
+        color: #000000 !important;
+        margin-bottom: 5px;
+    }
+    
+    /* 輔助人員樣式 */
+    .sub-workers-wrap {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 4px;
+        margin-top: 4px;
+    }
+    .sub-worker-name {
+        font-size: 13px !important;
+        color: #64748b !important;
+        background: #f1f5f9;
+        padding: 1px 6px;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+
     .order-card {
         background: white;
         border-radius: 16px;
@@ -78,41 +135,12 @@ st.markdown("""
         padding: 15px 24px;
         border-radius: 14px 14px 0 0;
     }
-
-    /* 看板格位字體 */
-    .compact-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-        gap: 12px;
-    }
-    .compact-box {
-        background: #ffffff;
-        padding: 12px 8px;
-        border-radius: 10px;
-        border: 2px solid #cbd5e1;
-        text-align: center;
-        min-height: 80px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-    }
-    
-    .p-name { font-size: 14px; font-weight: 700; color: #475569; margin-bottom: 6px; }
-    .p-worker { font-size: 18px !important; font-weight: 900 !important; color: #000000 !important; }
-
-    /* 搜尋區塊背景 */
     .search-box {
         background-color: #e2e8f0;
         padding: 20px;
         border-radius: 12px;
         margin-bottom: 25px;
         border: 2px solid #334155;
-    }
-
-    label p {
-        font-size: 18px !important;
-        font-weight: 800 !important;
-        color: #1e293b !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -136,16 +164,15 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 📊 生產看板 (新增搜尋功能) ---
+    # --- 3. 📊 生產看板 ---
     if menu == "📊 生產看板":
         st.markdown('<p class="main-title">📊 超慧科技●生產進度看板</p>', unsafe_allow_html=True)
         
-        # 🟢 新增：搜尋區塊
         with st.container():
             st.markdown('<div class="search-box">', unsafe_allow_html=True)
             col_s1, col_s2 = st.columns(2)
-            search_order = col_s1.selectbox("🔍 搜尋製令 (可輸入關鍵字)", ["全部"] + sorted(order_list))
-            search_staff = col_s2.selectbox("👤 搜尋參與人員 (可輸入關鍵字)", ["全部"] + sorted(all_staff))
+            search_order = col_s1.selectbox("🔍 搜尋製令", ["全部"] + sorted(order_list))
+            search_staff = col_s2.selectbox("👤 搜尋參與人員", ["全部"] + sorted(all_staff))
             st.markdown('</div>', unsafe_allow_html=True)
 
         try:
@@ -157,39 +184,31 @@ else:
                     df = pd.DataFrame(all_logs)
                     unique_orders = df["製令"].unique()
                     
-                    # 開始過濾顯示內容
-                    display_count = 0
                     for order in unique_orders:
-                        # 1. 製令過濾
-                        if search_order != "全部" and search_order != order:
-                            continue
-                        
+                        if search_order != "全部" and search_order != order: continue
                         order_df = df[df["製令"] == order]
-                        
-                        # 2. 人員過濾 (檢查該製令內任一工序是否包含此人)
                         if search_staff != "全部":
-                            # 檢查人員1到人員5是否有選中者
                             staff_cols = [f"人員{i}" for i in range(1, 6)]
-                            is_present = order_df[staff_cols].apply(lambda row: search_staff in row.values, axis=1).any()
-                            if not is_present:
-                                continue
+                            if not order_df[staff_cols].apply(lambda row: search_staff in row.values, axis=1).any(): continue
 
-                        display_count += 1
                         st.markdown(f'<div class="order-card"><div class="order-header">📦 製令編號：{order}</div><div class="compact-grid">', unsafe_allow_html=True)
                         for proc in process_list:
                             matched = order_df[order_df["製造工序"] == proc]
                             if not matched.empty:
                                 row = matched.iloc[0]
-                                active_workers = [row.get(f"人員{i}") for i in range(1, 6) if row.get(f"人員{i}") not in ["NA", "管理員", None]]
-                                w_display = "、".join(active_workers) if active_workers else "-"
-                                worker_html = f'<div class="p-worker">{w_display}</div>'
+                                main_w = row.get("人員1", "-")
+                                # 取得其他人員 (2-5)
+                                subs = [row.get(f"人員{i}") for i in range(2, 6) if row.get(f"人員{i}") not in ["NA", "管理員", None, ""]]
+                                
+                                # 組合 HTML
+                                main_html = f'<div class="main-worker-name"><span class="leader-tag">主</span>{main_w}</div>'
+                                sub_html = '<div class="sub-workers-wrap">' + "".join([f'<span class="sub-worker-name">{s}</span>' for s in subs]) + '</div>'
+                                worker_box_content = main_html + sub_html
                             else:
-                                worker_html = '<div class="p-worker" style="color:#cbd5e1;">-</div>'
-                            st.markdown(f'<div class="compact-box"><div class="p-name">{proc}</div>{worker_html}</div>', unsafe_allow_html=True)
+                                worker_box_content = '<div style="color:#cbd5e1; font-weight:bold; margin-top:10px;">尚未派工</div>'
+                            
+                            st.markdown(f'<div class="compact-box"><div class="p-name">{proc}</div>{worker_box_content}</div>', unsafe_allow_html=True)
                         st.markdown('</div></div>', unsafe_allow_html=True)
-                    
-                    if display_count == 0:
-                        st.info("查無符合條件的製令資料。")
         except:
             st.error("看板資料讀取異常")
 
@@ -205,7 +224,7 @@ else:
             st.markdown("### 👥 作業人員配置")
             pc = st.columns(5)
             ws = []
-            ws.append(pc[0].selectbox("主要人員", all_staff, key="nw0"))
+            ws.append(pc[0].selectbox("主要人員 (人員1)", all_staff, key="nw0"))
             for i in range(1, 5):
                 ws.append(pc[i].selectbox(f"人員 {i+1}", all_staff, key=f"nw{i}"))
             
