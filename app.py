@@ -35,111 +35,110 @@ def get_settings():
     except Exception:
         return default_settings
 
-# --- 2. 頁面配置與強化 CSS ---
+# --- 2. 頁面配置與極致強化 CSS (優化 3 欄空間) ---
 st.set_page_config(page_title="超慧科技●製造部●派工系統", layout="wide")
 
 st.markdown("""
     <style>
     .stApp { background-color: #f8fafc; }
     .main-title { 
-        font-size: 36px !important; 
+        font-size: 32px !important; 
         font-weight: 900; 
         color: #1e293b; 
-        padding: 15px 0;
+        padding: 10px 0;
         border-bottom: 5px solid #1e40af;
-        margin-bottom: 25px;
+        margin-bottom: 20px;
         text-align: center;
     }
 
     /* 邊框強化 */
-    .stTextInput input, .stSelectbox div[data-baseweb="select"], .stTextArea textarea {
+    .stTextInput input, .stSelectbox div[data-baseweb="select"] {
         border: 3px solid #334155 !important; 
         border-radius: 8px !important;
         background-color: #ffffff !important;
     }
 
-    /* 看板格位重新設計 */
+    /* 三欄卡片設計微調 */
+    .order-card {
+        background: white;
+        border-radius: 12px;
+        padding: 15px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        border: 2px solid #e2e8f0;
+    }
+    .order-header {
+        font-size: 20px;
+        font-weight: 800;
+        color: #ffffff;
+        background: #1e40af;
+        margin: -15px -15px 12px -15px;
+        padding: 10px 15px;
+        border-radius: 10px 10px 0 0;
+    }
+
+    /* 縮小格位寬度以符合 3 欄 */
     .compact-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-        gap: 12px;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 8px;
     }
     .compact-box {
         background: #ffffff;
-        padding: 10px;
-        border-radius: 10px;
-        border: 2px solid #cbd5e1;
-        min-height: 110px;
+        padding: 8px 4px;
+        border-radius: 8px;
+        border: 1.5px solid #cbd5e1;
+        min-height: 100px;
         display: flex;
         flex-direction: column;
         align-items: center;
     }
     .p-name { 
-        font-size: 14px; 
+        font-size: 13px; 
         font-weight: 800; 
         color: #1e40af; 
-        margin-bottom: 8px;
-        border-bottom: 1px solid #e2e8f0;
+        margin-bottom: 6px;
+        border-bottom: 1px solid #f1f5f9;
         width: 100%;
         text-align: center;
     }
     
-    /* 主要人員樣式 */
     .leader-tag {
         background: #dbeafe;
         color: #1e40af;
-        font-size: 11px;
-        padding: 1px 4px;
-        border-radius: 4px;
-        margin-right: 4px;
+        font-size: 10px;
+        padding: 0px 3px;
+        border-radius: 3px;
+        margin-right: 3px;
         border: 1px solid #1e40af;
     }
     .main-worker-name {
-        font-size: 18px !important;
+        font-size: 16px !important;
         font-weight: 900 !important;
         color: #000000 !important;
-        margin-bottom: 5px;
+        margin-bottom: 4px;
     }
     
-    /* 輔助人員樣式 */
     .sub-workers-wrap {
         display: flex;
         flex-wrap: wrap;
         justify-content: center;
-        gap: 4px;
-        margin-top: 4px;
+        gap: 3px;
     }
     .sub-worker-name {
-        font-size: 13px !important;
+        font-size: 12px !important;
         color: #64748b !important;
         background: #f1f5f9;
-        padding: 1px 6px;
-        border-radius: 4px;
+        padding: 0px 4px;
+        border-radius: 3px;
         font-weight: 600;
     }
 
-    .order-card {
-        background: white;
-        border-radius: 16px;
-        padding: 24px;
-        margin-bottom: 30px;
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-        border: 2px solid #e2e8f0;
-    }
-    .order-header {
-        font-size: 24px;
-        font-weight: 800;
-        color: #ffffff;
-        background: #1e40af;
-        margin: -24px -24px 20px -24px;
-        padding: 15px 24px;
-        border-radius: 14px 14px 0 0;
-    }
     .search-box {
         background-color: #e2e8f0;
-        padding: 20px;
-        border-radius: 12px;
-        margin-bottom: 25px;
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 20px;
         border: 2px solid #334155;
     }
     </style>
@@ -164,7 +163,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 📊 生產看板 ---
+    # --- 3. 📊 生產看板 (三欄式佈局) ---
     if menu == "📊 生產看板":
         st.markdown('<p class="main-title">📊 超慧科技●生產進度看板</p>', unsafe_allow_html=True)
         
@@ -184,31 +183,37 @@ else:
                     df = pd.DataFrame(all_logs)
                     unique_orders = df["製令"].unique()
                     
+                    # 過濾後的製令名單
+                    filtered_orders = []
                     for order in unique_orders:
                         if search_order != "全部" and search_order != order: continue
                         order_df = df[df["製令"] == order]
                         if search_staff != "全部":
                             staff_cols = [f"人員{i}" for i in range(1, 6)]
                             if not order_df[staff_cols].apply(lambda row: search_staff in row.values, axis=1).any(): continue
+                        filtered_orders.append(order)
 
-                        st.markdown(f'<div class="order-card"><div class="order-header">📦 製令編號：{order}</div><div class="compact-grid">', unsafe_allow_html=True)
-                        for proc in process_list:
-                            matched = order_df[order_df["製造工序"] == proc]
-                            if not matched.empty:
-                                row = matched.iloc[0]
-                                main_w = row.get("人員1", "-")
-                                # 取得其他人員 (2-5)
-                                subs = [row.get(f"人員{i}") for i in range(2, 6) if row.get(f"人員{i}") not in ["NA", "管理員", None, ""]]
+                    # 🟢 核心改動：改為 3 欄顯示
+                    cols = st.columns(3)
+                    for idx, order in enumerate(filtered_orders):
+                        order_df = df[df["製令"] == order]
+                        with cols[idx % 3]: # 依序放入第 1, 2, 3 欄
+                            st.markdown(f'<div class="order-card"><div class="order-header">📦 {order}</div><div class="compact-grid">', unsafe_allow_html=True)
+                            for proc in process_list:
+                                matched = order_df[order_df["製造工序"] == proc]
+                                if not matched.empty:
+                                    row = matched.iloc[0]
+                                    main_w = row.get("人員1", "-")
+                                    subs = [row.get(f"人員{i}") for i in range(2, 6) if row.get(f"人員{i}") not in ["NA", "管理員", None, ""]]
+                                    
+                                    main_html = f'<div class="main-worker-name"><span class="leader-tag">主</span>{main_w}</div>'
+                                    sub_html = '<div class="sub-workers-wrap">' + "".join([f'<span class="sub-worker-name">{s}</span>' for s in subs]) + '</div>'
+                                    worker_box_content = main_html + sub_html
+                                else:
+                                    worker_box_content = '<div style="color:#cbd5e1; font-size:12px; margin-top:10px;">尚未派工</div>'
                                 
-                                # 組合 HTML
-                                main_html = f'<div class="main-worker-name"><span class="leader-tag">主</span>{main_w}</div>'
-                                sub_html = '<div class="sub-workers-wrap">' + "".join([f'<span class="sub-worker-name">{s}</span>' for s in subs]) + '</div>'
-                                worker_box_content = main_html + sub_html
-                            else:
-                                worker_box_content = '<div style="color:#cbd5e1; font-weight:bold; margin-top:10px;">尚未派工</div>'
-                            
-                            st.markdown(f'<div class="compact-box"><div class="p-name">{proc}</div>{worker_box_content}</div>', unsafe_allow_html=True)
-                        st.markdown('</div></div>', unsafe_allow_html=True)
+                                st.markdown(f'<div class="compact-box"><div class="p-name">{proc}</div>{worker_box_content}</div>', unsafe_allow_html=True)
+                            st.markdown('</div></div>', unsafe_allow_html=True)
         except:
             st.error("看板資料讀取異常")
 
@@ -238,7 +243,7 @@ else:
                     "派工人員": assigner, "提交時間": get_now_str()
                 }
                 requests.post(f"{DB_URL}.json", data=json.dumps(log))
-                st.success(f"✅ 製令 {order_no} 已更新")
+                st.success(f"✅ 任務已同步")
                 st.rerun()
 
     # --- 5. 📝 紀錄編輯 ---
