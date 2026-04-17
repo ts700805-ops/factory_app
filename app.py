@@ -4,46 +4,42 @@ import datetime
 import requests
 import json
 
-# --- 1. 核心設定 (修正連線容錯) ---
-# 這裡使用 Firebase 連結，確保設定為 public 即可免授權存取
-DB_URL = "https://my-factory-system-default-rtdb.firebaseio.com/work_logs"
-DONE_URL = "https://my-factory-system-default-rtdb.firebaseio.com/completed_logs"
-SETTING_URL = "https://my-factory-system-default-rtdb.firebaseio.com/settings"
+# --- 1. 核心設定 ---
+# 確保您的 Firebase Database 規則已設定為讀寫無需授權 (auth == null)
+DB_BASE_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
+DB_URL = f"{DB_BASE_URL}/work_logs"
+SETTING_URL = f"{DB_BASE_URL}/settings"
 
 def get_now_str():
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
     return now.strftime("%Y-%m-%d %H:%M:%S")
 
 def get_settings():
-    """從資料庫抓取人員與工序清單，若失敗則回傳預設值以防止選單消失"""
+    """從資料庫抓取人員與工序清單，加強防錯機制確保選單不消失"""
+    default_settings = {
+        "all_staff": ["管理員", "徐梓翔", "陳德文"], 
+        "processes": ["骨架作業", "前置作業", "配電作業", "模組作業", "水平調整", "通電作業", "IPQC表單查檢", "S.T作業", "收機清潔", "包機作業", "異常", "欠料", "PACKING", "前置作業(門板組立)"]
+    }
     try:
         r = requests.get(f"{SETTING_URL}.json", timeout=5)
         if r.status_code == 200:
             data = r.json()
-            if not data: 
-                return {"all_staff": ["管理員"], "processes": ["預設工序"]}
-            
-            # 確保必要欄位存在，避免 JSON 解析成功但內容缺失
-            if "all_staff" not in data or not data["all_staff"]: 
-                data["all_staff"] = ["管理員"]
-            if "processes" not in data or not data["processes"]: 
-                data["processes"] = ["預設工序"]
-            return data
-        else:
-            return {"all_staff": ["管理員"], "processes": ["預設工序"]}
-    except Exception as e:
-        # 當網路斷線或 URL 錯誤時，這裡保證程式不會閃退
-        return {"all_staff": ["管理員", "測試人員"], "processes": ["預設工序"]}
+            if data and isinstance(data, dict):
+                # 確保抓取的資料不是空的且包含必要鍵值
+                staff = data.get("all_staff", default_settings["all_staff"])
+                procs = data.get("processes", default_settings["processes"])
+                return {"all_staff": staff, "processes": procs}
+        return default_settings
+    except Exception:
+        return default_settings
 
-# --- 2. 頁面配置 (樣式維持原本設計) ---
+# --- 2. 頁面配置 ---
 st.set_page_config(page_title="大量科技●製造部●派工系統", layout="wide")
 
 st.markdown("""
     <style>
     .stApp { background-color: #f4f7f9; }
     .main-title { font-size: 32px !important; font-weight: bold; color: #1E3A8A; border-bottom: 4px solid #1E3A8A; margin-bottom: 20px; }
-    
-    /* 製令看板卡片 */
     .order-container {
         background-color: #ffffff;
         padding: 20px;
@@ -53,8 +49,6 @@ st.markdown("""
         margin-bottom: 25px;
     }
     .order-title { font-size: 24px; font-weight: bold; color: #1e293b; margin-bottom: 15px; }
-    
-    /* 工序網格佈局 */
     .process-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -73,10 +67,10 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 讀取設定 (人員與工序)
+# 初始讀取設定
 settings = get_settings()
-all_staff = settings.get("all_staff", ["管理員"])
-process_list = settings.get("processes", ["預設工序"])
+all_staff = settings["all_staff"]
+process_list = settings["processes"]
 
 # 登入機制
 if "user" not in st.session_state:
@@ -92,40 +86,43 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 📊 控制塔台 (首頁) ---
+    # --- 3. 📊 控制塔台 ---
     if menu == "📊 控制塔台 (首頁進度)":
         st.markdown('<p class="main-title">📊 大量科技●控制塔台看板</p>', unsafe_allow_html=True)
         try:
             r = requests.get(f"{DB_URL}.json", timeout=5)
             data = r.json()
             if data:
-                all_logs = [dict(v, db_key=k) for k, v in data.items() if v]
-                df = pd.DataFrame(all_logs)
-                unique_orders = df["製令"].unique()
-                
-                for order in unique_orders:
-                    order_df = df[df["製令"] == order]
-                    st.markdown(f'''
-                    <div class="order-container">
-                        <div class="order-title">📦 製令單：{order}</div>
-                        <div class="process-grid">
-                    ''', unsafe_allow_html=True)
+                all_logs = [dict(v, db_key=k) for k, v in data.items() if v and isinstance(v, dict)]
+                if all_logs:
+                    df = pd.DataFrame(all_logs)
+                    unique_orders = df["製令"].unique()
                     
-                    for proc in process_list:
-                        matched = order_df[order_df["製造工序"] == proc]
-                        if not matched.empty:
-                            worker_display = matched.iloc[0].get("人員1", "未知")
-                            html_worker = f'<span class="worker-name">{worker_display}</span>'
-                        else:
-                            html_worker = '<span class="na-tag">NA</span>'
-                        
+                    for order in unique_orders:
+                        order_df = df[df["製令"] == order]
                         st.markdown(f'''
-                            <div class="process-box">
-                                <div class="process-name">{proc}</div>
-                                {html_worker}
-                            </div>
+                        <div class="order-container">
+                            <div class="order-title">📦 製令單：{order}</div>
+                            <div class="process-grid">
                         ''', unsafe_allow_html=True)
-                    st.markdown('</div></div>', unsafe_allow_html=True)
+                        
+                        for proc in process_list:
+                            matched = order_df[order_df["製造工序"] == proc]
+                            if not matched.empty:
+                                worker_display = matched.iloc[0].get("人員1", "未知")
+                                html_worker = f'<span class="worker-name">{worker_display}</span>'
+                            else:
+                                html_worker = '<span class="na-tag">NA</span>'
+                            
+                            st.markdown(f'''
+                                <div class="process-box">
+                                    <div class="process-name">{proc}</div>
+                                    {html_worker}
+                                </div>
+                            ''', unsafe_allow_html=True)
+                        st.markdown('</div></div>', unsafe_allow_html=True)
+                else:
+                    st.info("目前無有效派工紀錄。")
             else:
                 st.info("目前無任何派工紀錄。")
         except Exception as e:
@@ -138,20 +135,17 @@ else:
         with st.form("new_dispatch"):
             c1, c2 = st.columns(2)
             order_no = c1.text_input("📦 輸入製令編號", placeholder="例如: 1111")
-            # 這裡的 process_list 是從 get_settings 抓來的
             proc_name = c2.selectbox("⚙️ 選擇工序", process_list)
             
             st.markdown("---")
             st.subheader("👥 主要人員與派工人員配置 (共5位)")
             pc1, pc2, pc3, pc4, pc5 = st.columns(5)
-            # 確保選單資料 all_staff 存在
-            w1 = pc1.selectbox("人員 1 (主)", all_staff, key="w1")
-            w2 = pc2.selectbox("人員 2", all_staff, key="w2")
-            w3 = pc3.selectbox("人員 3", all_staff, key="w3")
-            w4 = pc4.selectbox("人員 4", all_staff, key="w4")
-            w5 = pc5.selectbox("人員 5", all_staff, key="w5")
+            w1 = pc1.selectbox("人員 1 (主)", all_staff, key="nw1")
+            w2 = pc2.selectbox("人員 2", all_staff, key="nw2")
+            w3 = pc3.selectbox("人員 3", all_staff, key="nw3")
+            w4 = pc4.selectbox("人員 4", all_staff, key="nw4")
+            w5 = pc5.selectbox("人員 5", all_staff, key="nw5")
             
-            # 自動帶入登入者作為派工人員
             user_idx = all_staff.index(st.session_state.user) if st.session_state.user in all_staff else 0
             assigner = st.selectbox("🚩 指定派工人員", all_staff, index=user_idx)
             
@@ -167,14 +161,15 @@ else:
                         "提交時間": get_now_str()
                     }
                     try:
-                        resp = requests.post(f"{DB_URL}.json", json=log, timeout=5)
+                        # 修正：確保路徑正確且使用 json.dumps 確保格式
+                        resp = requests.post(f"{DB_URL}.json", data=json.dumps(log), timeout=5)
                         if resp.status_code == 200:
                             st.success(f"製令 {order_no} 已同步至控制塔台！")
                             st.balloons()
                         else:
-                            st.error(f"發送失敗，錯誤代碼：{resp.status_code}")
-                    except:
-                        st.error("發送失敗，請檢查資料庫連線。")
+                            st.error(f"發送失敗，代碼：{resp.status_code}，訊息：{resp.text}")
+                    except Exception as e:
+                        st.error(f"發送失敗：{str(e)}")
 
     # --- 5. 📝 編輯派工紀錄 ---
     elif menu == "📝 編輯派工紀錄":
@@ -183,33 +178,32 @@ else:
             r = requests.get(f"{DB_URL}.json", timeout=5)
             db_data = r.json()
             if db_data:
-                all_logs = [dict(v, id=k) for k, v in db_data.items() if v]
-                log_options = {log['id']: f"[{log.get('製令')}] {log.get('製造工序')} - {log.get('人員1')}" for log in all_logs}
+                all_logs = [dict(v, id=k) for k, v in db_data.items() if v and isinstance(v, dict)]
+                log_options = {log['id']: f"[{log.get('製令', '無')}] {log.get('製造工序', '無')} - {log.get('人員1', '無')}" for log in all_logs}
+                
                 target_id = st.selectbox("選擇修改項目", options=list(log_options.keys()), format_func=lambda x: log_options[x])
                 curr = next((i for i in all_logs if i["id"] == target_id), None)
                 
                 if curr:
-                    with st.expander("📝 編輯人員與資訊", expanded=True):
-                        # 動態對齊索引值，避免找不到工序時報錯
+                    with st.expander("📝 編輯內容", expanded=True):
                         def get_idx(val, lst):
                             return lst.index(val) if val in lst else 0
 
                         edit_proc = st.selectbox("修改工序", process_list, index=get_idx(curr.get('製造工序'), process_list))
                         
-                        st.write("修改主要人員清單：")
                         ec1, ec2, ec3, ec4, ec5 = st.columns(5)
-                        nw1 = ec1.selectbox("人員1", all_staff, index=get_idx(curr.get('人員1'), all_staff))
-                        nw2 = ec2.selectbox("人員2", all_staff, index=get_idx(curr.get('人員2'), all_staff))
-                        nw3 = ec3.selectbox("人員3", all_staff, index=get_idx(curr.get('人員3'), all_staff))
-                        nw4 = ec4.selectbox("人員4", all_staff, index=get_idx(curr.get('人員4'), all_staff))
-                        nw5 = ec5.selectbox("人員5", all_staff, index=get_idx(curr.get('人員5'), all_staff))
+                        nw1 = ec1.selectbox("人員1", all_staff, index=get_idx(curr.get('人員1'), all_staff), key="e1")
+                        nw2 = ec2.selectbox("人員2", all_staff, index=get_idx(curr.get('人員2'), all_staff), key="e2")
+                        nw3 = ec3.selectbox("人員3", all_staff, index=get_idx(curr.get('人員3'), all_staff), key="e3")
+                        nw4 = ec4.selectbox("人員4", all_staff, index=get_idx(curr.get('人員4'), all_staff), key="e4")
+                        nw5 = ec5.selectbox("人員5", all_staff, index=get_idx(curr.get('人員5'), all_staff), key="e5")
                         
                         if st.button("💾 儲存修改"):
                             update_data = {
                                 "製造工序": edit_proc,
                                 "人員1": nw1, "人員2": nw2, "人員3": nw3, "人員4": nw4, "人員5": nw5
                             }
-                            requests.patch(f"{DB_URL}/{target_id}.json", json=update_data)
+                            requests.patch(f"{DB_URL}/{target_id}.json", data=json.dumps(update_data))
                             st.success("已更新！")
                             st.rerun()
                     
@@ -221,26 +215,23 @@ else:
         except:
             st.error("讀取錯誤")
 
-    # --- 6. ⚙️ 系統內容管理 (這裡控制下拉選單的源頭) ---
+    # --- 6. ⚙️ 系統內容管理 ---
     elif menu == "⚙️ 系統內容管理":
         st.header("⚙️ 系統名單設定")
         with st.form("sys_config"):
-            st.info("💡 這裡輸入的名單會直接影響「愛的派工中心」與「編輯」選單的選項內容。")
-            st.write("⚠️ 注意：多個人員請以半形逗號 `,` 分隔")
+            st.info("💡 修改後請點擊儲存，這將更新所有下拉選單的內容。")
+            all_staff_str = st.text_area("👥 人員名單 (逗號分隔)", value=",".join(all_staff))
+            new_processes = st.text_area("⚙️ 工序清單 (逗號分隔)", value=",".join(process_list))
             
-            # 使用目前的 all_staff 作為預設顯示內容
-            all_staff_str = st.text_area("👥 全體人員名單管理", value=",".join(all_staff))
-            new_processes = st.text_area("⚙️ 編輯工序清單", value=",".join(process_list))
-            
-            if st.form_submit_button("💾 儲存並更新所有選單"):
+            if st.form_submit_button("💾 儲存並重置選單"):
                 new_data = {
                     "all_staff": [x.strip() for x in all_staff_str.split(",") if x.strip()],
                     "processes": [x.strip() for x in new_processes.split(",") if x.strip()]
                 }
-                # 使用 patch 更新 Firebase 內的 settings
                 try:
-                    requests.patch(f"{SETTING_URL}.json", json=new_data, timeout=5)
-                    st.success("系統設定已成功更新！下拉選單現在應已恢復正常。")
+                    # 使用 put 覆蓋舊設定，確保結構完整
+                    requests.put(f"{SETTING_URL}.json", data=json.dumps(new_data), timeout=5)
+                    st.success("系統設定已更新！")
                     st.rerun()
                 except:
-                    st.error("儲存失敗，請檢查資料庫權限或網路連線。")
+                    st.error("儲存失敗，請檢查資料庫連線。")
