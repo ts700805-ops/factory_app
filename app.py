@@ -14,9 +14,11 @@ def get_now_str():
     return now.strftime("%Y-%m-%d %H:%M:%S")
 
 def get_settings():
+    # 加入製令預設值
     default_settings = {
         "all_staff": ["管理員", "徐梓翔", "陳德文"], 
-        "processes": ["骨架作業", "前置作業", "配電作業", "模組作業", "水平調整", "通電作業", "IPQC表單查檢", "S.T作業", "收機清潔", "包機作業", "異常", "欠料", "PACKING", "前置作業(門板組立)"]
+        "processes": ["骨架作業", "前置作業", "配電作業", "模組作業", "水平調整", "通電作業", "IPQC表單查檢", "S.T作業", "收機清潔", "包機作業", "異常", "欠料", "PACKING", "前置作業(門板組立)"],
+        "order_list": ["001", "002"] 
     }
     try:
         r = requests.get(f"{SETTING_URL}.json", timeout=5)
@@ -25,7 +27,8 @@ def get_settings():
             if data and isinstance(data, dict):
                 staff = data.get("all_staff", default_settings["all_staff"])
                 procs = data.get("processes", default_settings["processes"])
-                return {"all_staff": staff, "processes": procs}
+                orders = data.get("order_list", default_settings["order_list"])
+                return {"all_staff": staff, "processes": procs, "order_list": orders}
         return default_settings
     except Exception:
         return default_settings
@@ -35,10 +38,7 @@ st.set_page_config(page_title="大量科技●製造部●派工系統", layout=
 
 st.markdown("""
     <style>
-    /* 整體背景 */
     .stApp { background-color: #f8fafc; }
-    
-    /* 標題樣式 */
     .main-title { 
         font-size: 32px !important; 
         font-weight: 800; 
@@ -46,31 +46,27 @@ st.markdown("""
         padding: 15px 0;
         border-bottom: 4px solid #2563eb;
         margin-bottom: 25px;
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
     }
 
-    /* 強化所有輸入框與選單的邊框 */
+    /* 強化所有輸入框與選單的邊框，解決「太淡」的問題 */
     .stTextInput input, .stSelectbox div[data-baseweb="select"], .stTextArea textarea {
-        border: 2px solid #cbd5e1 !important; /* 加深邊框顏色 */
+        border: 2.5px solid #94a3b8 !important; /* 加深加粗邊框 */
         border-radius: 8px !important;
         background-color: #ffffff !important;
-        box-shadow: inset 0 1px 3px rgba(0,0,0,0.1) !important;
-        transition: border-color 0.2s, box-shadow 0.2s;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
     }
     
-    /* 聚焦時的顏色 */
     .stTextInput input:focus, .stSelectbox div[data-baseweb="select"]:focus-within, .stTextArea textarea:focus {
-        border-color: #3b82f6 !important;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2) !important;
+        border-color: #2563eb !important;
+        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.2) !important;
     }
 
-    /* 卡片樣式強化 */
     .order-card {
         background: white;
         border-radius: 14px;
         padding: 20px;
         margin-bottom: 25px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08); /* 加深陰影 */
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         border: 1px solid #e2e8f0;
     }
     .order-header {
@@ -82,7 +78,6 @@ st.markdown("""
         padding-left: 12px;
     }
 
-    /* 工序格子強化 */
     .compact-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(135px, 1fr));
@@ -92,7 +87,7 @@ st.markdown("""
         background: #f1f5f9;
         padding: 10px 6px;
         border-radius: 8px;
-        border: 1.5px solid #cbd5e1; /* 邊框明顯化 */
+        border: 2px solid #cbd5e1; /* 強化格子邊框 */
         text-align: center;
         min-height: 65px;
         display: flex;
@@ -101,21 +96,21 @@ st.markdown("""
     }
     .p-name { font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 4px; }
     .p-worker { font-size: 14px; font-weight: 800; color: #0f172a; }
-    
-    /* 設定頁面的輸入區塊外框 */
-    .config-section {
-        background: #ffffff;
-        padding: 20px;
-        border: 2px solid #e2e8f0;
-        border-radius: 12px;
-        margin-bottom: 20px;
+
+    /* 針對表單內的文字強化 */
+    label p {
+        font-size: 16px !important;
+        font-weight: bold !important;
+        color: #334155 !important;
     }
     </style>
 """, unsafe_allow_html=True)
 
+# 讀取系統設定
 settings = get_settings()
 all_staff = settings["all_staff"]
 process_list = settings["processes"]
+order_list = settings["order_list"]
 
 # 登入機制
 if "user" not in st.session_state:
@@ -130,16 +125,6 @@ else:
     if st.sidebar.button("登出系統"):
         st.session_state.clear()
         st.rerun()
-
-    # --- 取得所有現有製令 ---
-    existing_orders = []
-    try:
-        r_orders = requests.get(f"{DB_URL}.json", timeout=5)
-        data_orders = r_orders.json()
-        if data_orders:
-            existing_orders = sorted(list(set([v.get("製令") for k, v in data_orders.items() if v and v.get("製令")])))
-    except:
-        pass
 
     # --- 3. 📊 控制塔台 ---
     if menu == "📊 控制塔台":
@@ -171,18 +156,15 @@ else:
         except:
             st.error("看板讀取失敗")
 
-    # --- 4. 📝 任務派發 ---
+    # --- 4. 📝 任務派發 (現在完全使用下拉選單) ---
     elif menu == "📝 任務派發":
         st.markdown('<p class="main-title">📝 新增派工任務</p>', unsafe_allow_html=True)
-        order_mode = st.radio("🛠️ 製令輸入模式", ["從現有挑選", "手動輸入新製令"], horizontal=True)
         
         with st.form("new_dispatch"):
             c1, c2 = st.columns(2)
-            if order_mode == "從現有挑選":
-                order_no = c1.selectbox("📦 選擇製令", existing_orders if existing_orders else ["(無資料)"])
-            else:
-                order_no = c1.text_input("📦 輸入新製令編號", placeholder="請輸入編號...")
-            proc_name = c2.selectbox("⚙️ 選擇工序", process_list)
+            # 這邊改為直接從系統設定的製令清單選擇
+            order_no = c1.selectbox("📦 選擇製令編號", order_list)
+            proc_name = c2.selectbox("⚙️ 選擇製造工序", process_list)
             
             st.write("---")
             st.write("👥 **人員配置 (最多5位)**")
@@ -193,13 +175,10 @@ else:
             assigner = st.selectbox("🚩 派工負責人", all_staff, index=user_idx)
             
             if st.form_submit_button("🚀 確認發布至看板"):
-                if not order_no or order_no == "(無資料)":
-                    st.error("請確認製令編號！")
-                else:
-                    log = {"製令": order_no, "製造工序": proc_name, "人員1": ws[0], "人員2": ws[1], "人員3": ws[2], "人員4": ws[3], "人員5": ws[4], "派工人員": assigner, "提交時間": get_now_str()}
-                    requests.post(f"{DB_URL}.json", data=json.dumps(log))
-                    st.success("派發成功！")
-                    st.rerun()
+                log = {"製令": order_no, "製造工序": proc_name, "人員1": ws[0], "人員2": ws[1], "人員3": ws[2], "人員4": ws[3], "人員5": ws[4], "派工人員": assigner, "提交時間": get_now_str()}
+                requests.post(f"{DB_URL}.json", data=json.dumps(log))
+                st.success(f"✅ 製令 {order_no} 派發成功！")
+                st.rerun()
 
     # --- 5. 📝 紀錄編輯 ---
     elif menu == "📝 紀錄編輯":
@@ -227,26 +206,29 @@ else:
                         st.rerun()
                     st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- 6. ⚙️ 系統設定 ---
+    # --- 6. ⚙️ 系統設定 (新增製令輸入區) ---
     elif menu == "⚙️ 系統設定":
         st.markdown('<p class="main-title">⚙️ 基礎資料管理</p>', unsafe_allow_html=True)
         st.info("💡 請在下方框中輸入內容，多個項目請用 **半形逗號 ( , )** 隔開。")
         
         with st.form("sys_config"):
-            st.markdown("### 👥 人員名單設定")
-            all_staff_str = st.text_area("目前的清單：", value=",".join(all_staff), height=150, help="例如：管理員,張三,李四")
+            st.markdown("### 📦 製令名單設定")
+            new_order_str = st.text_area("請輸入可選製令：", value=",".join(order_list), height=100, help="輸入後，派工頁面就可以下拉選擇這些製令")
             
             st.markdown("---")
+            st.markdown("### 👥 人員名單設定")
+            all_staff_str = st.text_area("目前的人員：", value=",".join(all_staff), height=100)
             
+            st.markdown("---")
             st.markdown("### ⚙️ 工序流程設定")
-            new_processes = st.text_area("目前的清單：", value=",".join(process_list), height=150, help="例如：骨架作業,前置作業,包裝")
+            new_processes = st.text_area("目前的工序：", value=",".join(process_list), height=100)
             
-            st.write("")
             if st.form_submit_button("💾 儲存所有設定"):
                 new_data = {
+                    "order_list": [x.strip() for x in new_order_str.split(",") if x.strip()],
                     "all_staff": [x.strip() for x in all_staff_str.split(",") if x.strip()],
                     "processes": [x.strip() for x in new_processes.split(",") if x.strip()]
                 }
                 requests.put(f"{SETTING_URL}.json", data=json.dumps(new_data))
-                st.success("✅ 設定已成功存入資料庫！")
+                st.success("✅ 所有設定（含製令、人員、工序）已成功更新！")
                 st.rerun()
