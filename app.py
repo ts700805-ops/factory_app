@@ -119,9 +119,9 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 📊 超慧科技公佈欄 ---
+    # --- 📊 超慧科技公佈欄 (修改後的標題) ---
     if menu == "📊 超慧科技公佈欄":
-        st.markdown('<h1 style="text-align:center; color:#1e40af; font-weight:900;">📋 超慧科技公佈欄</h1>', unsafe_allow_html=True)
+        st.markdown('<h1 style="text-align:center; color:#1e40af; font-weight:900;">📋 超慧科技~阿文要派工了啦~</h1>', unsafe_allow_html=True)
         
         with st.container():
             st.markdown('<div class="search-panel">', unsafe_allow_html=True)
@@ -182,7 +182,6 @@ else:
     elif menu == "📝 任務派發":
         st.markdown('<h2 style="color:#1e40af;">📝 任務派發 / 內容修正</h2>', unsafe_allow_html=True)
         
-        # 使用 Session State 存儲待處理的資料
         if "pending_payload" not in st.session_state:
             st.session_state.pending_payload = None
             st.session_state.pending_key = None
@@ -220,18 +219,15 @@ else:
                     }
 
                     if target_key:
-                        # 紀錄到暫存，觸發確認步驟
                         st.session_state.pending_payload = payload
                         st.session_state.pending_key = target_key
                     else:
-                        # 直接新增
                         requests.post(f"{DB_URL}.json", data=json.dumps(payload))
                         st.success(f"✅ 已成功新增製令 {target_o} 派工")
                         st.rerun()
                 except:
                     st.error("連線失敗")
 
-        # --- 確認覆蓋區塊 ---
         if st.session_state.pending_payload:
             st.warning(f"⚠️ 偵測到重複資料：製令【{st.session_state.pending_payload['製令']}】的【{st.session_state.pending_payload['製造工序']}】已有紀錄。")
             c1, c2, _ = st.columns([1, 1, 2])
@@ -247,7 +243,7 @@ else:
             if c2.button("❌ 不寫入（取消）"):
                 st.session_state.pending_payload = None
                 st.session_state.pending_key = None
-                st.info("已取消操作，未進行任何修改。")
+                st.info("已取消操作。")
                 st.rerun()
 
     # --- ⚙️ 設定管理 ---
