@@ -44,7 +44,6 @@ st.markdown("""
         border-bottom: 3px solid #3b82f6;
         margin-bottom: 20px;
     }
-    /* 卡片容器 */
     .order-card {
         background: white;
         border-radius: 12px;
@@ -63,7 +62,6 @@ st.markdown("""
         border-left: 5px solid #3b82f6;
         padding-left: 10px;
     }
-    /* 工序緊湊網格 */
     .compact-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
@@ -75,14 +73,13 @@ st.markdown("""
         border-radius: 6px;
         border: 1px solid #f1f5f9;
         text-align: center;
-        transition: all 0.2s;
         min-height: 60px;
         display: flex;
         flex-direction: column;
         justify-content: center;
     }
-    .p-name { font-size: 11px; color: #94a3b8; margin-bottom: 2px; line-height: 1.1; }
-    .p-worker { font-size: 13px; font-weight: 600; color: #334155; white-space: pre-wrap; }
+    .p-name { font-size: 11px; color: #94a3b8; margin-bottom: 2px; }
+    .p-worker { font-size: 13px; font-weight: 600; color: #334155; }
     .status-empty { color: #cbd5e1; font-weight: normal; font-size: 12px; }
     </style>
 """, unsafe_allow_html=True)
@@ -105,10 +102,19 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 📊 控制塔台 (首頁美化) ---
+    # --- 取得所有現有製令 (供下拉選單使用) ---
+    existing_orders = []
+    try:
+        r_orders = requests.get(f"{DB_URL}.json", timeout=5)
+        data_orders = r_orders.json()
+        if data_orders:
+            existing_orders = sorted(list(set([v.get("製令") for k, v in data_orders.items() if v and v.get("製令")])))
+    except:
+        pass
+
+    # --- 3. 📊 控制塔台 ---
     if menu == "📊 控制塔台":
         st.markdown('<p class="main-title">📊 製造部●生產進度即時看板</p>', unsafe_allow_html=True)
-        
         try:
             r = requests.get(f"{DB_URL}.json", timeout=5)
             data = r.json()
@@ -117,57 +123,47 @@ else:
                 if all_logs:
                     df = pd.DataFrame(all_logs)
                     unique_orders = df["製令"].unique()
-                    
                     cols = st.columns(2)
                     for idx, order in enumerate(unique_orders):
                         order_df = df[df["製令"] == order]
                         with cols[idx % 2]:
-                            st.markdown(f'''
-                            <div class="order-card">
-                                <div class="order-header">📦 製令：{order}</div>
-                                <div class="compact-grid">
-                            ''', unsafe_allow_html=True)
-                            
+                            st.markdown(f'<div class="order-card"><div class="order-header">📦 製令：{order}</div><div class="compact-grid">', unsafe_allow_html=True)
                             for proc in process_list:
                                 matched = order_df[order_df["製造工序"] == proc]
                                 if not matched.empty:
                                     row = matched.iloc[0]
-                                    # 收集所有人員，過濾掉不需要顯示的標籤
-                                    workers = [row.get(f"人員{i}", "NA") for i in range(1, 6)]
-                                    # 過濾掉 'NA' 和 '管理員'，只留下實際作業的人員
-                                    active_workers = [w for w in workers if w not in ["NA", "管理員", None]]
-                                    
-                                    if active_workers:
-                                        # 用逗號連結多個人員名字
-                                        w_display = "、".join(active_workers)
-                                        worker_html = f'<div class="p-worker">{w_display}</div>'
-                                    else:
-                                        worker_html = '<div class="p-worker status-empty">-</div>'
+                                    active_workers = [row.get(f"人員{i}") for i in range(1, 6) if row.get(f"人員{i}") not in ["NA", "管理員", None]]
+                                    w_display = "、".join(active_workers) if active_workers else "-"
+                                    worker_html = f'<div class="p-worker">{w_display}</div>'
                                 else:
                                     worker_html = '<div class="p-worker status-empty">-</div>'
-                                
-                                st.markdown(f'''
-                                    <div class="compact-box">
-                                        <div class="p-name">{proc}</div>
-                                        {worker_html}
-                                    </div>
-                                ''', unsafe_allow_html=True)
+                                st.markdown(f'<div class="compact-box"><div class="p-name">{proc}</div>{worker_html}</div>', unsafe_allow_html=True)
                             st.markdown('</div></div>', unsafe_allow_html=True)
                 else:
                     st.info("尚無派工紀錄。")
             else:
                 st.info("目前無資料。")
-        except Exception as e:
+        except:
             st.error("看板讀取失敗")
 
-    # --- 4. 📝 任務派發 ---
+    # --- 4. 📝 任務派發 (新增製令下拉選單) ---
     elif menu == "📝 任務派發":
         st.markdown('<p class="main-title">📝 新增派工任務</p>', unsafe_allow_html=True)
+        
+        # 讓使用者選擇是要「輸入新製令」還是「從現有挑選」
+        order_mode = st.radio("製令輸入模式", ["從現有製令選擇", "手動輸入新製令"], horizontal=True)
+        
         with st.form("new_dispatch"):
             c1, c2 = st.columns(2)
-            order_no = c1.text_input("📦 製令編號")
-            proc_name = c2.selectbox("⚙️ 製造工序", process_list)
             
+            if order_mode == "從現有製令選擇":
+                order_no = c1.selectbox("📦 選擇現有製令", existing_orders if existing_orders else ["(尚無資料)"])
+            else:
+                order_no = c1.text_input("📦 輸入新製令編號", placeholder="例如: 1111")
+                
+            proc_name = c2.selectbox("⚙️ 選擇製造工序", process_list)
+            
+            st.write("👥 人員配置")
             pc = st.columns(5)
             w1 = pc[0].selectbox("人員1", all_staff, key="nw1")
             w2 = pc[1].selectbox("人員2", all_staff, key="nw2")
@@ -179,13 +175,13 @@ else:
             assigner = st.selectbox("🚩 派工負責人", all_staff, index=user_idx)
             
             if st.form_submit_button("🚀 發布至看板"):
-                if not order_no:
-                    st.error("請輸入製令編號")
+                if not order_no or order_no == "(尚無資料)":
+                    st.error("請確認製令編號！")
                 else:
                     log = {"製令": order_no, "製造工序": proc_name, "人員1": w1, "人員2": w2, "人員3": w3, "人員4": w4, "人員5": w5, "派工人員": assigner, "提交時間": get_now_str()}
                     requests.post(f"{DB_URL}.json", data=json.dumps(log))
                     st.success(f"製令 {order_no} 派發成功！")
-                    st.balloons()
+                    st.rerun()
 
     # --- 5. 📝 紀錄編輯 ---
     elif menu == "📝 紀錄編輯":
@@ -214,8 +210,8 @@ else:
     elif menu == "⚙️ 系統設定":
         st.header("⚙️ 基礎資料管理")
         with st.form("sys_config"):
-            all_staff_str = st.text_area("👥 人員清單", value=",".join(all_staff), help="以英文逗號隔開")
-            new_processes = st.text_area("⚙️ 工序清單", value=",".join(process_list), help="以英文逗號隔開")
+            all_staff_str = st.text_area("👥 人員清單 (逗號隔開)", value=",".join(all_staff))
+            new_processes = st.text_area("⚙️ 工序清單 (逗號隔開)", value=",".join(process_list))
             if st.form_submit_button("💾 儲存設定"):
                 new_data = {
                     "all_staff": [x.strip() for x in all_staff_str.split(",") if x.strip()],
