@@ -5,7 +5,6 @@ import requests
 import json
 
 # --- 1. 核心設定 ---
-# 提醒：請確保您的 Firebase Rules 是設定為 ".read": true, ".write": true 以免權限阻擋
 DB_URL = "https://my-factory-system-default-rtdb.firebaseio.com/work_logs"
 DONE_URL = "https://my-factory-system-default-rtdb.firebaseio.com/completed_logs"
 SETTING_URL = "https://my-factory-system-default-rtdb.firebaseio.com/settings"
@@ -20,7 +19,6 @@ def get_settings():
         data = r.json()
         if not data:
             return {"orders": [], "assigners": ["管理員"], "worker_map": {}, "processes": ["工序A", "工序B"]}
-        # 確保必要的 key 存在
         if "processes" not in data or not data["processes"]:
             data["processes"] = ["預設工序"]
         if "worker_map" not in data:
@@ -29,7 +27,7 @@ def get_settings():
     except:
         return {"orders": [], "assigners": ["管理員"], "worker_map": {}, "processes": ["工序A", "工序B"]}
 
-# --- 2. 頁面樣式設計 (維持原樣) ---
+# --- 2. 頁面樣式設計 (維持您喜歡的風格) ---
 st.set_page_config(page_title="超慧科技●現場派工看板", layout="wide")
 
 st.markdown("""
@@ -68,7 +66,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 📊 控制塔台 (首頁) (維持原樣風格) ---
+    # --- 3. 📊 控制塔台 (首頁) ---
     if menu == "📊 控制塔台 (首頁)":
         st.markdown('<p class="main-title">📊 超慧科技現場派工看板</p>', unsafe_allow_html=True)
         try:
@@ -99,7 +97,7 @@ else:
                     if st.button(f"✅ 製令 {v.get('製令')} 全工序完工報工", key=f"fin_{k}", use_container_width=True):
                         done_data = v.copy()
                         done_data['實際完工時間'] = get_now_str()
-                        requests.post(f"{DONE_URL}.json", json=done_data)
+                        requests.post(f"{DONE_URL}.json", data=json.dumps(done_data))
                         requests.delete(f"{DB_URL}/{k}.json")
                         st.balloons()
                         st.rerun()
@@ -108,7 +106,7 @@ else:
         except Exception as e:
             st.error(f"連線錯誤：{e}")
 
-    # --- 4. 💖 愛的派工作業中心 (修正發送邏輯) ---
+    # --- 4. 💖 愛的派工作業中心 (修正核心錯誤處) ---
     elif menu == "💖 愛的派工作業中心":
         st.markdown('<p class="main-title">💖 愛的派工作業中心</p>', unsafe_allow_html=True)
         
@@ -122,9 +120,6 @@ else:
             
             workers = ["NA"] + settings.get("worker_map", {}).get(selected_assigner, [])
             proc_list = settings.get("processes", [])
-            
-            if not proc_list:
-                st.warning("⚠️ 尚未定義工序，請先至『系統內容管理』設定工序清單。")
             
             new_assign_data = {}
             cols_per_row = 4
@@ -141,19 +136,18 @@ else:
             if st.button("🚀 確認發布此製令單至看板", type="primary", use_container_width=True):
                 if not order_input:
                     st.error("❌ 請務必填寫『製令編號』！")
-                elif not proc_list:
-                    st.error("❌ 無法發布：請先設定工序清單！")
                 else:
+                    # 修正：確保所有欄位皆為 JSON 可接受的字串格式
                     payload = {
-                        "製令": order_input,
-                        "派工人員": selected_assigner,
-                        "作業期限": str(deadline),
+                        "製令": str(order_input),
+                        "派工人員": str(selected_assigner),
+                        "作業期限": deadline.strftime("%Y-%m-%d"), # 強制轉字串
                         "提交時間": get_now_str(),
                         **new_assign_data
                     }
                     try:
-                        # 修正：使用 json.dumps 確保格式完全正確，並檢查回應代碼
-                        res = requests.post(f"{DB_URL}.json", data=json.dumps(payload), timeout=10)
+                        # 使用 json.dumps 確保非 ASCII 字元(中文)正常處理
+                        res = requests.post(f"{DB_URL}.json", data=json.dumps(payload, ensure_ascii=False).encode('utf-8'), timeout=10)
                         if res.status_code == 200:
                             st.success(f"✅ 製令 {order_input} 派工完成！")
                             st.balloons()
@@ -161,21 +155,21 @@ else:
                         else:
                             st.error(f"發送失敗，代碼：{res.status_code}，訊息：{res.text}")
                     except Exception as e:
-                        st.error(f"系統連線發生錯誤：{e}")
+                        st.error(f"系統錯誤：{e}")
 
-    # --- 5. 系統內容管理 (修正名單更新邏輯) ---
+    # --- 5. 系統內容管理 ---
     elif menu == "⚙️ 系統內容管理":
         st.markdown('<p class="main-title">⚙️ 系統內容管理</p>', unsafe_allow_html=True)
         with st.form("basic_settings"):
             st.subheader("🛠️ 基本名單編輯")
-            new_assigners = st.text_area("🚩 編輯派工人員 (用英文逗點隔開)", value=",".join(settings.get("assigners", [])))
-            new_processes = st.text_area("⚙️ 編輯工序清單 (用英文逗點隔開)", value=",".join(settings.get("processes", [])))
+            new_assigners = st.text_area("🚩 編輯派工人員 (用逗點隔開)", value=",".join(settings.get("assigners", [])))
+            new_processes = st.text_area("⚙️ 編輯工序清單 (用逗點隔開)", value=",".join(settings.get("processes", [])))
             if st.form_submit_button("💾 儲存名單定義"):
-                update_payload = {
+                update_data = {
                     "assigners": [x.strip() for x in new_assigners.split(",") if x.strip()],
                     "processes": [x.strip() for x in new_processes.split(",") if x.strip()]
                 }
-                requests.patch(f"{SETTING_URL}.json", data=json.dumps(update_payload))
+                requests.patch(f"{SETTING_URL}.json", data=json.dumps(update_data, ensure_ascii=False).encode('utf-8'))
                 st.success("名單已更新！")
                 st.rerun()
 
@@ -183,24 +177,23 @@ else:
         target_assigner = st.selectbox("請選擇派工人員來配置所屬作業員：", settings.get("assigners", []))
         if target_assigner:
             with st.form("worker_config"):
-                worker_input = st.text_area(f"👷 {target_assigner} 的作業員清單 (用英文逗點隔開)", value=",".join(settings.get("worker_map", {}).get(target_assigner, [])))
+                worker_input = st.text_area(f"👷 {target_assigner} 的作業員清單 (用逗點隔開)", value=",".join(settings.get("worker_map", {}).get(target_assigner, [])))
                 if st.form_submit_button("💾 儲存人員配置"):
                     wm = settings.get("worker_map", {})
                     wm[target_assigner] = [x.strip() for x in worker_input.split(",") if x.strip()]
-                    requests.patch(f"{SETTING_URL}.json", data=json.dumps({"worker_map": wm}))
+                    requests.patch(f"{SETTING_URL}.json", data=json.dumps({"worker_map": wm}, ensure_ascii=False).encode('utf-8'))
                     st.success(f"{target_assigner} 的名單已更新！")
                     st.rerun()
 
-    # --- 6. 完工紀錄 (維持原樣) ---
+    # --- 6. 完工紀錄 ---
     elif menu == "✅ 已完工歷史紀錄查詢":
         st.markdown('<p class="main-title">✅ 已完工歷史紀錄</p>', unsafe_allow_html=True)
         try:
             r_done = requests.get(f"{DONE_URL}.json")
-            done_json = r_done.json()
-            if done_json:
-                df_done = pd.DataFrame([v for k, v in done_json.items() if v]).fillna("NA")
+            if r_done.json():
+                df_done = pd.DataFrame([v for k, v in r_done.json().items() if v]).fillna("NA")
                 st.dataframe(df_done, use_container_width=True)
             else:
                 st.info("尚無歷史紀錄。")
         except:
-            st.error("讀取歷史紀錄失敗。")
+            st.error("讀取資料失敗。")
