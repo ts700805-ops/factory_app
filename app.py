@@ -23,7 +23,7 @@ def get_settings():
     except:
         return {"orders": [], "assigners": ["管理員"], "worker_map": {}, "processes": ["工序A", "工序B"]}
 
-# --- 2. 頁面樣式設計 (嚴格保留原風格) ---
+# --- 2. 頁面樣式設計 (嚴格保留原風格，完全不改動) ---
 st.set_page_config(page_title="大量科技●現場派工看板", layout="wide")
 
 st.markdown("""
@@ -81,7 +81,8 @@ else:
                     if st.button(f"✅ 完成這筆紀錄 ({v.get('製令')})", key=f"fin_{k}", use_container_width=True):
                         done_data = v.copy()
                         done_data['實際完工時間'] = get_now_str()
-                        requests.post(f"{DONE_URL}.json", json=done_data)
+                        # 確保發送純 JSON 格式
+                        requests.post(f"{DONE_URL}.json", data=json.dumps(done_data))
                         requests.delete(f"{DB_URL}/{k}.json")
                         st.rerun()
             else:
@@ -89,7 +90,7 @@ else:
         except Exception as e:
             st.error(f"連線異常：{e}")
 
-    # --- 4. 💖 愛的派工作業中心 (修正重點區域) ---
+    # --- 4. 💖 愛的派工作業中心 (修正核心錯誤處) ---
     elif menu == "💖 愛的派工作業中心":
         st.markdown('<p class="main-title">💖 愛的派工作業中心</p>', unsafe_allow_html=True)
         with st.container(border=True):
@@ -109,33 +110,35 @@ else:
                         new_assign_data[p_name] = st.selectbox(p_name, workers, key=f"sel_{p_name}")
             
             st.markdown("---")
-            deadline = st.date_input("4. 設定作業期限", datetime.date.today())
+            deadline_val = st.date_input("4. 設定作業期限", datetime.date.today())
             
             if st.button("🚀 確認發布此製令單至看板", type="primary", use_container_width=True):
                 if order_input:
-                    # 【核心修正】：手動格式化所有可能導致 JSON 解析失敗的欄位
+                    # 【核心修正】：將所有資料彙整成一個「純字串」字典
+                    payload = {
+                        "製令": str(order_input),
+                        "派工人員": str(selected_assigner),
+                        "作業期限": deadline_val.strftime("%Y-%m-%d"), # 轉成字串，這是關鍵
+                        "提交時間": get_now_str()
+                    }
+                    # 將各工序負責人也轉成字串
+                    for p_key, p_val in new_assign_data.items():
+                        payload[str(p_key)] = str(p_val)
+                    
                     try:
-                        final_payload = {
-                            "製令": str(order_input),
-                            "派工人員": str(selected_assigner),
-                            "作業期限": deadline.strftime("%Y-%m-%d"), # 強制轉為字串
-                            "提交時間": get_now_str()
-                        }
-                        # 合併工序資料並確保皆為字串
-                        for pk, pv in new_assign_data.items():
-                            final_payload[str(pk)] = str(pv)
-                        
-                        # 【雙重保險】：直接發送 json 參數，由 requests 自動處理 header 與序列化
-                        res = requests.post(f"{DB_URL}.json", json=final_payload, timeout=10)
+                        # 【雙重保險】：不使用 json= 參數，改用 data= 並手動轉為 JSON 字串送出
+                        # 這樣可以 100% 確保 Firebase 收到的是標準 JSON
+                        json_string = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+                        res = requests.post(f"{DB_URL}.json", data=json_string, timeout=10)
                         
                         if res.status_code == 200:
                             st.success("✅ 派工成功！")
+                            st.balloons()
                             st.rerun()
                         else:
-                            # 顯示更細節的錯誤以利除錯
-                            st.error(f"發送失敗 ({res.status_code}): {res.text}")
-                    except Exception as ex:
-                        st.error(f"系統錯誤: {ex}")
+                            st.error(f"發送失敗，代碼：{res.status_code}，錯誤訊息：{res.text}")
+                    except Exception as e:
+                        st.error(f"資料庫連線錯誤：{e}")
                 else:
                     st.warning("請填寫製令編號")
 
@@ -150,7 +153,7 @@ else:
                     "assigners": [x.strip() for x in new_assigners.split(",") if x.strip()],
                     "processes": [x.strip() for x in new_processes.split(",") if x.strip()]
                 }
-                requests.patch(f"{SETTING_URL}.json", json=payload)
+                requests.patch(f"{SETTING_URL}.json", data=json.dumps(payload))
                 st.rerun()
 
     elif menu == "✅ 已完工歷史紀錄查詢":
