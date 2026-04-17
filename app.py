@@ -33,7 +33,7 @@ def get_settings():
     except:
         return default_settings
 
-# --- 2. 介面樣式 (製令卡片與表格格線) ---
+# --- 2. 介面樣式 ---
 st.set_page_config(page_title="超慧科技公佈欄", layout="wide")
 
 st.markdown("""
@@ -97,7 +97,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. 邏輯與介面渲染 ---
+# --- 3. 核心邏輯 ---
 settings = get_settings()
 all_leaders = settings["all_leaders"]
 all_staff = settings["all_staff"]
@@ -111,7 +111,7 @@ if "user" not in st.session_state:
         st.session_state.user = u
         st.rerun()
 else:
-    st.sidebar.markdown(f"👤 **使用者：{st.session_state.user}**")
+    st.sidebar.markdown(f"👤 **目前使用者：{st.session_state.user}**")
     menu = st.sidebar.radio("功能導航", ["📊 超慧科技公佈欄", "📝 任務派發", "⚙️ 設定管理"])
     
     if st.sidebar.button("登出"):
@@ -142,7 +142,7 @@ else:
                 cols = st.columns(3)
                 for idx, o_id in enumerate(filtered_orders):
                     o_df = df[df["製令"] == o_id]
-                    # 抓取該製令最後一次更新的通電日期
+                    # 抓取該製令最新的通電日期
                     p_date = o_df.sort_values("提交時間", ascending=False).iloc[0].get("通電日期", "未設定")
 
                     if s_staff != "全部":
@@ -174,31 +174,54 @@ else:
         except:
             st.info("目前尚無派工紀錄")
 
-    # --- 📝 任務派發 (新增通電日期) ---
+    # --- 📝 任務派發 (具備自動覆蓋/編輯功能) ---
     elif menu == "📝 任務派發":
-        st.markdown('<h2 style="color:#1e40af;">📝 任務派發</h2>', unsafe_allow_html=True)
+        st.markdown('<h2 style="color:#1e40af;">📝 任務派發 / 內容修正</h2>', unsafe_allow_html=True)
+        st.caption("提示：若「製令」與「工序」相同，重新發布將自動「覆蓋舊內容」，達到編輯效果。")
+        
         with st.form("dispatch_form"):
             c1, c2, c3, c4 = st.columns(4)
             target_o = c1.selectbox("1. 製令編號", order_list)
             target_p = c2.selectbox("2. 製造工序", process_list)
             target_l = c3.selectbox("3. 指派組長", all_leaders)
-            target_d = c4.date_input("4. 通電日期", datetime.date.today()) # 新增日期欄位
+            target_d = c4.date_input("4. 通電日期", datetime.date.today())
             
             st.write("---")
             st.write("🔧 分派組員 (最多5位)")
             pc = st.columns(5)
             workers = [pc[i].selectbox(f"人員 {i+1}", ["NA"] + all_staff, key=f"ws_{i}") for i in range(5)]
             
-            if st.form_submit_button("🚀 發布至公佈欄"):
-                payload = {
-                    "製令": target_o, "製造工序": target_p, "組長": target_l,
-                    "通電日期": str(target_d), # 儲存日期
-                    "人員1": workers[0], "人員2": workers[1], "人員3": workers[2], "人員4": workers[3], "人員5": workers[4],
-                    "提交時間": get_now_str()
-                }
-                requests.post(f"{DB_URL}.json", data=json.dumps(payload))
-                st.success(f"✅ {target_o} 派工成功！")
-                st.rerun()
+            if st.form_submit_button("🚀 發布並更新公佈欄"):
+                # 1. 先抓取舊資料，尋找是否有相同的 (製令 + 工序)
+                try:
+                    r = requests.get(f"{DB_URL}.json", timeout=5)
+                    db_data = r.json()
+                    target_key = None
+                    if db_data:
+                        for key, val in db_data.items():
+                            if val.get("製令") == target_o and val.get("製造工序") == target_p:
+                                target_key = key # 找到舊資料的 ID
+                                break
+                    
+                    payload = {
+                        "製令": target_o, "製造工序": target_p, "組長": target_l,
+                        "通電日期": str(target_d),
+                        "人員1": workers[0], "人員2": workers[1], "人員3": workers[2], "人員4": workers[3], "人員5": workers[4],
+                        "提交時間": get_now_str()
+                    }
+
+                    if target_key:
+                        # 2. 如果有舊資料，用 PUT (覆蓋)
+                        requests.put(f"{DB_BASE_URL}/work_logs/{target_key}.json", data=json.dumps(payload))
+                        st.success(f"🔄 已更新製令 {target_o} 的 {target_p} 資料")
+                    else:
+                        # 3. 如果沒舊資料，用 POST (新增)
+                        requests.post(f"{DB_URL}.json", data=json.dumps(payload))
+                        st.success(f"✅ 已新增製令 {target_o} 派工")
+                    
+                    st.rerun()
+                except:
+                    st.error("連線失敗，請檢查網路")
 
     # --- ⚙️ 設定管理 ---
     elif menu == "⚙️ 設定管理":
@@ -217,5 +240,5 @@ else:
                     "processes": [x.strip() for x in edit_p.split(",") if x.strip()]
                 }
                 requests.put(f"{SETTING_URL}.json", data=json.dumps(updated_cfg))
-                st.success("✅ 所有選單與組長名單已同步更新！")
+                st.success("✅ 所有設定已同步更新！")
                 st.rerun()
