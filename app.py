@@ -34,7 +34,7 @@ def get_settings():
         return default_settings
 
 # --- 2. 介面樣式 ---
-st.set_page_config(page_title="超慧科技公佈欄", layout="wide")
+st.set_page_config(page_title="超慧科技趙子龍專用派工系統", layout="wide")
 
 st.markdown("""
     <style>
