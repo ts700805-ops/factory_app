@@ -35,121 +35,83 @@ def get_settings():
     except Exception:
         return default_settings
 
-# --- 2. 頁面配置與「終極固定標題」CSS ---
-st.set_page_config(page_title="超慧科技●製造部●派工系統", layout="wide")
+# --- 2. 頁面配置與「超強固定」CSS ---
+st.set_page_config(page_title="超慧科技●生產看板", layout="wide")
 
 st.markdown("""
     <style>
-    .stApp { background-color: #f8fafc; }
+    /* 隱藏 Streamlit 原生多餘邊距 */
+    .block-container { padding-top: 1rem; padding-bottom: 0rem; }
     
-    /* 核心卡片外框：嚴格控制高度 */
+    /* 1. 頂部搜尋區固定 */
+    .fixed-top-header {
+        position: sticky;
+        top: 0;
+        background: #f8fafc;
+        z-index: 999;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #e2e8f0;
+    }
+
+    /* 2. 看板主容器：強制不讓網頁出現大捲動條 */
+    .board-container {
+        display: flex;
+        gap: 20px;
+        padding: 10px;
+        height: 75vh;  /* 鎖定看板高度為視窗的 75% */
+        overflow-x: auto; /* 橫向排列製令 */
+        align-items: flex-start;
+    }
+
+    /* 3. 製令卡片：固定寬度、高度，內部分層 */
     .order-card {
+        min-width: 320px;
+        max-width: 320px;
+        height: 100%; /* 跟隨父容器高度 */
         background: white;
         border-radius: 12px;
-        margin-bottom: 25px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-        border: 2px solid #cbd5e1;
-        height: 600px;           /* 總高度固定 */
-        width: 100%;
-        display: block;
-        overflow: hidden;        /* 禁止外框出現捲動條 */
-    }
-
-    /* 絕對固定的標題區：不參與任何捲動 */
-    .order-header {
-        background: #1e40af;
-        color: #ffffff;
-        padding: 15px 20px;
-        font-size: 22px;
-        font-weight: 900;
-        height: 65px;            /* 固定標題高度 */
-        display: flex;
-        align-items: center;
-        border-bottom: 3px solid #1e3a8a;
-    }
-
-    /* 唯一被允許捲動的內容區 */
-    .order-content-scroll {
-        height: 535px;           /* 總高度 600 - 標題 65 */
-        overflow-y: auto !important; /* 強制開啟垂直捲動 */
-        padding: 15px;
-        background: #fdfdfd;
-        scrollbar-width: thin;    /* 讓捲動條美觀一點 */
-    }
-
-    /* 格位排版：在 3 欄下建議單列顯示最清楚 */
-    .compact-grid {
+        border: 2px solid #1e40af;
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
     }
-    
-    .compact-box {
-        background: #ffffff;
-        padding: 15px 10px;
-        border-radius: 10px;
-        border: 2px solid #e2e8f0;
-        min-height: 110px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-    }
-    .compact-box:hover { border-color: #1e40af; background: #f0f7ff; }
 
-    .p-name { 
-        font-size: 14px; 
-        font-weight: 800; 
-        color: #1e40af; 
-        margin-bottom: 8px;
-        border-bottom: 1px solid #e2e8f0;
-        width: 100%;
-        text-align: center;
-        padding-bottom: 5px;
-    }
-    
-    .leader-tag {
+    /* 4. [絕對固定] 製令標題藍色區塊 */
+    .card-title-fixed {
         background: #1e40af;
         color: white;
-        font-size: 11px;
-        padding: 1px 5px;
-        border-radius: 4px;
-        margin-right: 6px;
-        font-weight: bold;
+        padding: 15px;
+        font-size: 20px;
+        font-weight: 900;
+        flex-shrink: 0; /* 禁止壓縮 */
+        text-align: center;
+        border-bottom: 2px solid #1e3a8a;
     }
 
-    .main-worker-name {
-        font-size: 19px !important;
-        font-weight: 900 !important;
-        color: #0f172a !important;
-        margin-bottom: 6px;
+    /* 5. [獨立捲動] 工序內容區塊 */
+    .card-body-scroll {
+        flex-grow: 1;
+        overflow-y: scroll !important; /* 強制開啟垂直捲動 */
+        padding: 10px;
+        background: #ffffff;
     }
+
+    /* 工序格子設計 */
+    .process-item {
+        background: #f1f5f9;
+        margin-bottom: 8px;
+        padding: 10px;
+        border-radius: 8px;
+        border-left: 5px solid #cbd5e1;
+    }
+    .process-item.active { border-left: 5px solid #1e40af; background: #eff6ff; }
     
-    .sub-workers-wrap {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 6px;
-        margin-top: 4px;
-    }
-
-    .sub-worker-name {
-        font-size: 13px !important;
-        color: #475569 !important;
-        background: #e2e8f0;
-        padding: 2px 8px;
-        border-radius: 6px;
-        font-weight: 600;
-    }
-
-    .search-box {
-        background-color: #ffffff;
-        padding: 20px;
-        border-radius: 12px;
-        margin-bottom: 25px;
-        border: 2px solid #1e40af;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
+    .proc-name { font-size: 13px; font-weight: 700; color: #475569; margin-bottom: 5px; }
+    .staff-main { font-size: 16px; font-weight: 900; color: #1e40af; }
+    .staff-sub { font-size: 12px; color: #64748b; background: white; padding: 2px 5px; border-radius: 4px; margin-right: 3px; border: 1px solid #e2e8f0; }
+    
+    .no-assign { color: #94a3b8; font-style: italic; font-size: 12px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -160,7 +122,7 @@ order_list = settings["order_list"]
 assigner_list = settings["assigners"]
 
 if "user" not in st.session_state:
-    st.title("⚓ 超慧科技 - 系統登入")
+    st.title("⚓ 超慧科技系統登入")
     u = st.selectbox("👤 請選擇您的姓名", all_staff)
     if st.button("確認登入"):
         st.session_state.user = u
@@ -168,93 +130,98 @@ if "user" not in st.session_state:
 else:
     st.sidebar.markdown(f"👤 **使用者：{st.session_state.user}**")
     menu = st.sidebar.radio("功能導航", ["📊 生產看板", "📝 派工錄入", "📝 紀錄編輯", "⚙️ 系統設定"])
-    if st.sidebar.button("登出系統"):
-        st.session_state.clear()
-        st.rerun()
 
-    # --- 3. 📊 生產看板 (終極標題固定版) ---
+    # --- 3. 📊 生產看板 (全新設計版) ---
     if menu == "📊 生產看板":
-        st.markdown(f'<div style="text-align:center; margin-bottom:20px;"><h1 style="color:#1e40af; font-weight:900; font-size:36px;">📊 生產進度看板</h1></div>', unsafe_allow_html=True)
-        
-        with st.container():
-            st.markdown('<div class="search-box">', unsafe_allow_html=True)
-            col_s1, col_s2 = st.columns(2)
-            search_order = col_s1.selectbox("🔍 搜尋製令", ["全部"] + sorted(order_list))
-            search_staff = col_s2.selectbox("👤 搜尋參與人員", ["全部"] + sorted(all_staff))
-            st.markdown('</div>', unsafe_allow_html=True)
+        # 標題與搜尋區 (固定在頂部)
+        st.markdown('<div class="fixed-top-header">', unsafe_allow_html=True)
+        st.markdown(f'<h1 style="text-align:center; color:#1e40af; margin-bottom:15px;">📊 生產進度即時看板</h1>', unsafe_allow_html=True)
+        col_s1, col_s2 = st.columns(2)
+        search_order = col_s1.selectbox("🔍 搜尋製令", ["全部項目"] + sorted(order_list))
+        search_staff = col_s2.selectbox("👤 搜尋參與人員", ["全部人員"] + sorted(all_staff))
+        st.markdown('</div>', unsafe_allow_html=True)
 
         try:
             r = requests.get(f"{DB_URL}.json", timeout=5)
             data = r.json()
             if data:
                 all_logs = [dict(v, db_key=k) for k, v in data.items() if v and isinstance(v, dict)]
-                if all_logs:
-                    df = pd.DataFrame(all_logs)
-                    unique_orders = df["製令"].unique()
+                df = pd.DataFrame(all_logs)
+                unique_orders = df["製令"].unique()
+                
+                # 過濾邏輯
+                display_orders = []
+                for order in unique_orders:
+                    if search_order != "全部項目" and search_order != order: continue
+                    order_df = df[df["製令"] == order]
+                    if search_staff != "全部人員":
+                        staff_cols = [f"人員{i}" for i in range(1, 6)]
+                        if not order_df[staff_cols].apply(lambda row: search_staff in row.values, axis=1).any(): continue
+                    display_orders.append(order)
+
+                # 看板 HTML 開始
+                board_html = '<div class="board-container">'
+                
+                for order in display_orders:
+                    order_df = df[df["製令"] == order]
+                    # 卡片標題區 (固定不動)
+                    board_html += f'''
+                        <div class="order-card">
+                            <div class="card-title-fixed">📦 製令：{order}</div>
+                            <div class="card-body-scroll">
+                    '''
                     
-                    filtered_orders = []
-                    for order in unique_orders:
-                        if search_order != "全部" and search_order != order: continue
-                        order_df = df[df["製令"] == order]
-                        if search_staff != "全部":
-                            staff_cols = [f"人員{i}" for i in range(1, 6)]
-                            if not order_df[staff_cols].apply(lambda row: search_staff in row.values, axis=1).any(): continue
-                        filtered_orders.append(order)
-
-                    # 3 欄顯示
-                    cols = st.columns(3)
-                    for idx, order in enumerate(filtered_orders):
-                        order_df = df[df["製令"] == order]
-                        with cols[idx % 3]:
-                            # 🟢 結構強化：Header 與 Content 完全物理隔離高度
-                            st.markdown(f'''
-                                <div class="order-card">
-                                    <div class="order-header">📦 製令：{order}</div>
-                                    <div class="order-content-scroll">
-                                        <div class="compact-grid">
-                            ''', unsafe_allow_html=True)
+                    # 卡片內容區 (獨立滾動)
+                    for proc in process_list:
+                        matched = order_df[order_df["製造工序"] == proc]
+                        if not matched.empty:
+                            row = matched.iloc[0]
+                            main_w = row.get("人員1", "-")
+                            subs = [row.get(f"人員{i}") for i in range(2, 6) if row.get(f"人員{i}") not in ["NA", "管理員", None, ""]]
                             
-                            for proc in process_list:
-                                matched = order_df[order_df["製造工序"] == proc]
-                                if not matched.empty:
-                                    row = matched.iloc[0]
-                                    main_w = row.get("人員1", "-")
-                                    subs = [row.get(f"人員{i}") for i in range(2, 6) if row.get(f"人員{i}") not in ["NA", "管理員", None, ""]]
-                                    
-                                    main_html = f'<div class="main-worker-name"><span class="leader-tag">主</span>{main_w}</div>'
-                                    sub_html = '<div class="sub-workers-wrap">' + "".join([f'<span class="sub-worker-name">{s}</span>' for s in subs]) + '</div>'
-                                    box_content = main_html + sub_html
-                                else:
-                                    box_content = '<div style="color:#94a3b8; font-size:14px; margin-top:15px; font-weight:bold;">尚未派工</div>'
-                                
-                                st.markdown(f'<div class="compact-box"><div class="p-name">{proc}</div>{box_content}</div>', unsafe_allow_html=True)
-                            
-                            st.markdown('</div></div></div>', unsafe_allow_html=True)
-        except Exception as e:
-            st.error(f"連線資料庫失敗")
+                            sub_html = "".join([f'<span class="staff-sub">{s}</span>' for s in subs])
+                            board_html += f'''
+                                <div class="process-item active">
+                                    <div class="proc-name">{proc}</div>
+                                    <div class="staff-main">👤 {main_w}</div>
+                                    <div style="margin-top:5px;">{sub_html}</div>
+                                </div>
+                            '''
+                        else:
+                            board_html += f'''
+                                <div class="process-item">
+                                    <div class="proc-name">{proc}</div>
+                                    <div class="no-assign">尚未派工</div>
+                                </div>
+                            '''
+                    
+                    board_html += '</div></div>' # 關閉卡片
+                
+                board_html += '</div>' # 關閉看板容器
+                st.markdown(board_html, unsafe_allow_html=True)
+                
+        except Exception:
+            st.error("暫無看板資料或連線異常")
 
-    # --- 派工、編輯與設定維持原功能 ---
+    # --- 派工、編輯與設定 (維持原本功能) ---
     elif menu == "📝 派工錄入":
-        st.markdown('<h2 style="color:#1e40af;">📝 派發新任務</h2>', unsafe_allow_html=True)
+        st.markdown("## 📝 派發新任務")
         with st.form("new_dispatch"):
             c1, c2 = st.columns(2)
             order_no = c1.selectbox("📦 選擇製令", order_list)
             proc_name = c2.selectbox("⚙️ 選擇工序", process_list)
             st.write("---")
             pc = st.columns(5)
-            ws = [pc[0].selectbox("主要人員 (人員1)", all_staff, key="nw0")]
-            for i in range(1, 5):
-                ws.append(pc[i].selectbox(f"人員 {i+1}", all_staff, key=f"nw{i}"))
-            st.write("---")
+            ws = [pc[i].selectbox(f"人員 {i+1}", all_staff, key=f"nw{i}") for i in range(5)]
             assigner = st.selectbox("🚩 派工負責人", assigner_list)
             if st.form_submit_button("🚀 確認發布"):
                 log = {"製令": order_no, "製造工序": proc_name, "人員1": ws[0], "人員2": ws[1], "人員3": ws[2], "人員4": ws[3], "人員5": ws[4], "派工人員": assigner, "提交時間": get_now_str()}
                 requests.post(f"{DB_URL}.json", data=json.dumps(log))
-                st.success("✅ 任務發布成功")
+                st.success("✅ 任務已同步")
                 st.rerun()
 
     elif menu == "📝 紀錄編輯":
-        st.markdown('<h2 style="color:#1e40af;">📝 修改現有派工</h2>', unsafe_allow_html=True)
+        st.markdown("## 📝 修改派工紀錄")
         r = requests.get(f"{DB_URL}.json")
         db_data = r.json()
         if db_data:
@@ -265,9 +232,7 @@ else:
             if curr:
                 new_p = st.selectbox("工序", process_list, index=process_list.index(curr['製造工序']) if curr['製造工序'] in process_list else 0)
                 ec = st.columns(5)
-                nw = [ec[0].selectbox("主要人員", all_staff, index=all_staff.index(curr.get('人員1')) if curr.get('人員1') in all_staff else 0, key="e0")]
-                for i in range(1, 5):
-                    nw.append(ec[i].selectbox(f"人員 {i+1}", all_staff, index=all_staff.index(curr.get(f'人員{i+1}')) if curr.get(f'人員{i+1}') in all_staff else 0, key=f"e{i}"))
+                nw = [ec[i].selectbox(f"人員 {i+1}", all_staff, index=all_staff.index(curr.get(f'人員{i+1}')) if curr.get(f'人員{i+1}') in all_staff else 0, key=f"e{i}") for i in range(5)]
                 if st.button("💾 儲存修改"):
                     upd = {"製造工序": new_p, "人員1": nw[0], "人員2": nw[1], "人員3": nw[2], "人員4": nw[3], "人員5": nw[4]}
                     requests.patch(f"{DB_URL}/{tid}.json", data=json.dumps(upd))
@@ -277,7 +242,7 @@ else:
                     st.rerun()
 
     elif menu == "⚙️ 系統設定":
-        st.markdown('<h2 style="color:#1e40af;">⚙️ 系統設定</h2>', unsafe_allow_html=True)
+        st.markdown("## ⚙️ 系統設定")
         with st.form("sys_config"):
             new_order_str = st.text_area("製令名單：", value=",".join(order_list))
             new_assigner_str = st.text_area("派工負責人：", value=",".join(assigner_list))
@@ -291,5 +256,5 @@ else:
                     "processes": [x.strip() for x in new_processes.split(",") if x.strip()]
                 }
                 requests.put(f"{SETTING_URL}.json", data=json.dumps(new_data))
-                st.success("✅ 設定已更新")
+                st.success("✅ 設定更新")
                 st.rerun()
