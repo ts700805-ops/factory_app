@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import datetime
 import requests
-import json
 
 # --- 1. 核心設定 (絕對不動) ---
 DB_URL = "https://my-factory-system-default-rtdb.firebaseio.com/work_logs"
@@ -24,13 +23,16 @@ def get_settings():
     except:
         return {"orders": [], "assigners": ["管理員"], "worker_map": {}, "processes": ["預設工序"]}
 
-# --- 2. 頁面配置 (保留您喜歡的樣式) ---
+# --- 2. 頁面配置 (強化 CSS 樣式) ---
 st.set_page_config(page_title="超慧科技●神鬼奇航●派工系統", layout="wide")
 
 st.markdown("""
     <style>
+    /* 全域字體優化 */
     .stApp { background-color: #f4f7f9; }
     .main-title { font-size: 36px !important; font-weight: bold; color: #1E3A8A; border-bottom: 4px solid #1E3A8A; margin-bottom: 25px; }
+    
+    /* 看板數字卡片 */
     .stat-card { 
         background-color: #ffffff; 
         padding: 15px; 
@@ -42,6 +44,8 @@ st.markdown("""
     }
     .stat-label { font-size: 18px !important; color: #555; font-weight: bold; }
     .stat-value { font-size: 32px !important; font-weight: 800; color: #1E3A8A; }
+
+    /* 待辦任務卡片式設計 */
     .task-card {
         background: white;
         padding: 20px;
@@ -49,12 +53,16 @@ st.markdown("""
         border-left: 8px solid #1E3A8A;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         margin-bottom: 15px;
+        transition: transform 0.2s;
     }
+    .task-card:hover { transform: translateY(-3px); }
     .task-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px; }
     .task-order { font-size: 22px; font-weight: bold; color: #1e293b; }
     .task-badge { background-color: #e0e7ff; color: #4338ca; padding: 4px 12px; border-radius: 20px; font-size: 14px; font-weight: bold; }
     .task-info { font-size: 18px; color: #334155; margin: 5px 0; }
     .task-footer { font-size: 14px; color: #64748b; margin-top: 10px; font-style: italic; }
+
+    /* 按鈕樣式 */
     .stButton>button { border-radius: 8px; font-weight: bold !important; }
     </style>
 """, unsafe_allow_html=True)
@@ -100,13 +108,22 @@ else:
                     sel_order = f1.selectbox("按製令篩選", ["全部"] + sorted(df["製令"].unique().tolist()))
                     sel_process = f2.selectbox("按工序篩選", ["全部"] + sorted(df["製造工序"].unique().tolist()))
                     sel_assigner = f3.selectbox("按派工員篩選", ["全部"] + sorted(df["派工人員"].unique().tolist()))
+                    
+                    f4, f5, f6 = st.columns(3)
+                    sel_worker = f4.selectbox("按作業員篩選", ["全部"] + sorted(df["作業人員"].unique().tolist()))
+                    sel_assistant = f5.selectbox("按協助人員篩選", ["全部"] + sorted(df["協助人員"].unique().tolist()))
+                    sel_deadline = f6.selectbox("按作業期限篩選", ["全部"] + sorted(df["作業期限"].unique().tolist()))
 
                 filtered_df = df.copy()
                 if sel_order != "全部": filtered_df = filtered_df[filtered_df["製令"] == sel_order]
                 if sel_process != "全部": filtered_df = filtered_df[filtered_df["製造工序"] == sel_process]
                 if sel_assigner != "全部": filtered_df = filtered_df[filtered_df["派工人員"] == sel_assigner]
+                if sel_worker != "全部": filtered_df = filtered_df[filtered_df["作業人員"] == sel_worker]
+                if sel_assistant != "全部": filtered_df = filtered_df[filtered_df["協助人員"] == sel_assistant]
+                if sel_deadline != "全部": filtered_df = filtered_df[filtered_df["作業期限"] == sel_deadline]
 
                 st.markdown("---")
+                # 【修改重點：標題名稱變更】
                 st.subheader("📦 轉角遇到愛任務")
 
                 for index, row in filtered_df.iterrows():
@@ -126,10 +143,8 @@ else:
                         done_data = row.to_dict()
                         db_key = done_data.pop('db_key')
                         done_data['實際完工時間'] = get_now_str()
-                        final_data = {str(k): (str(v) if pd.notna(v) else "無") for k, v in done_data.items()}
-                        
-                        # 【修正 1】：使用 Unicode 編碼發送完工紀錄
-                        requests.post(f"{DONE_URL}.json", data=json.dumps(final_data, ensure_ascii=True))
+                        final_data = {k: (v if pd.notna(v) else "無") for k, v in done_data.items()}
+                        requests.post(f"{DONE_URL}.json", json=final_data)
                         requests.delete(f"{DB_URL}/{db_key}.json")
                         st.balloons()
                         st.rerun()
@@ -138,7 +153,53 @@ else:
         except Exception as e:
             st.error(f"系統錯誤：{e}")
 
-    # --- 4. 📝 現場派工作業 (關鍵修正處) ---
+    # --- 4. 其餘功能保持不變 ---
+    elif menu == "✅ 已完工歷史紀錄查詢":
+        st.markdown('<p class="main-title" style="color: #059669; border-bottom: 4px solid #059669;">✅ 已完工歷史紀錄查詢</p>', unsafe_allow_html=True)
+        try:
+            r_done = requests.get(f"{DONE_URL}.json")
+            done_data = r_done.json()
+            if done_data:
+                done_list = []
+                for k, v in done_data.items():
+                    if v: v['done_key'] = k; done_list.append(v)
+                if done_list:
+                    df_done = pd.DataFrame(done_list).fillna("無")
+                    if '實際完工時間' in df_done.columns:
+                        df_done = df_done.sort_values(by='實際完工時間', ascending=False)
+                    hist_display_cols = ["實際完工時間", "製令", "製造工序", "作業人員", "協助人員"]
+                    st.dataframe(df_done[[c for c in hist_display_cols if c in df_done.columns]], use_container_width=True, height=300, hide_index=True)
+                    
+                    st.markdown("---")
+                    st.subheader("🛠️ 歷史紀錄管理 (編輯 / 刪除)")
+                    hist_options = {row['done_key']: f"[{row.get('實際完工時間', '無')}] {row['製令']} - {row['作業人員']}" for _, row in df_done.iterrows()}
+                    target_done_key = st.selectbox("請選擇要編輯或刪除的完工紀錄", options=list(hist_options.keys()), format_func=lambda x: hist_options[x])
+                    
+                    curr_done = next((item for item in done_list if item["done_key"] == target_done_key), None)
+                    if curr_done:
+                        with st.expander("📝 編輯完工資訊"):
+                            ec1, ec2 = st.columns(2)
+                            p_assigner = curr_done.get('派工人員')
+                            p_worker_list = settings.get("worker_map", {}).get(p_assigner, [])
+                            h_worker = ec1.selectbox("修改人員", p_worker_list, index=p_worker_list.index(curr_done.get('作業人員')) if curr_done.get('作業人員') in p_worker_list else 0)
+                            h_assistant = ec2.selectbox("修改協助人員", ["無"] + p_worker_list, index=(["無"] + p_worker_list).index(curr_done.get('協助人員')) if curr_done.get('協助人員') in (["無"] + p_worker_list) else 0)
+                            if st.button("💾 儲存歷史修改"):
+                                requests.patch(f"{DONE_URL}/{target_done_key}.json", json={"作業人員": h_worker, "協助人員": h_assistant})
+                                st.success("歷史紀錄已更新！")
+                                st.rerun()
+
+                        st.markdown("⚠️ **刪除歷史紀錄**")
+                        del_h_pass = st.text_input("輸入管理密碼以刪除紀錄", type="password", key=f"h_del_pwd_{target_done_key}")
+                        if st.button("🗑️ 確認刪除此筆歷史紀錄", type="primary"):
+                            if del_h_pass == "1234":
+                                requests.delete(f"{DONE_URL}/{target_done_key}.json")
+                                st.warning("紀錄已移除。")
+                                st.rerun()
+                            else: st.error("密碼錯誤！")
+                else: st.info("目前尚無完工紀錄。")
+            else: st.info("目前尚無完工紀錄。")
+        except Exception as e: st.error(f"連線錯誤：{e}")
+
     elif menu == "📝 現場派工作業":
         st.header("📝 建立新派工任務")
         order_no = st.selectbox("📦 選擇製令編號", settings.get("orders", []))
@@ -154,25 +215,11 @@ else:
         if st.button("🚀 發布任務"):
             if not worker: st.error("請先配置作業人員。")
             else:
-                # 【修正 2】：將日期與資料強制轉為字串並透過 Unicode 序列化發送
-                log = {
-                    "製令": str(order_no), 
-                    "製造工序": str(process_name), 
-                    "派工人員": str(assigner), 
-                    "作業人員": str(worker), 
-                    "協助人員": str(assistant), 
-                    "作業期限": deadline.strftime("%Y-%m-%d"), 
-                    "提交時間": get_now_str()
-                }
-                headers = {'Content-Type': 'application/json'}
-                res = requests.post(f"{DB_URL}.json", data=json.dumps(log, ensure_ascii=True), headers=headers)
-                
+                log = {"製令": order_no, "製造工序": process_name, "派工人員": assigner, "作業人員": worker, "協助人員": assistant, "作業期限": str(deadline), "提交時間": get_now_str()}
+                res = requests.post(f"{DB_URL}.json", json=log)
                 if res.status_code == 200:
                     st.balloons(); st.success(f"任務 [{order_no}] 已發布！")
-                else:
-                    st.error(f"發布失敗：{res.text}")
 
-    # --- 5. 其餘功能 (編輯/管理) 同步修正傳輸格式 ---
     elif menu == "📝 編輯派工紀錄":
         st.header("📝 待辦派工紀錄維護")
         try:
@@ -186,17 +233,21 @@ else:
                 if curr:
                     with st.expander("📝 編輯內容", expanded=True):
                         c1, c2, c3 = st.columns(3)
-                        edit_order = c1.selectbox("修改製令", settings.get("orders", []))
-                        edit_proc = c2.selectbox("修改工序", settings.get("processes", []))
-                        edit_assigner = c3.selectbox("修改派工員", settings.get("assigners", []))
+                        edit_order = c1.selectbox("修改製令", settings.get("orders", []), index=settings.get("orders", []).index(curr.get('製令')) if curr.get('製令') in settings.get("orders", []) else 0)
+                        edit_proc = c2.selectbox("修改工序", settings.get("processes", []), index=settings.get("processes", []).index(curr.get('製造工序')) if curr.get('製造工序') in settings.get("processes", []) else 0)
+                        edit_assigner = c3.selectbox("修改派工員", settings.get("assigners", []), index=settings.get("assigners", []).index(curr.get('派工人員')) if curr.get('派工人員') in settings.get("assigners", []) else 0)
+                        
+                        edit_worker_list = settings.get("worker_map", {}).get(edit_assigner, [])
+                        c4, c5 = st.columns(2)
+                        new_worker = c4.selectbox("修改主手", edit_worker_list, index=edit_worker_list.index(curr.get('作業人員')) if curr.get('作業人員') in edit_worker_list else 0)
+                        new_assist = c5.selectbox("修改助手", ["無"] + edit_worker_list, index=(["無"] + edit_worker_list).index(curr.get('協助人員')) if curr.get('協助人員') in (["無"] + edit_worker_list) else 0)
                         
                         if st.button("💾 儲存修改"):
-                            # 【修正 3】：Patch 也使用 Unicode 安全傳輸
-                            patch_data = {"製令": str(edit_order), "製造工序": str(edit_proc), "派工人員": str(edit_assigner)}
-                            requests.patch(f"{DB_URL}/{target_id}.json", data=json.dumps(patch_data, ensure_ascii=True))
+                            requests.patch(f"{DB_URL}/{target_id}.json", json={"製令": edit_order, "製造工序": edit_proc, "派工人員": edit_assigner, "作業人員": new_worker, "協助人員": new_assist})
                             st.success("更新成功！"); st.rerun()
                     if st.button("🗑️ 刪除此待辦", type="primary"):
                         requests.delete(f"{DB_URL}/{target_id}.json"); st.rerun()
+            else: st.info("無待辦紀錄。")
         except: st.error("讀取錯誤")
 
     elif menu == "⚙️ 系統內容管理":
@@ -206,29 +257,19 @@ else:
             new_assigners = st.text_area("🚩 編輯派工人員", value=",".join(settings.get("assigners", [])))
             new_processes = st.text_area("⚙️ 編輯工序清單", value=",".join(settings.get("processes", ["預設工序"])))
             if st.form_submit_button("💾 儲存名單"):
-                new_data = {
+                requests.patch(f"{SETTING_URL}.json", json={
                     "orders": [x.strip() for x in new_orders.split(",") if x.strip()],
                     "assigners": [x.strip() for x in new_assigners.split(",") if x.strip()],
                     "processes": [x.strip() for x in new_processes.split(",") if x.strip()]
-                }
-                # 【修正 4】：系統設定儲存也採用 Unicode 安全模式
-                requests.patch(f"{SETTING_URL}.json", data=json.dumps(new_data, ensure_ascii=True))
+                })
                 st.rerun()
         
         st.markdown("---")
-        target_assigner = st.selectbox("配置作業員：", settings.get("assigners", []))
+        target_assigner = st.selectbox("請選擇派工人員配置手下：", settings.get("assigners", []))
         with st.form("worker_config"):
             worker_input = st.text_area(f"👷 {target_assigner} 的作業員", value=",".join(settings.get("worker_map", {}).get(target_assigner, [])))
             if st.form_submit_button("💾 儲存配置"):
                 wm = settings.get("worker_map", {})
                 wm[target_assigner] = [x.strip() for x in worker_input.split(",") if x.strip()]
-                requests.patch(f"{SETTING_URL}.json", data=json.dumps({"worker_map": wm}, ensure_ascii=True))
+                requests.patch(f"{SETTING_URL}.json", json={"worker_map": wm})
                 st.rerun()
-
-    elif menu == "✅ 已完工歷史紀錄查詢":
-        # 此處保持讀取邏輯
-        st.markdown('<p class="main-title" style="color: #059669; border-bottom: 4px solid #059669;">✅ 已完工歷史紀錄查詢</p>', unsafe_allow_html=True)
-        r_done = requests.get(f"{DONE_URL}.json")
-        if r_done.json():
-            df_done = pd.DataFrame(list(r_done.json().values())).fillna("無")
-            st.dataframe(df_done, use_container_width=True, hide_index=True)
