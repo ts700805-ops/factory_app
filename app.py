@@ -106,7 +106,7 @@ process_list = settings["processes"]
 order_list = settings["order_list"]
 
 if "user" not in st.session_state:
-    st.title("⚓ 超慧科技公佈欄 - 登入")
+    st.title("⚓ 超慧科技趙子龍專用派工系統 - 登入")
     u = st.selectbox("👤 請選擇您的姓名", all_leaders + all_staff)
     if st.button("確認進入"):
         st.session_state.user = u
@@ -119,9 +119,9 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 📊 超慧科技公佈欄 ---
-    if menu == "📊 超慧科技公佈欄":
-        st.markdown('<h1 style="text-align:center; color:#1e40af; font-weight:900;">📋 超慧科技公佈欄</h1>', unsafe_allow_html=True)
+    # --- 📊 超慧科技趙子龍專用派工系統 ---
+    if menu == "📊 超慧科技趙子龍專用派工系統":
+        st.markdown('<h1 style="text-align:center; color:#1e40af; font-weight:900;">📋 超慧科技趙子龍專用派工系統</h1>', unsafe_allow_html=True)
         
         with st.container():
             st.markdown('<div class="search-panel">', unsafe_allow_html=True)
