@@ -66,19 +66,23 @@ st.markdown("""
     /* 工序緊湊網格 */
     .compact-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-        gap: 6px;
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        gap: 8px;
     }
     .compact-box {
         background: #f8fafc;
-        padding: 6px 4px;
+        padding: 8px 4px;
         border-radius: 6px;
         border: 1px solid #f1f5f9;
         text-align: center;
         transition: all 0.2s;
+        min-height: 60px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     }
     .p-name { font-size: 11px; color: #94a3b8; margin-bottom: 2px; line-height: 1.1; }
-    .p-worker { font-size: 14px; font-weight: 600; color: #334155; }
+    .p-worker { font-size: 13px; font-weight: 600; color: #334155; white-space: pre-wrap; }
     .status-empty { color: #cbd5e1; font-weight: normal; font-size: 12px; }
     </style>
 """, unsafe_allow_html=True)
@@ -114,11 +118,9 @@ else:
                     df = pd.DataFrame(all_logs)
                     unique_orders = df["製令"].unique()
                     
-                    # 使用 2 欄佈局，讓橫向空間利用率更高
                     cols = st.columns(2)
                     for idx, order in enumerate(unique_orders):
                         order_df = df[df["製令"] == order]
-                        # 決定放在左欄還是右欄
                         with cols[idx % 2]:
                             st.markdown(f'''
                             <div class="order-card">
@@ -129,8 +131,18 @@ else:
                             for proc in process_list:
                                 matched = order_df[order_df["製造工序"] == proc]
                                 if not matched.empty:
-                                    w = matched.iloc[0].get("人員1", "未知")
-                                    worker_html = f'<div class="p-worker">{w}</div>'
+                                    row = matched.iloc[0]
+                                    # 收集所有人員，過濾掉不需要顯示的標籤
+                                    workers = [row.get(f"人員{i}", "NA") for i in range(1, 6)]
+                                    # 過濾掉 'NA' 和 '管理員'，只留下實際作業的人員
+                                    active_workers = [w for w in workers if w not in ["NA", "管理員", None]]
+                                    
+                                    if active_workers:
+                                        # 用逗號連結多個人員名字
+                                        w_display = "、".join(active_workers)
+                                        worker_html = f'<div class="p-worker">{w_display}</div>'
+                                    else:
+                                        worker_html = '<div class="p-worker status-empty">-</div>'
                                 else:
                                     worker_html = '<div class="p-worker status-empty">-</div>'
                                 
