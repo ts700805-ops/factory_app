@@ -33,7 +33,7 @@ def get_settings():
     except:
         return default_settings
 
-# --- 2. 介面樣式 (包含人員1的主要標籤設定) ---
+# --- 2. 介面樣式 ---
 st.set_page_config(page_title="超慧科技公佈欄", layout="wide")
 
 st.markdown("""
@@ -91,11 +91,9 @@ st.markdown("""
         gap: 6px;
         align-items: center;
     }
-    /* 標籤顏色設定 */
     .badge-leader { background: #f59e0b; color: white; padding: 2px 8px; border-radius: 4px; font-size: 13px; font-weight: 900; }
     .badge-main { background: #1e40af; color: white; padding: 2px 8px; border-radius: 4px; font-size: 13px; font-weight: 900; }
     .badge-sub { background: #e2e8f0; color: #475569; padding: 2px 6px; border-radius: 4px; font-size: 12px; font-weight: 600; border: 1px solid #cbd5e1; }
-    
     .search-panel { background: white; padding: 15px; border-radius: 10px; border: 1px solid #cbd5e1; margin-bottom: 20px; }
     </style>
 """, unsafe_allow_html=True)
@@ -114,14 +112,14 @@ if "user" not in st.session_state:
         st.session_state.user = u
         st.rerun()
 else:
-    st.sidebar.markdown(f"👤 **使用者：{st.session_state.user}**")
+    st.sidebar.markdown(f"👤 **目前使用者：{st.session_state.user}**")
     menu = st.sidebar.radio("功能導航", ["📊 超慧科技公佈欄", "📝 任務派發", "⚙️ 設定管理"])
     
-    if st.sidebar.button("登出"):
+    if st.sidebar.button("登出系統"):
         st.session_state.clear()
         st.rerun()
 
-    # --- 📊 公佈欄 ---
+    # --- 📊 超慧科技公佈欄 ---
     if menu == "📊 超慧科技公佈欄":
         st.markdown('<h1 style="text-align:center; color:#1e40af; font-weight:900;">📋 超慧科技公佈欄</h1>', unsafe_allow_html=True)
         
@@ -165,7 +163,6 @@ else:
                             if not match.empty:
                                 row = match.iloc[0]
                                 leader = row.get("組長", "-")
-                                # 判斷人員 1 與其他人員
                                 w1 = row.get("人員1", "NA")
                                 others = [row.get(f"人員{i}") for i in range(2, 6) if row.get(f"人員{i}") not in ["NA", None, ""]]
                                 
@@ -181,9 +178,15 @@ else:
         except:
             st.info("目前尚無派工紀錄")
 
-    # --- 📝 任務派發 (自動覆蓋功能) ---
+    # --- 📝 任務派發 (含覆蓋確認按鈕) ---
     elif menu == "📝 任務派發":
         st.markdown('<h2 style="color:#1e40af;">📝 任務派發 / 內容修正</h2>', unsafe_allow_html=True)
+        
+        # 使用 Session State 存儲待處理的資料
+        if "pending_payload" not in st.session_state:
+            st.session_state.pending_payload = None
+            st.session_state.pending_key = None
+
         with st.form("dispatch_form"):
             c1, c2, c3, c4 = st.columns(4)
             target_o = c1.selectbox("1. 製令編號", order_list)
@@ -192,11 +195,13 @@ else:
             target_d = c4.date_input("4. 通電日期", datetime.date.today())
             
             st.write("---")
-            st.write("🔧 分派組員 (人員 1 將顯示為藍色主要標籤)")
+            st.write("🔧 分派組員 (人員 1 為主要標籤)")
             pc = st.columns(5)
             workers = [pc[i].selectbox(f"人員 {i+1}", ["NA"] + all_staff, key=f"ws_{i}") for i in range(5)]
             
-            if st.form_submit_button("🚀 發布並更新公佈欄"):
+            submit_clicked = st.form_submit_button("🚀 準備發布")
+            
+            if submit_clicked:
                 try:
                     r = requests.get(f"{DB_URL}.json", timeout=5)
                     db_data = r.json()
@@ -215,14 +220,35 @@ else:
                     }
 
                     if target_key:
-                        requests.put(f"{DB_BASE_URL}/work_logs/{target_key}.json", data=json.dumps(payload))
-                        st.success(f"🔄 已更新製令 {target_o} 資料")
+                        # 紀錄到暫存，觸發確認步驟
+                        st.session_state.pending_payload = payload
+                        st.session_state.pending_key = target_key
                     else:
+                        # 直接新增
                         requests.post(f"{DB_URL}.json", data=json.dumps(payload))
-                        st.success(f"✅ 已新增製令 {target_o} 派工")
-                    st.rerun()
+                        st.success(f"✅ 已成功新增製令 {target_o} 派工")
+                        st.rerun()
                 except:
                     st.error("連線失敗")
+
+        # --- 確認覆蓋區塊 ---
+        if st.session_state.pending_payload:
+            st.warning(f"⚠️ 偵測到重複資料：製令【{st.session_state.pending_payload['製令']}】的【{st.session_state.pending_payload['製造工序']}】已有紀錄。")
+            c1, c2, _ = st.columns([1, 1, 2])
+            
+            if c1.button("✅ 確認覆蓋舊資料", type="primary"):
+                requests.put(f"{DB_BASE_URL}/work_logs/{st.session_state.pending_key}.json", 
+                             data=json.dumps(st.session_state.pending_payload))
+                st.session_state.pending_payload = None
+                st.session_state.pending_key = None
+                st.success("🔄 資料已更新！")
+                st.rerun()
+                
+            if c2.button("❌ 不寫入（取消）"):
+                st.session_state.pending_payload = None
+                st.session_state.pending_key = None
+                st.info("已取消操作，未進行任何修改。")
+                st.rerun()
 
     # --- ⚙️ 設定管理 ---
     elif menu == "⚙️ 設定管理":
@@ -233,7 +259,7 @@ else:
             edit_s = st.text_area("一般人員名單設定", value=",".join(all_staff))
             edit_p = st.text_area("工序流程設定", value=",".join(process_list))
             
-            if st.form_submit_button("💾 儲存並更新系統設定"):
+            if st.form_submit_button("💾 儲存並更新"):
                 updated_cfg = {
                     "order_list": [x.strip() for x in edit_o.split(",") if x.strip()],
                     "all_leaders": [x.strip() for x in edit_l.split(",") if x.strip()],
@@ -241,5 +267,5 @@ else:
                     "processes": [x.strip() for x in edit_p.split(",") if x.strip()]
                 }
                 requests.put(f"{SETTING_URL}.json", data=json.dumps(updated_cfg))
-                st.success("✅ 所有設定已同步更新！")
+                st.success("✅ 設定已更新")
                 st.rerun()
