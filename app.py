@@ -2,8 +2,10 @@ import streamlit as st
 import pandas as pd
 import datetime
 import requests
+import json
 
 # --- 1. 核心設定 ---
+# 提醒：請確保您的 Firebase Rules 是設定為 ".read": true, ".write": true 以免權限阻擋
 DB_URL = "https://my-factory-system-default-rtdb.firebaseio.com/work_logs"
 DONE_URL = "https://my-factory-system-default-rtdb.firebaseio.com/completed_logs"
 SETTING_URL = "https://my-factory-system-default-rtdb.firebaseio.com/settings"
@@ -18,11 +20,16 @@ def get_settings():
         data = r.json()
         if not data:
             return {"orders": [], "assigners": ["管理員"], "worker_map": {}, "processes": ["工序A", "工序B"]}
+        # 確保必要的 key 存在
+        if "processes" not in data or not data["processes"]:
+            data["processes"] = ["預設工序"]
+        if "worker_map" not in data:
+            data["worker_map"] = {}
         return data
     except:
         return {"orders": [], "assigners": ["管理員"], "worker_map": {}, "processes": ["工序A", "工序B"]}
 
-# --- 2. 頁面樣式設計 ---
+# --- 2. 頁面樣式設計 (維持原樣) ---
 st.set_page_config(page_title="超慧科技●現場派工看板", layout="wide")
 
 st.markdown("""
@@ -30,14 +37,12 @@ st.markdown("""
     .stApp { background-color: #f8fafc; }
     .main-title { font-size: 32px !important; font-weight: 800; color: #1e3a8a; border-bottom: 3px solid #1e3a8a; padding-bottom: 10px; margin-bottom: 20px; }
     
-    /* 製令卡片樣式 */
     .order-card {
         background: white; border-radius: 15px; padding: 20px; margin-bottom: 20px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-top: 6px solid #1e3a8a;
     }
     .order-id { font-size: 24px; font-weight: 900; color: #1e3a8a; margin-bottom: 10px; }
     
-    /* 工序表格樣式 */
     .proc-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
     .proc-table th { background-color: #f1f5f9; color: #475569; padding: 8px; font-size: 14px; border: 1px solid #e2e8f0; text-align: center; }
     .proc-table td { padding: 12px; font-size: 16px; border: 1px solid #e2e8f0; text-align: center; font-weight: 600; }
@@ -63,7 +68,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 📊 控制塔台 (首頁) ---
+    # --- 3. 📊 控制塔台 (首頁) (維持原樣風格) ---
     if menu == "📊 控制塔台 (首頁)":
         st.markdown('<p class="main-title">📊 超慧科技現場派工看板</p>', unsafe_allow_html=True)
         try:
@@ -74,7 +79,6 @@ else:
                 for k, v in data.items():
                     if not v: continue
                     
-                    # 建立卡片
                     st.markdown(f"""
                     <div class="order-card">
                         <div style="display: flex; justify-content: space-between;">
@@ -104,7 +108,7 @@ else:
         except Exception as e:
             st.error(f"連線錯誤：{e}")
 
-    # --- 4. 💖 愛的派工作業中心 (多工序同時指派) ---
+    # --- 4. 💖 愛的派工作業中心 (修正發送邏輯) ---
     elif menu == "💖 愛的派工作業中心":
         st.markdown('<p class="main-title">💖 愛的派工作業中心</p>', unsafe_allow_html=True)
         
@@ -115,13 +119,14 @@ else:
             selected_assigner = c2.selectbox("2. 確認派工人員", assign_list, index=assign_list.index(st.session_state.user) if st.session_state.user in assign_list else 0)
             
             st.markdown("### 3. 指派各工序負責人")
-            # 取得人員清單
+            
             workers = ["NA"] + settings.get("worker_map", {}).get(selected_assigner, [])
             proc_list = settings.get("processes", [])
             
-            # 動態生成工序選擇下拉選單
+            if not proc_list:
+                st.warning("⚠️ 尚未定義工序，請先至『系統內容管理』設定工序清單。")
+            
             new_assign_data = {}
-            # 每 4 個工序排成一橫列
             cols_per_row = 4
             for i in range(0, len(proc_list), cols_per_row):
                 row_procs = proc_list[i:i+cols_per_row]
@@ -136,8 +141,9 @@ else:
             if st.button("🚀 確認發布此製令單至看板", type="primary", use_container_width=True):
                 if not order_input:
                     st.error("❌ 請務必填寫『製令編號』！")
+                elif not proc_list:
+                    st.error("❌ 無法發布：請先設定工序清單！")
                 else:
-                    # 整合資料
                     payload = {
                         "製令": order_input,
                         "派工人員": selected_assigner,
@@ -146,47 +152,55 @@ else:
                         **new_assign_data
                     }
                     try:
-                        res = requests.post(f"{DB_URL}.json", json=payload)
+                        # 修正：使用 json.dumps 確保格式完全正確，並檢查回應代碼
+                        res = requests.post(f"{DB_URL}.json", data=json.dumps(payload), timeout=10)
                         if res.status_code == 200:
                             st.success(f"✅ 製令 {order_input} 派工完成！")
                             st.balloons()
+                            st.rerun()
                         else:
-                            st.error("發送失敗，請檢查資料庫。")
+                            st.error(f"發送失敗，代碼：{res.status_code}，訊息：{res.text}")
                     except Exception as e:
-                        st.error(f"系統錯誤：{e}")
+                        st.error(f"系統連線發生錯誤：{e}")
 
-    # --- 5. 系統內容管理 ---
+    # --- 5. 系統內容管理 (修正名單更新邏輯) ---
     elif menu == "⚙️ 系統內容管理":
         st.markdown('<p class="main-title">⚙️ 系統內容管理</p>', unsafe_allow_html=True)
         with st.form("basic_settings"):
             st.subheader("🛠️ 基本名單編輯")
-            new_assigners = st.text_area("🚩 編輯派工人員 (用逗點隔開)", value=",".join(settings.get("assigners", [])))
-            new_processes = st.text_area("⚙️ 編輯工序清單 (用逗點隔開)", value=",".join(settings.get("processes", [])))
+            new_assigners = st.text_area("🚩 編輯派工人員 (用英文逗點隔開)", value=",".join(settings.get("assigners", [])))
+            new_processes = st.text_area("⚙️ 編輯工序清單 (用英文逗點隔開)", value=",".join(settings.get("processes", [])))
             if st.form_submit_button("💾 儲存名單定義"):
-                requests.patch(f"{SETTING_URL}.json", json={
+                update_payload = {
                     "assigners": [x.strip() for x in new_assigners.split(",") if x.strip()],
                     "processes": [x.strip() for x in new_processes.split(",") if x.strip()]
-                })
+                }
+                requests.patch(f"{SETTING_URL}.json", data=json.dumps(update_payload))
                 st.success("名單已更新！")
                 st.rerun()
 
         st.markdown("---")
         target_assigner = st.selectbox("請選擇派工人員來配置所屬作業員：", settings.get("assigners", []))
-        with st.form("worker_config"):
-            worker_input = st.text_area(f"👷 {target_assigner} 的作業員清單 (用逗點隔開)", value=",".join(settings.get("worker_map", {}).get(target_assigner, [])))
-            if st.form_submit_button("💾 儲存人員配置"):
-                wm = settings.get("worker_map", {})
-                wm[target_assigner] = [x.strip() for x in worker_input.split(",") if x.strip()]
-                requests.patch(f"{SETTING_URL}.json", json={"worker_map": wm})
-                st.success(f"{target_assigner} 的名單已更新！")
-                st.rerun()
+        if target_assigner:
+            with st.form("worker_config"):
+                worker_input = st.text_area(f"👷 {target_assigner} 的作業員清單 (用英文逗點隔開)", value=",".join(settings.get("worker_map", {}).get(target_assigner, [])))
+                if st.form_submit_button("💾 儲存人員配置"):
+                    wm = settings.get("worker_map", {})
+                    wm[target_assigner] = [x.strip() for x in worker_input.split(",") if x.strip()]
+                    requests.patch(f"{SETTING_URL}.json", data=json.dumps({"worker_map": wm}))
+                    st.success(f"{target_assigner} 的名單已更新！")
+                    st.rerun()
 
-    # --- 6. 完工紀錄 (簡易表格呈現) ---
+    # --- 6. 完工紀錄 (維持原樣) ---
     elif menu == "✅ 已完工歷史紀錄查詢":
         st.markdown('<p class="main-title">✅ 已完工歷史紀錄</p>', unsafe_allow_html=True)
-        r_done = requests.get(f"{DONE_URL}.json")
-        if r_done.json():
-            df_done = pd.DataFrame([v for k, v in r_done.json().items() if v]).fillna("NA")
-            st.dataframe(df_done, use_container_width=True)
-        else:
-            st.info("尚無歷史紀錄。")
+        try:
+            r_done = requests.get(f"{DONE_URL}.json")
+            done_json = r_done.json()
+            if done_json:
+                df_done = pd.DataFrame([v for k, v in done_json.items() if v]).fillna("NA")
+                st.dataframe(df_done, use_container_width=True)
+            else:
+                st.info("尚無歷史紀錄。")
+        except:
+            st.error("讀取歷史紀錄失敗。")
