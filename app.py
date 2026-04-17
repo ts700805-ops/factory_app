@@ -35,91 +35,93 @@ def get_settings():
     except Exception:
         return default_settings
 
-# --- 2. 頁面配置與「絕對固定」CSS ---
+# --- 2. 頁面配置與「終極固定標題」CSS ---
 st.set_page_config(page_title="超慧科技●製造部●派工系統", layout="wide")
 
 st.markdown("""
     <style>
     .stApp { background-color: #f8fafc; }
     
-    /* 🟢 核心：強效固定卡片結構 */
+    /* 核心卡片外框：嚴格控制高度 */
     .order-card {
         background: white;
         border-radius: 12px;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-        border: 2px solid #e2e8f0;
-        height: 600px;         /* 每個製令卡片固定總高度 */
-        display: flex;         /* 啟用垂直佈局 */
-        flex-direction: column;
-        overflow: hidden;      /* 確保內容不溢出 */
+        margin-bottom: 25px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+        border: 2px solid #cbd5e1;
+        height: 600px;           /* 總高度固定 */
+        width: 100%;
+        display: block;
+        overflow: hidden;        /* 禁止外框出現捲動條 */
     }
 
-    /* 🟢 核心：絕對固定標題欄 */
+    /* 絕對固定的標題區：不參與任何捲動 */
     .order-header {
         background: #1e40af;
         color: #ffffff;
         padding: 15px 20px;
-        font-size: 20px;
-        font-weight: 800;
-        flex-shrink: 0;        /* 強制標題不縮小、不參與捲動 */
-        border-bottom: 2px solid #1e3a8a;
-        z-index: 10;
+        font-size: 22px;
+        font-weight: 900;
+        height: 65px;            /* 固定標題高度 */
+        display: flex;
+        align-items: center;
+        border-bottom: 3px solid #1e3a8a;
     }
 
-    /* 🟢 核心：獨立捲動內容區 */
+    /* 唯一被允許捲動的內容區 */
     .order-content-scroll {
-        flex-grow: 1;          /* 佔滿剩餘空間 */
+        height: 535px;           /* 總高度 600 - 標題 65 */
         overflow-y: auto !important; /* 強制開啟垂直捲動 */
         padding: 15px;
-        background: #ffffff;
+        background: #fdfdfd;
+        scrollbar-width: thin;    /* 讓捲動條美觀一點 */
     }
 
-    /* 格位排版微調 */
+    /* 格位排版：在 3 欄下建議單列顯示最清楚 */
     .compact-grid {
-        display: grid;
-        grid-template-columns: 1fr; /* 三欄模式下改為單列或雙列最清楚 */
+        display: flex;
+        flex-direction: column;
         gap: 12px;
     }
     
     .compact-box {
         background: #ffffff;
-        padding: 12px;
-        border-radius: 8px;
-        border: 1.5px solid #cbd5e1;
-        min-height: 100px;
+        padding: 15px 10px;
+        border-radius: 10px;
+        border: 2px solid #e2e8f0;
+        min-height: 110px;
         display: flex;
         flex-direction: column;
         align-items: center;
-        transition: 0.2s;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
     }
-    .compact-box:hover { border-color: #1e40af; background: #f8fafc; }
+    .compact-box:hover { border-color: #1e40af; background: #f0f7ff; }
 
     .p-name { 
         font-size: 14px; 
         font-weight: 800; 
         color: #1e40af; 
         margin-bottom: 8px;
-        border-bottom: 1px solid #f1f5f9;
+        border-bottom: 1px solid #e2e8f0;
         width: 100%;
         text-align: center;
+        padding-bottom: 5px;
     }
     
     .leader-tag {
-        background: #dbeafe;
-        color: #1e40af;
+        background: #1e40af;
+        color: white;
         font-size: 11px;
-        padding: 1px 4px;
-        border-radius: 3px;
-        margin-right: 5px;
-        border: 1px solid #1e40af;
+        padding: 1px 5px;
+        border-radius: 4px;
+        margin-right: 6px;
         font-weight: bold;
     }
 
     .main-worker-name {
-        font-size: 18px !important;
+        font-size: 19px !important;
         font-weight: 900 !important;
-        color: #000000 !important;
+        color: #0f172a !important;
         margin-bottom: 6px;
     }
     
@@ -127,24 +129,26 @@ st.markdown("""
         display: flex;
         flex-wrap: wrap;
         justify-content: center;
-        gap: 5px;
+        gap: 6px;
+        margin-top: 4px;
     }
 
     .sub-worker-name {
         font-size: 13px !important;
         color: #475569 !important;
-        background: #f1f5f9;
-        padding: 2px 6px;
-        border-radius: 4px;
+        background: #e2e8f0;
+        padding: 2px 8px;
+        border-radius: 6px;
         font-weight: 600;
     }
 
     .search-box {
-        background-color: #e2e8f0;
-        padding: 15px;
-        border-radius: 10px;
-        margin-bottom: 20px;
-        border: 2px solid #334155;
+        background-color: #ffffff;
+        padding: 20px;
+        border-radius: 12px;
+        margin-bottom: 25px;
+        border: 2px solid #1e40af;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }
     </style>
 """, unsafe_allow_html=True)
@@ -168,9 +172,9 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 📊 生產看板 (強效固定版) ---
+    # --- 3. 📊 生產看板 (終極標題固定版) ---
     if menu == "📊 生產看板":
-        st.markdown(f'<div style="text-align:center; padding:10px;"><h1 style="color:#1e40af; font-weight:900;">📊 超慧科技●生產進度看板</h1></div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="text-align:center; margin-bottom:20px;"><h1 style="color:#1e40af; font-weight:900; font-size:36px;">📊 生產進度看板</h1></div>', unsafe_allow_html=True)
         
         with st.container():
             st.markdown('<div class="search-box">', unsafe_allow_html=True)
@@ -202,7 +206,7 @@ else:
                     for idx, order in enumerate(filtered_orders):
                         order_df = df[df["製令"] == order]
                         with cols[idx % 3]:
-                            # 🟢 結構修改：Header 與 Content 完全分離
+                            # 🟢 結構強化：Header 與 Content 完全物理隔離高度
                             st.markdown(f'''
                                 <div class="order-card">
                                     <div class="order-header">📦 製令：{order}</div>
@@ -221,15 +225,15 @@ else:
                                     sub_html = '<div class="sub-workers-wrap">' + "".join([f'<span class="sub-worker-name">{s}</span>' for s in subs]) + '</div>'
                                     box_content = main_html + sub_html
                                 else:
-                                    box_content = '<div style="color:#cbd5e1; font-size:14px; margin-top:15px; font-weight:bold;">尚未派工</div>'
+                                    box_content = '<div style="color:#94a3b8; font-size:14px; margin-top:15px; font-weight:bold;">尚未派工</div>'
                                 
                                 st.markdown(f'<div class="compact-box"><div class="p-name">{proc}</div>{box_content}</div>', unsafe_allow_html=True)
                             
                             st.markdown('</div></div></div>', unsafe_allow_html=True)
         except Exception as e:
-            st.error(f"連線資料庫失敗: {e}")
+            st.error(f"連線資料庫失敗")
 
-    # --- 後續派工、編輯功能不變 ---
+    # --- 派工、編輯與設定維持原功能 ---
     elif menu == "📝 派工錄入":
         st.markdown('<h2 style="color:#1e40af;">📝 派發新任務</h2>', unsafe_allow_html=True)
         with st.form("new_dispatch"):
@@ -246,7 +250,7 @@ else:
             if st.form_submit_button("🚀 確認發布"):
                 log = {"製令": order_no, "製造工序": proc_name, "人員1": ws[0], "人員2": ws[1], "人員3": ws[2], "人員4": ws[3], "人員5": ws[4], "派工人員": assigner, "提交時間": get_now_str()}
                 requests.post(f"{DB_URL}.json", data=json.dumps(log))
-                st.success(f"✅ 製令 {order_no} 任務已發布")
+                st.success("✅ 任務發布成功")
                 st.rerun()
 
     elif menu == "📝 紀錄編輯":
@@ -287,5 +291,5 @@ else:
                     "processes": [x.strip() for x in new_processes.split(",") if x.strip()]
                 }
                 requests.put(f"{SETTING_URL}.json", data=json.dumps(new_data))
-                st.success("✅ 設定已同步")
+                st.success("✅ 設定已更新")
                 st.rerun()
