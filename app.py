@@ -35,7 +35,7 @@ def get_settings():
     except Exception:
         return default_settings
 
-# --- 2. 頁面配置與 CSS 強化 (新增標題凍結邏輯) ---
+# --- 2. 頁面配置與強效標題凍結 CSS ---
 st.set_page_config(page_title="超慧科技●製造部●派工系統", layout="wide")
 
 st.markdown("""
@@ -51,67 +51,72 @@ st.markdown("""
         text-align: center;
     }
 
-    /* 邊框強化 */
-    .stTextInput input, .stSelectbox div[data-baseweb="select"] {
-        border: 2px solid #334155 !important; 
-        border-radius: 8px !important;
+    /* 搜尋區塊 */
+    .search-box {
+        background-color: #e2e8f0;
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        border: 2px solid #334155;
     }
 
-    /* 製令卡片容器：新增內部滾動 */
+    /* 🟢 核心卡片容器：固定高度並允許內部滾動 */
     .order-card {
         background: white;
         border-radius: 12px;
         margin-bottom: 20px;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         border: 2px solid #e2e8f0;
-        height: 550px; /* 固定卡片高度 */
-        overflow-y: auto; /* 內部可滾動 */
-        position: relative;
+        height: 600px; /* 固定總高度 */
+        display: flex;
+        flex-direction: column;
+        overflow: hidden; /* 外部不准滾動 */
     }
 
-    /* 🟢 核心修改：凍結標題 */
+    /* 🟢 核心：凍結標題欄位 */
     .order-header {
-        position: sticky; /* 黏性定位 */
-        top: 0;           /* 固定在卡片最上方 */
-        z-index: 100;     /* 確保在最上層 */
+        position: sticky;
+        top: 0;
+        z-index: 100;
         font-size: 20px;
         font-weight: 800;
         color: #ffffff;
         background: #1e40af;
-        padding: 12px 15px;
-        border-radius: 10px 10px 0 0;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        padding: 15px 20px;
+        flex-shrink: 0; /* 標題不被壓縮 */
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
 
-    /* 內部工序區域內距 */
-    .order-content {
+    /* 🟢 核心：可捲動的工序內容區 */
+    .order-content-scroll {
+        flex-grow: 1;
+        overflow-y: auto; /* 只有這裡可以滾動 */
         padding: 15px;
+        background: #ffffff;
     }
 
     .compact-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-        gap: 10px;
+        gap: 12px;
     }
     
     .compact-box {
         background: #ffffff;
-        padding: 10px 5px;
+        padding: 10px;
         border-radius: 8px;
         border: 1.5px solid #cbd5e1;
         min-height: 110px;
         display: flex;
         flex-direction: column;
         align-items: center;
-        transition: border-color 0.2s;
     }
-    .compact-box:hover { border-color: #1e40af; }
 
     .p-name { 
         font-size: 13px; 
         font-weight: 800; 
         color: #1e40af; 
-        margin-bottom: 6px;
+        margin-bottom: 8px;
         border-bottom: 1px solid #f1f5f9;
         width: 100%;
         text-align: center;
@@ -121,39 +126,34 @@ st.markdown("""
         background: #dbeafe;
         color: #1e40af;
         font-size: 10px;
-        padding: 0px 3px;
+        padding: 1px 4px;
         border-radius: 3px;
-        margin-right: 3px;
+        margin-right: 4px;
         border: 1px solid #1e40af;
+        font-weight: bold;
     }
+
     .main-worker-name {
         font-size: 16px !important;
         font-weight: 900 !important;
         color: #000000 !important;
-        margin-bottom: 4px;
+        margin-bottom: 5px;
     }
     
     .sub-workers-wrap {
         display: flex;
         flex-wrap: wrap;
         justify-content: center;
-        gap: 3px;
+        gap: 4px;
     }
+
     .sub-worker-name {
         font-size: 12px !important;
         color: #64748b !important;
         background: #f1f5f9;
-        padding: 0px 4px;
-        border-radius: 3px;
+        padding: 1px 5px;
+        border-radius: 4px;
         font-weight: 600;
-    }
-
-    .search-box {
-        background-color: #e2e8f0;
-        padding: 15px;
-        border-radius: 10px;
-        margin-bottom: 20px;
-        border: 2px solid #334155;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -177,7 +177,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 📊 生產看板 (凍結標題版) ---
+    # --- 3. 📊 生產看板 (凍結標題修正版) ---
     if menu == "📊 生產看板":
         st.markdown('<p class="main-title">📊 超慧科技●生產進度看板</p>', unsafe_allow_html=True)
         
@@ -210,11 +210,11 @@ else:
                     for idx, order in enumerate(filtered_orders):
                         order_df = df[df["製令"] == order]
                         with cols[idx % 3]:
-                            # 卡片結構：外部固定高度 + 內部凍結標題
+                            # 🟢 結構：Card -> Header(固定) -> Content(捲動)
                             st.markdown(f'''
                                 <div class="order-card">
-                                    <div class="order-header">📦 {order}</div>
-                                    <div class="order-content">
+                                    <div class="order-header">📦 製令：{order}</div>
+                                    <div class="order-content-scroll">
                                         <div class="compact-grid">
                             ''', unsafe_allow_html=True)
                             
@@ -237,7 +237,7 @@ else:
         except:
             st.error("看板資料讀取異常")
 
-    # --- 4. 📝 任務派發 ---
+    # --- 4. 📝 任務派發 (維持現有功能) ---
     elif menu == "📝 派工錄入":
         st.markdown('<p class="main-title">📝 派發新任務</p>', unsafe_allow_html=True)
         with st.form("new_dispatch"):
@@ -266,7 +266,7 @@ else:
                 st.success(f"✅ 任務已同步")
                 st.rerun()
 
-    # --- 其餘編輯與設定維持原樣 ---
+    # --- 5. 📝 紀錄編輯 (維持現有功能) ---
     elif menu == "📝 紀錄編輯":
         st.markdown('<p class="main-title">📝 修改現有派工</p>', unsafe_allow_html=True)
         r = requests.get(f"{DB_URL}.json")
@@ -296,6 +296,7 @@ else:
                         st.rerun()
                     st.markdown('</div>', unsafe_allow_html=True)
 
+    # --- 6. ⚙️ 系統設定 (維持現有功能) ---
     elif menu == "⚙️ 系統設定":
         st.markdown('<p class="main-title">⚙️ 系統後台管理</p>', unsafe_allow_html=True)
         with st.form("sys_config"):
