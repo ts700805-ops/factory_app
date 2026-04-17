@@ -18,12 +18,12 @@ def get_settings():
         r = requests.get(f"{SETTING_URL}.json", timeout=5)
         data = r.json()
         if not data:
-            return {"orders": [], "assigners": ["管理員"], "worker_map": {}, "processes": ["工序A", "工序B"]}
+            return {"assigners": ["管理員"], "processes": ["工序A", "工序B"], "worker_map": {}}
         return data
     except:
-        return {"orders": [], "assigners": ["管理員"], "worker_map": {}, "processes": ["工序A", "工序B"]}
+        return {"assigners": ["管理員"], "processes": ["工序A", "工序B"], "worker_map": {}}
 
-# --- 2. 頁面樣式設計 (嚴格保留原風格，完全不改動) ---
+# --- 2. 頁面樣式設計 (嚴格保留原風格) ---
 st.set_page_config(page_title="大量科技●現場派工看板", layout="wide")
 
 st.markdown("""
@@ -56,7 +56,7 @@ else:
     st.sidebar.markdown(f"👤 **使用者：{st.session_state.user}**")
     menu = st.sidebar.radio("導航選單", ["📊 經營者看板 (首頁)", "💖 愛的派工作業中心", "✅ 已完工歷史紀錄查詢", "⚙️ 系統內容管理"])
 
-    # --- 3. 📊 經營者看板 (首頁) ---
+    # --- 3. 📊 首頁看板 (介面完全不變) ---
     if menu == "📊 經營者看板 (首頁)":
         st.markdown('<p class="main-title">📊 大量科技現場派工看板</p>', unsafe_allow_html=True)
         try:
@@ -78,11 +78,10 @@ else:
                         </table>
                     </div>
                     """, unsafe_allow_html=True)
-                    if st.button(f"✅ 完成這筆紀錄 ({v.get('製令')})", key=f"fin_{k}", use_container_width=True):
+                    if st.button(f"✅ 完成紀錄 ({v.get('製令')})", key=f"fin_{k}", use_container_width=True):
                         done_data = v.copy()
                         done_data['實際完工時間'] = get_now_str()
-                        # 確保發送純 JSON 格式
-                        requests.post(f"{DONE_URL}.json", data=json.dumps(done_data))
+                        requests.post(f"{DONE_URL}.json", data=json.dumps(done_data, ensure_ascii=False).encode('utf-8'))
                         requests.delete(f"{DB_URL}/{k}.json")
                         st.rerun()
             else:
@@ -90,7 +89,7 @@ else:
         except Exception as e:
             st.error(f"連線異常：{e}")
 
-    # --- 4. 💖 愛的派工作業中心 (修正核心錯誤處) ---
+    # --- 4. 💖 愛的派工作業中心 (修正核心發送邏輯) ---
     elif menu == "💖 愛的派工作業中心":
         st.markdown('<p class="main-title">💖 愛的派工作業中心</p>', unsafe_allow_html=True)
         with st.container(border=True):
@@ -110,39 +109,39 @@ else:
                         new_assign_data[p_name] = st.selectbox(p_name, workers, key=f"sel_{p_name}")
             
             st.markdown("---")
+            # 這裡產生的 deadline_val 是 datetime.date 物件，不能直接進 JSON
             deadline_val = st.date_input("4. 設定作業期限", datetime.date.today())
             
             if st.button("🚀 確認發布此製令單至看板", type="primary", use_container_width=True):
-                if order_input:
-                    # 【核心修正】：將所有資料彙整成一個「純字串」字典
+                if not order_input:
+                    st.warning("請填寫製令編號")
+                else:
+                    # 【核心修正】：強制將所有資料轉成「純字串」格式的字典
                     payload = {
                         "製令": str(order_input),
                         "派工人員": str(selected_assigner),
-                        "作業期限": deadline_val.strftime("%Y-%m-%d"), # 轉成字串，這是關鍵
+                        "作業期限": deadline_val.strftime("%Y-%m-%d"), # 修正：日期轉字串
                         "提交時間": get_now_str()
                     }
-                    # 將各工序負責人也轉成字串
+                    # 將各工序資料加入並確保為字串
                     for p_key, p_val in new_assign_data.items():
                         payload[str(p_key)] = str(p_val)
                     
                     try:
-                        # 【雙重保險】：不使用 json= 參數，改用 data= 並手動轉為 JSON 字串送出
-                        # 這樣可以 100% 確保 Firebase 收到的是標準 JSON
-                        json_string = json.dumps(payload, ensure_ascii=False).encode('utf-8')
-                        res = requests.post(f"{DB_URL}.json", data=json_string, timeout=10)
+                        # 使用 json.dumps 確保格式標準，並用 encode('utf-8') 處理中文字
+                        json_payload = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+                        res = requests.post(f"{DB_URL}.json", data=json_payload, timeout=10)
                         
                         if res.status_code == 200:
-                            st.success("✅ 派工成功！")
+                            st.success(f"✅ 製令 {order_input} 派工完成！")
                             st.balloons()
                             st.rerun()
                         else:
-                            st.error(f"發送失敗，代碼：{res.status_code}，錯誤訊息：{res.text}")
+                            st.error(f"發送失敗 ({res.status_code}): {res.text}")
                     except Exception as e:
-                        st.error(f"資料庫連線錯誤：{e}")
-                else:
-                    st.warning("請填寫製令編號")
+                        st.error(f"系統連線失敗: {e}")
 
-    # --- 5. 系統管理與歷史紀錄 ---
+    # --- 5. 其他功能保留 ---
     elif menu == "⚙️ 系統內容管理":
         st.markdown('<p class="main-title">⚙️ 系統內容管理</p>', unsafe_allow_html=True)
         with st.form("sys_form"):
@@ -153,7 +152,7 @@ else:
                     "assigners": [x.strip() for x in new_assigners.split(",") if x.strip()],
                     "processes": [x.strip() for x in new_processes.split(",") if x.strip()]
                 }
-                requests.patch(f"{SETTING_URL}.json", data=json.dumps(payload))
+                requests.patch(f"{SETTING_URL}.json", data=json.dumps(payload, ensure_ascii=False).encode('utf-8'))
                 st.rerun()
 
     elif menu == "✅ 已完工歷史紀錄查詢":
