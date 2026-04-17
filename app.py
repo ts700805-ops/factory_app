@@ -35,7 +35,7 @@ def get_settings():
     except Exception:
         return default_settings
 
-# --- 2. 頁面配置與極致強化 CSS (優化 3 欄空間) ---
+# --- 2. 頁面配置與 CSS 強化 (新增標題凍結邏輯) ---
 st.set_page_config(page_title="超慧科技●製造部●派工系統", layout="wide")
 
 st.markdown("""
@@ -53,46 +53,60 @@ st.markdown("""
 
     /* 邊框強化 */
     .stTextInput input, .stSelectbox div[data-baseweb="select"] {
-        border: 3px solid #334155 !important; 
+        border: 2px solid #334155 !important; 
         border-radius: 8px !important;
-        background-color: #ffffff !important;
     }
 
-    /* 三欄卡片設計微調 */
+    /* 製令卡片容器：新增內部滾動 */
     .order-card {
         background: white;
         border-radius: 12px;
-        padding: 15px;
         margin-bottom: 20px;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         border: 2px solid #e2e8f0;
+        height: 550px; /* 固定卡片高度 */
+        overflow-y: auto; /* 內部可滾動 */
+        position: relative;
     }
+
+    /* 🟢 核心修改：凍結標題 */
     .order-header {
+        position: sticky; /* 黏性定位 */
+        top: 0;           /* 固定在卡片最上方 */
+        z-index: 100;     /* 確保在最上層 */
         font-size: 20px;
         font-weight: 800;
         color: #ffffff;
         background: #1e40af;
-        margin: -15px -15px 12px -15px;
-        padding: 10px 15px;
+        padding: 12px 15px;
         border-radius: 10px 10px 0 0;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
 
-    /* 縮小格位寬度以符合 3 欄 */
+    /* 內部工序區域內距 */
+    .order-content {
+        padding: 15px;
+    }
+
     .compact-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-        gap: 8px;
+        gap: 10px;
     }
+    
     .compact-box {
         background: #ffffff;
-        padding: 8px 4px;
+        padding: 10px 5px;
         border-radius: 8px;
         border: 1.5px solid #cbd5e1;
-        min-height: 100px;
+        min-height: 110px;
         display: flex;
         flex-direction: column;
         align-items: center;
+        transition: border-color 0.2s;
     }
+    .compact-box:hover { border-color: #1e40af; }
+
     .p-name { 
         font-size: 13px; 
         font-weight: 800; 
@@ -163,7 +177,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 3. 📊 生產看板 (三欄式佈局) ---
+    # --- 3. 📊 生產看板 (凍結標題版) ---
     if menu == "📊 生產看板":
         st.markdown('<p class="main-title">📊 超慧科技●生產進度看板</p>', unsafe_allow_html=True)
         
@@ -183,7 +197,6 @@ else:
                     df = pd.DataFrame(all_logs)
                     unique_orders = df["製令"].unique()
                     
-                    # 過濾後的製令名單
                     filtered_orders = []
                     for order in unique_orders:
                         if search_order != "全部" and search_order != order: continue
@@ -193,12 +206,18 @@ else:
                             if not order_df[staff_cols].apply(lambda row: search_staff in row.values, axis=1).any(): continue
                         filtered_orders.append(order)
 
-                    # 🟢 核心改動：改為 3 欄顯示
                     cols = st.columns(3)
                     for idx, order in enumerate(filtered_orders):
                         order_df = df[df["製令"] == order]
-                        with cols[idx % 3]: # 依序放入第 1, 2, 3 欄
-                            st.markdown(f'<div class="order-card"><div class="order-header">📦 {order}</div><div class="compact-grid">', unsafe_allow_html=True)
+                        with cols[idx % 3]:
+                            # 卡片結構：外部固定高度 + 內部凍結標題
+                            st.markdown(f'''
+                                <div class="order-card">
+                                    <div class="order-header">📦 {order}</div>
+                                    <div class="order-content">
+                                        <div class="compact-grid">
+                            ''', unsafe_allow_html=True)
+                            
                             for proc in process_list:
                                 matched = order_df[order_df["製造工序"] == proc]
                                 if not matched.empty:
@@ -213,7 +232,8 @@ else:
                                     worker_box_content = '<div style="color:#cbd5e1; font-size:12px; margin-top:10px;">尚未派工</div>'
                                 
                                 st.markdown(f'<div class="compact-box"><div class="p-name">{proc}</div>{worker_box_content}</div>', unsafe_allow_html=True)
-                            st.markdown('</div></div>', unsafe_allow_html=True)
+                            
+                            st.markdown('</div></div></div>', unsafe_allow_html=True)
         except:
             st.error("看板資料讀取異常")
 
@@ -246,7 +266,7 @@ else:
                 st.success(f"✅ 任務已同步")
                 st.rerun()
 
-    # --- 5. 📝 紀錄編輯 ---
+    # --- 其餘編輯與設定維持原樣 ---
     elif menu == "📝 紀錄編輯":
         st.markdown('<p class="main-title">📝 修改現有派工</p>', unsafe_allow_html=True)
         r = requests.get(f"{DB_URL}.json")
@@ -258,7 +278,7 @@ else:
             curr = next((i for i in all_logs if i["id"] == tid), None)
             if curr:
                 with st.container():
-                    st.markdown('<div class="order-card">', unsafe_allow_html=True)
+                    st.markdown('<div class="order-card" style="height:auto; overflow:visible;">', unsafe_allow_html=True)
                     new_p = st.selectbox("工序", process_list, index=process_list.index(curr['製造工序']) if curr['製造工序'] in process_list else 0)
                     ec = st.columns(5)
                     nw = []
@@ -276,7 +296,6 @@ else:
                         st.rerun()
                     st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- 6. ⚙️ 系統設定 ---
     elif menu == "⚙️ 系統設定":
         st.markdown('<p class="main-title">⚙️ 系統後台管理</p>', unsafe_allow_html=True)
         with st.form("sys_config"):
