@@ -21,7 +21,7 @@ def get_settings():
         "all_staff": ["徐梓翔", "陳德文", "人員C"], 
         "processes": ["骨架作業", "前置作業", "配電作業", "模組作業", "水平調整", "通電作業", "IPQC表單查檢", "S.T作業", "收機清潔", "包機作業", "異常", "欠料", "PACKING", "前置作業(門板組立)"],
         "order_list": ["26M0041-01", "26M0041-02", "26M0051-01", "12345"],
-        "leader_map": {} # 新增：存放組長與組員的對應關係
+        "leader_map": {} 
     }
     try:
         r = requests.get(f"{SETTING_URL}.json", timeout=10)
@@ -80,7 +80,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 📊 製造部公佈欄 (維持不變) ---
+    # --- 📊 製造部公佈欄 ---
     if menu == "📊 製造部公佈欄":
         st.markdown('<h1 style="text-align:center; color:#1e40af; font-weight:900;">📋 超慧科技製造部派工進度</h1>', unsafe_allow_html=True)
         with st.container():
@@ -141,7 +141,7 @@ else:
         except Exception as e: 
             st.warning(f"⚠️ 公佈欄讀取暫時中斷：{e}")
 
-    # --- 📜 完工紀錄查詢 (嚴格保持版本-不動) ---
+    # --- 📜 完工紀錄查詢 ---
     elif menu == "📜 完工紀錄查詢":
         st.markdown('<h2 style="color:#1e40af;">📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
         try:
@@ -197,25 +197,22 @@ else:
         except Exception as e: 
             st.warning(f"⚠️ 歷史紀錄讀取暫時中斷：{e}")
 
-    # --- 📝 任務派發 (新增選單連動邏輯) ---
+    # --- 📝 任務派發 ---
     elif menu == "📝 任務派發":
         st.markdown('<h2 style="color:#1e40af;">📝 任務派發 / 內容修正</h2>', unsafe_allow_html=True)
         with st.form("dispatch_form"):
             c1, c2, c3, c4 = st.columns(4)
             t_o = c1.selectbox("1. 製令編號", order_list)
             t_p = c2.selectbox("2. 製造工序", process_list)
-            t_l = c3.selectbox("3. 指派組長", all_leaders) # 先選組長
+            t_l = c3.selectbox("3. 指派組長", all_leaders) 
             t_d = c4.date_input("4. 通電日期")
             st.write("---")
             
-            # --- 修改位置：人員選單連動 ---
-            # 根據選定的組長 t_l，找出對應的組員，若無則顯示全部
             my_team = leader_map.get(t_l, [])
             display_staff = my_team if my_team else all_staff
             
             pc = st.columns(5)
             workers = [pc[i].selectbox(f"人員 {i+1}", ["NA"] + display_staff, key=f"w{i}") for i in range(5)]
-            # ---------------------------
             
             if st.form_submit_button("🚀 準備發布"):
                 payload = {"製令": str(t_o), "製造工序": t_p, "組長": t_l, "通電日期": str(t_d), "提交時間": get_now_str()}
@@ -229,11 +226,10 @@ else:
                     st.rerun()
                 except: st.error("發布失敗")
 
-    # --- ⚙️ 設定管理 (新增組長綁定組員介面) ---
+    # --- ⚙️ 設定管理 ---
     elif menu == "⚙️ 設定管理":
         st.markdown('<h2 style="color:#1e40af;">⚙️ 系統資料後台管理</h2>', unsafe_allow_html=True)
         
-        # 區塊 A：基本名單設定
         with st.expander("📌 基本名單設定", expanded=True):
             with st.form("admin_settings"):
                 e_o = st.text_area("製令編號 (逗號分隔)", value=",".join(order_list))
@@ -252,12 +248,20 @@ else:
                     st.success("基本名單已更新")
                     st.rerun()
 
-        # 區塊 B：修改位置 - 組長與人員對應綁定
         st.markdown("---")
         st.markdown("### 👥 組長與人員對應綁定")
+        
+        # --- 新增：顯示目前已綁定的清單 ---
+        if leader_map:
+            with st.expander("📋 查看目前所有綁定關係"):
+                bind_data = []
+                for leader, staff_list in leader_map.items():
+                    bind_data.append({"組長": leader, "已綁定組員": "、".join(staff_list)})
+                st.table(pd.DataFrame(bind_data))
+        # ---------------------------
+
         with st.form("leader_binding_form"):
             selected_leader = st.selectbox("1. 選擇組長", all_leaders)
-            # 取得該組長現有的組員名單串接成字串
             current_team = ",".join(leader_map.get(selected_leader, []))
             team_input = st.text_input(f"2. 輸入 {selected_leader} 的專屬組員 (請用逗號分隔)", value=current_team)
             
@@ -265,7 +269,6 @@ else:
                 new_map = leader_map.copy()
                 new_map[selected_leader] = [x.strip() for x in team_input.split(",") if x.strip()]
                 
-                # 存回資料庫
                 new_cfg = settings.copy()
                 new_cfg["leader_map"] = new_map
                 requests.put(f"{SETTING_URL}.json", data=json.dumps(new_cfg))
