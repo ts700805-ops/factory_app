@@ -225,26 +225,59 @@ else:
             else: st.info("💡 目前無派工紀錄")
         except: st.error("❌ 連線異常，請檢查網路或資料庫設定")
 
-    # --- 其餘功能模組 (保持原樣) ---
+    # --- 📜 完工紀錄查詢 (依要求更換格式與增加密碼刪除) ---
     elif menu == "📜 完工紀錄查詢":
         st.markdown('<h2 style="color:#1e40af;">📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
         try:
             r = requests.get(f"{FINISH_URL}.json", timeout=10)
             f_data = r.json()
             if f_data:
-                f_df = pd.DataFrame([dict(v, id=k) for k, v in f_data.items()]).fillna("NA")
+                # 建立 DataFrame
+                all_finish_logs = [dict(v, id=k) for k, v in f_data.items()]
+                f_df = pd.DataFrame(all_finish_logs).fillna("NA")
+
+                # 搜尋面板
                 st.markdown('<div class="search-panel">', unsafe_allow_html=True)
                 sc1, sc2 = st.columns(2)
                 f_order_input = sc1.text_input("🔍 手動輸入製令搜尋", placeholder="輸入製令關鍵字...")
                 f_staff = sc2.selectbox("👤 搜尋人員", ["全部"] + sorted(all_staff))
                 st.markdown('</div>', unsafe_allow_html=True)
                 
+                # 篩選邏輯
                 if f_order_input: 
                     f_df = f_df[f_df["製令"].astype(str).str.contains(f_order_input, case=False)]
                 if f_staff != "全部": 
                     f_df = f_df[f_df[["人員1", "人員2", "人員3", "人員4", "人員5"]].apply(lambda x: f_staff in x.values, axis=1)]
 
-                st.dataframe(f_df.sort_values("完工時間", ascending=False), use_container_width=True)
+                # 依要求顯示特定欄位與格式
+                # 確保這些欄位存在於資料中
+                display_cols = ["完工時間", "製令", "製造工序", "人員1", "人員2", "人員3", "人員4", "人員5"]
+                # 過濾出存在的欄位以免噴錯
+                available_cols = [c for c in display_cols if c in f_df.columns]
+                
+                st.dataframe(f_df[available_cols].sort_values("完工時間", ascending=False), use_container_width=True)
+
+                # --- 刪除功能區 (密碼 1111) ---
+                st.markdown("---")
+                st.subheader("🗑️ 紀錄維護 (管理專用)")
+                del_col1, del_col2, del_col3 = st.columns([2, 2, 1])
+                record_id_to_del = del_col1.text_input("輸入欲刪除的 Firebase ID (請參考完整資料或 ID 欄位)")
+                del_pass = del_col2.text_input("輸入刪除權限密碼", type="password")
+                
+                if del_col3.button("確認刪除"):
+                    if del_pass == "1111":
+                        if record_id_to_del:
+                            res = requests.delete(f"{FINISH_URL}/{record_id_to_del}.json")
+                            if res.status_code == 200:
+                                st.success(f"已成功刪除紀錄：{record_id_to_del}")
+                                st.rerun()
+                            else:
+                                st.error("刪除失敗，請確認 ID 是否正確")
+                        else:
+                            st.warning("請先輸入要刪除的紀錄 ID")
+                    else:
+                        st.error("密碼錯誤！無法刪除")
+
             else: st.info("目前無紀錄")
         except: st.error("讀取失敗")
 
