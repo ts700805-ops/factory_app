@@ -68,24 +68,26 @@ st.markdown("""
         font-weight: bold;
     }
     
-    /* 表格列與格線設計：確保格子大小一樣且連結在一起 */
+    /* 表格列與格線設計：強制固定高度與對齊 */
     .table-row { 
         display: flex; 
-        border-bottom: 1px solid #dee2e6; /* 底部邊框連結下一行 */
-        height: 50px; /* 固定高度確保格子大小一致 */
+        border-bottom: 1px solid #dee2e6; 
+        height: 60px; /* 增加一點高度確保人員標籤多時不會溢出 */
         align-items: stretch; 
+        width: 100%;
     }
-    .table-row:last-child { border-bottom: none; } /* 最後一行不需底線 */
+    .table-row:last-child { border-bottom: none; } 
 
     .cell-proc { 
-        width: 120px; 
+        width: 110px; 
+        min-width: 110px;
         background: #f1f5f9; 
         color: #1e40af; 
         font-weight: 800; 
         padding: 0 10px;
         display: flex;
         align-items: center;
-        border-right: 1px solid #dee2e6; /* 垂直分隔線 */
+        border-right: 1px solid #dee2e6; 
         font-size: 14px;
     }
     .cell-staff { 
@@ -94,23 +96,32 @@ st.markdown("""
         display: flex; 
         align-items: center; 
         flex-wrap: wrap; 
-        gap: 6px; 
+        gap: 4px; 
         background: white;
+        overflow: hidden; /* 防止內容撐開高度 */
     }
     
     /* 人員標籤 */
-    .badge-leader { background: #f59e0b; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
-    .badge-main { background: #1e40af; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
-    .badge-sub { background: #e2e8f0; color: #475569; padding: 2px 6px; border-radius: 4px; font-size: 11px; border: 1px solid #cbd5e1; }
+    .badge-leader { background: #f59e0b; color: white; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+    .badge-main { background: #1e40af; color: white; padding: 1px 6px; border-radius: 4px; font-size: 11px; }
+    .badge-sub { background: #e2e8f0; color: #475569; padding: 1px 5px; border-radius: 4px; font-size: 10px; border: 1px solid #cbd5e1; }
     
     .no-dispatch { color: #cbd5e1; font-size: 12px; }
     .search-panel { background: white; padding: 15px; border-radius: 10px; border: 1px solid #cbd5e1; margin-bottom: 20px; }
     
-    /* 修正按鈕在格子內的間距 */
+    /* 修正按鈕欄位的高度對齊 */
+    .btn-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 60px; /* 與 table-row 同高 */
+        border-bottom: 1px solid #dee2e6;
+    }
+    
     .stButton>button {
-        margin-top: 5px !important;
-        padding: 0px 10px !important;
-        height: 35px !important;
+        padding: 0px 5px !important;
+        height: 30px !important;
+        font-size: 12px !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -136,7 +147,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 📊 製造部公佈欄 (顯示修正：格子大小一致與格線連結) ---
+    # --- 📊 製造部公佈欄 ---
     if menu == "📊 製造部公佈欄":
         st.markdown('<h1 style="text-align:center; color:#1e40af; font-weight:900;">📋 超慧科技製造部派工進度</h1>', unsafe_allow_html=True)
         
@@ -166,13 +177,11 @@ else:
 
                     p_date = str(o_df.iloc[0].get("通電日期", "未設定"))
                     with cols[idx % 3]:
-                        # 製令標題
                         st.markdown(f'<div class="order-card"><div class="order-title"><span>📦 製令：{o_id}</span><span class="power-date">⚡ 通電：{p_date}</span></div>', unsafe_allow_html=True)
                         
-                        # 內容格子（緊密相連）
                         for proc in process_list:
                             match = o_df[o_df["製造工序"] == proc]
-                            row_cols = st.columns([0.85, 0.15]) # 左右格子對齊
+                            row_cols = st.columns([0.82, 0.18]) 
                             
                             if not match.empty:
                                 row = match.iloc[0]
@@ -185,7 +194,7 @@ else:
                                 with row_cols[0]: 
                                     st.markdown(f'<div class="table-row"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
                                 with row_cols[1]:
-                                    # ✅ 按鈕放在獨立列，但視覺上緊貼右側格子
+                                    st.markdown('<div class="btn-container">', unsafe_allow_html=True)
                                     if st.button("✅", key=f"fin_{row['id']}"):
                                         clean_data = {k: (v if not (isinstance(v, float) and math.isnan(v)) else "NA") for k, v in row.to_dict().items()}
                                         clean_data["完工時間"] = get_now_str()
@@ -194,9 +203,12 @@ else:
                                             requests.delete(f"{DB_URL}/{row['id']}.json")
                                             st.balloons()
                                             st.rerun()
+                                    st.markdown('</div>', unsafe_allow_html=True)
                             else:
                                 with row_cols[0]: 
                                     st.markdown(f'<div class="table-row"><div class="cell-proc" style="color:#cbd5e1;">{proc}</div><div class="cell-staff no-dispatch">未派工</div></div>', unsafe_allow_html=True)
+                                with row_cols[1]:
+                                    st.markdown('<div class="btn-container"></div>', unsafe_allow_html=True)
                         st.markdown('</div>', unsafe_allow_html=True)
             else: st.info("💡 目前無派工紀錄")
         except: st.error("❌ 連線異常，請檢查網路或資料庫設定")
