@@ -5,10 +5,10 @@ import requests
 import json
 
 # --- 1. 核心資料與設定 ---
-# 提醒：請確保您的 Firebase Database URL 是正確的且末端不需要斜線
+# 提醒：根據您的 Firebase 截圖，完工節點名稱為 completed_logs
 DB_BASE_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
 DB_URL = f"{DB_BASE_URL}/work_logs"
-FINISH_URL = f"{DB_BASE_URL}/finish_logs"
+FINISH_URL = f"{DB_BASE_URL}/completed_logs"  # 已修正為截圖中的名稱
 SETTING_URL = f"{DB_BASE_URL}/settings"
 
 def get_now_str():
@@ -145,7 +145,6 @@ else:
                 cols = st.columns(3)
                 for idx, o_id in enumerate(filtered_orders):
                     o_df = df[df["製令"] == o_id]
-                    # 修正日期顯示
                     p_date_val = o_df.sort_values("提交時間", ascending=False).iloc[0].get("通電日期", "未設定")
                     p_date = str(p_date_val) if pd.notnull(p_date_val) else "未設定"
 
@@ -184,16 +183,17 @@ else:
                                         finish_data["完工時間"] = get_now_str()
                                         finish_data["完工人員"] = st.session_state.user
                                         
-                                        # 嘗試寫入完工庫
                                         try:
+                                            # 注意：這裡使用修正後的 FINISH_URL (completed_logs)
                                             res_post = requests.post(f"{FINISH_URL}.json", data=json.dumps(finish_data), timeout=10)
                                             if res_post.status_code == 200:
-                                                requests.delete(f"{DB_BASE_URL}/work_logs/{row['id']}.json", timeout=10)
+                                                requests.delete(f"{DB_URL}/{row['id']}.json", timeout=10)
+                                                st.success("完工成功！")
                                                 st.rerun()
                                             else:
                                                 st.error(f"寫入失敗: {res_post.status_code}")
-                                        except:
-                                            st.error("寫入完工資料庫連線失敗")
+                                        except Exception as e:
+                                            st.error(f"連線失敗: {str(e)}")
                             else:
                                 with row_cols[0]:
                                     st.markdown(f'<div class="table-row"><div class="cell-proc" style="color:#cbd5e1;">{proc}</div><div class="cell-staff" style="color:#cbd5e1; font-size:11px;">未派工</div></div>', unsafe_allow_html=True)
@@ -201,7 +201,7 @@ else:
             else:
                 st.info("💡 目前資料庫中沒有任何派工紀錄。")
         except Exception as e:
-            st.error(f"❌ 連線資料庫失敗，請檢查網路或 URL 設定。")
+            st.error(f"❌ 讀取資料庫失敗")
 
     # --- 📜 完工紀錄查詢 ---
     elif menu == "📜 完工紀錄查詢":
@@ -269,22 +269,20 @@ else:
                             st.success(f"✅ 已成功新增製令 {target_o} 派工")
                             st.rerun()
                         else:
-                            st.error(f"❌ 寫入失敗 (狀態碼: {res.status_code})")
+                            st.error(f"❌ 寫入失敗 (碼: {res.status_code})")
                 except Exception as e:
-                    st.error(f"❌ 連線異常: {str(e)}")
+                    st.error(f"❌ 連線異常")
 
         if st.session_state.pending_payload:
-            st.warning(f"⚠️ 偵測到重複資料：是否覆蓋製令【{st.session_state.pending_payload['製令']}】的【{st.session_state.pending_payload['製造工序']}】紀錄？")
-            c1, c2, _ = st.columns([1, 1, 2])
-            if c1.button("✅ 確認覆蓋", type="primary"):
-                res = requests.put(f"{DB_BASE_URL}/work_logs/{st.session_state.pending_key}.json", data=json.dumps(st.session_state.pending_payload))
+            st.warning(f"⚠️ 是否覆蓋製令【{st.session_state.pending_payload['製令']}】的【{st.session_state.pending_payload['製造工序']}】紀錄？")
+            cc1, cc2, _ = st.columns([1, 1, 2])
+            if cc1.button("✅ 確認覆蓋", type="primary"):
+                res = requests.put(f"{DB_URL}/{st.session_state.pending_key}.json", data=json.dumps(st.session_state.pending_payload))
                 if res.status_code == 200:
                     st.session_state.pending_payload = None
                     st.session_state.pending_key = None
                     st.rerun()
-                else:
-                    st.error("覆蓋失敗")
-            if c2.button("❌ 不寫入"):
+            if cc2.button("❌ 取消"):
                 st.session_state.pending_payload = None
                 st.session_state.pending_key = None
                 st.rerun()
