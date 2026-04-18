@@ -4,6 +4,7 @@ import datetime
 import requests
 import json
 import math
+import time  # 為了讓氣球效果能跑完
 
 # --- 1. 核心資料與設定 ---
 DB_BASE_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
@@ -230,8 +231,10 @@ else:
                 if target_key: requests.put(f"{DB_URL}/{target_key}.json", data=json.dumps(payload))
                 else: requests.post(f"{DB_URL}.json", data=json.dumps(payload))
                 
-                st.balloons() # 新增氣球效果
+                # 這裡修正：先顯示氣球，暫停 1.5 秒後才重整頁面
+                st.balloons()
                 st.success(f"✅ 製令 {t_o} 發布完成！")
+                time.sleep(1.5)
                 st.rerun()
             except Exception as e: st.error(f"發布失敗：{str(e)}")
 
@@ -279,8 +282,11 @@ else:
                     new_cfg["process_map"] = new_p_map
                     requests.put(f"{SETTING_URL}.json", data=json.dumps(new_cfg))
                     st.success("✅ 工序連動已更新！")
+                    time.sleep(1)
                     st.rerun()
-                except: st.error("❌ 格式錯誤，請檢查冒號與逗號")
+                except:
+                    # 原本的紅色格式錯誤區塊已依指令移除
+                    pass
 
         st.markdown("---")
         
@@ -303,5 +309,8 @@ else:
                     new_cfg["leader_map"] = new_map
                     requests.put(f"{SETTING_URL}.json", data=json.dumps(new_cfg))
                     st.success("✅ 人員綁定已更新！")
+                    time.sleep(1)
                     st.rerun()
-                except: st.error("❌ 格式錯誤，請檢查冒號與逗號")
+                except:
+                    # 原本的紅色格式錯誤區塊已依指令移除
+                    pass
