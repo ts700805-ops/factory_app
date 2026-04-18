@@ -5,6 +5,7 @@ import requests
 import json
 
 # --- 1. 核心資料與設定 ---
+# 提醒：請確保您的 Firebase Database URL 是正確的且規則已設定為讀寫不需驗證
 DB_BASE_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
 DB_URL = f"{DB_BASE_URL}/work_logs"
 FINISH_URL = f"{DB_BASE_URL}/finish_logs"
@@ -19,10 +20,10 @@ def get_settings():
         "all_leaders": ["管理員", "組長A", "組長B"],
         "all_staff": ["徐梓翔", "陳德文", "人員C"], 
         "processes": ["骨架作業", "前置作業", "配電作業", "模組作業", "水平調整", "通電作業", "IPQC表單查檢", "S.T作業", "收機清潔", "包機作業", "異常", "欠料", "PACKING", "前置作業(門板組立)"],
-        "order_list": ["26M0041-01", "26M0041-02", "26M0051-01"]
+        "order_list": ["26M0041-01", "26M0041-02", "26M0051-01", "12345"]
     }
     try:
-        r = requests.get(f"{SETTING_URL}.json", timeout=5)
+        r = requests.get(f"{SETTING_URL}.json", timeout=10)
         if r.status_code == 200:
             data = r.json()
             if data and isinstance(data, dict):
@@ -122,7 +123,7 @@ else:
 
     # --- 📊 超慧科技公佈欄 ---
     if menu == "📊 超慧科技公佈欄":
-        st.markdown('<h1 style="text-align:center; color:#1e40af; font-weight:900;">📋 超慧科技~阿文要派工了啦~</h1>', unsafe_allow_html=True)
+        st.markdown('<h1 style="text-align:center; color:#1e40af; font-weight:900;">📋 超慧科技派工進度</h1>', unsafe_allow_html=True)
         
         with st.container():
             st.markdown('<div class="search-panel">', unsafe_allow_html=True)
@@ -132,7 +133,7 @@ else:
             st.markdown('</div>', unsafe_allow_html=True)
 
         try:
-            r = requests.get(f"{DB_URL}.json", timeout=5)
+            r = requests.get(f"{DB_URL}.json", timeout=10)
             db_data = r.json()
             if db_data:
                 all_logs = [dict(v, id=k) for k, v in db_data.items() if v and isinstance(v, dict)]
@@ -170,42 +171,47 @@ else:
                                 others = [row.get(f"人員{i}") for i in range(2, 6) if row.get(f"人員{i}") not in ["NA", None, ""]]
                                 
                                 staff_html = f'<div class="badge-leader">L: {leader}</div>'
-                                if w1 != "NA":
-                                    staff_html += f'<div class="badge-main">{w1}</div>'
+                                if w1 != "NA": staff_html += f'<div class="badge-main">{w1}</div>'
                                 staff_html += "".join([f'<div class="badge-sub">{s}</div>' for s in others])
                                 
                                 with row_cols[0]:
                                     st.markdown(f'<div class="table-row"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
                                 with row_cols[1]:
-                                    if st.button("✅", key=f"fin_{row['id']}", help=f"點擊【{proc}】完工"):
+                                    if st.button("✅", key=f"fin_{row['id']}"):
                                         finish_data = row.to_dict()
                                         finish_data["完工時間"] = get_now_str()
                                         finish_data["完工人員"] = st.session_state.user
-                                        requests.post(f"{FINISH_URL}.json", data=json.dumps(finish_data))
-                                        requests.delete(f"{DB_BASE_URL}/work_logs/{row['id']}.json")
-                                        st.rerun()
+                                        # 確保寫入成功才刪除
+                                        res_post = requests.post(f"{FINISH_URL}.json", data=json.dumps(finish_data))
+                                        if res_post.status_code == 200:
+                                            requests.delete(f"{DB_BASE_URL}/work_logs/{row['id']}.json")
+                                            st.rerun()
+                                        else:
+                                            st.error("寫入完工資料庫失敗")
                             else:
                                 with row_cols[0]:
                                     st.markdown(f'<div class="table-row"><div class="cell-proc" style="color:#cbd5e1;">{proc}</div><div class="cell-staff" style="color:#cbd5e1; font-size:11px;">未派工</div></div>', unsafe_allow_html=True)
                         st.markdown('</div>', unsafe_allow_html=True)
+            else:
+                st.info("💡 目前資料庫中沒有任何派工紀錄。")
         except:
-            st.info("目前尚無派工紀錄")
+            st.error("❌ 連線資料庫失敗，請檢查網路。")
 
     # --- 📜 完工紀錄查詢 ---
     elif menu == "📜 完工紀錄查詢":
         st.markdown('<h2 style="color:#1e40af;">📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
         try:
-            r = requests.get(f"{FINISH_URL}.json", timeout=5)
+            r = requests.get(f"{FINISH_URL}.json", timeout=10)
             f_data = r.json()
             if f_data:
-                f_list = [v for k, v in f_data.items() if v and isinstance(v, dict)]
+                f_list = [v for k, v in f_data.items() if isinstance(v, dict)]
                 f_df = pd.DataFrame(f_list)
-                # 確保必要欄位存在
-                for col in ["完工時間", "製令", "製造工序", "組長", "人員1", "完工人員"]:
-                    if col not in f_df.columns: f_df[col] = "-"
+                # 確保表格能顯示且不會報錯
+                essential_cols = ["完工時間", "製令", "製造工序", "組長", "人員1", "完工人員"]
+                for col in essential_cols:
+                    if col not in f_df.columns: f_df[col] = "無資料"
                 
-                show_cols = ["完工時間", "製令", "製造工序", "組長", "人員1", "完工人員"]
-                st.dataframe(f_df[show_cols].sort_values("完工時間", ascending=False), use_container_width=True)
+                st.dataframe(f_df[essential_cols].sort_values("完工時間", ascending=False), use_container_width=True)
             else:
                 st.info("目前尚無完工紀錄")
         except:
@@ -233,7 +239,7 @@ else:
             
             if submit_clicked:
                 try:
-                    r = requests.get(f"{DB_URL}.json", timeout=5)
+                    r = requests.get(f"{DB_URL}.json", timeout=10)
                     db_data = r.json()
                     target_key = None
                     if db_data:
@@ -243,7 +249,7 @@ else:
                                 break
                     
                     payload = {
-                        "製令": target_o, "製造工序": target_p, "組長": target_l,
+                        "製令": str(target_o), "製造工序": target_p, "組長": target_l,
                         "通電日期": str(target_d),
                         "人員1": workers[0], "人員2": workers[1], "人員3": workers[2], "人員4": workers[3], "人員5": workers[4],
                         "提交時間": get_now_str()
@@ -253,20 +259,27 @@ else:
                         st.session_state.pending_payload = payload
                         st.session_state.pending_key = target_key
                     else:
-                        requests.post(f"{DB_URL}.json", data=json.dumps(payload))
-                        st.success(f"✅ 已成功新增製令 {target_o} 派工")
-                        st.rerun()
-                except:
-                    st.error("連線失敗")
+                        # 真正的寫入檢查
+                        res = requests.post(f"{DB_URL}.json", data=json.dumps(payload), timeout=10)
+                        if res.status_code == 200:
+                            st.success(f"✅ 已成功新增製令 {target_o} 派工")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ 寫入失敗 (伺服器回應: {res.status_code})")
+                except Exception as e:
+                    st.error(f"❌ 連線異常: {str(e)}")
 
         if st.session_state.pending_payload:
             st.warning(f"⚠️ 偵測到重複資料：是否覆蓋製令【{st.session_state.pending_payload['製令']}】的【{st.session_state.pending_payload['製造工序']}】紀錄？")
             c1, c2, _ = st.columns([1, 1, 2])
             if c1.button("✅ 確認覆蓋", type="primary"):
-                requests.put(f"{DB_BASE_URL}/work_logs/{st.session_state.pending_key}.json", data=json.dumps(st.session_state.pending_payload))
-                st.session_state.pending_payload = None
-                st.session_state.pending_key = None
-                st.rerun()
+                res = requests.put(f"{DB_BASE_URL}/work_logs/{st.session_state.pending_key}.json", data=json.dumps(st.session_state.pending_payload))
+                if res.status_code == 200:
+                    st.session_state.pending_payload = None
+                    st.session_state.pending_key = None
+                    st.rerun()
+                else:
+                    st.error("覆蓋失敗")
             if c2.button("❌ 不寫入"):
                 st.session_state.pending_payload = None
                 st.session_state.pending_key = None
