@@ -136,7 +136,7 @@ else:
             else: st.info("💡 目前無派工紀錄")
         except: st.error("❌ 連線異常")
 
-    # --- 📜 完工紀錄查詢 (修正刪除按鈕位置與邏輯) ---
+    # --- 📜 完工紀錄查詢 (修正刪除按鈕與表格顯示) ---
     elif menu == "📜 完工紀錄查詢":
         st.markdown('<h2 style="color:#1e40af;">📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
         try:
@@ -159,12 +159,13 @@ else:
 
                 f_df = f_df.sort_values("完工時間", ascending=False)
 
-                # --- 自定義表格與後置刪除按鈕 ---
+                # --- 核心修正：手寫表格表頭 ---
                 h_cols = st.columns([1.5, 1.2, 1, 0.8, 0.8, 0.8, 0.8, 0.8, 0.5])
                 headers = ["完工時間", "製令", "工序", "人員1", "人員2", "人員3", "人員4", "人員5", "刪除"]
                 for h_col, h_text in zip(h_cols, headers):
                     h_col.markdown(f'<div class="history-header">{h_text}</div>', unsafe_allow_html=True)
 
+                # --- 核心修正：手寫表格內容與行尾刪除鈕 ---
                 for _, row in f_df.iterrows():
                     r_cols = st.columns([1.5, 1.2, 1, 0.8, 0.8, 0.8, 0.8, 0.8, 0.5])
                     r_cols[0].write(row.get("完工時間", "NA"))
@@ -176,20 +177,20 @@ else:
                     r_cols[6].write(row.get("人員4", "NA"))
                     r_cols[7].write(row.get("人員5", "NA"))
                     
-                    # 刪除按鈕放在最後
+                    # 刪除按鈕：點擊彈出密碼確認框
                     with r_cols[8]:
                         with st.popover("🗑️"):
                             st.write("確認刪除？")
-                            pwd = st.text_input("輸入刪除密碼", type="password", key=f"pwd_{row['id']}")
-                            if st.button("確認", key=f"btn_{row['id']}"):
+                            pwd = st.text_input("輸入密碼", type="password", key=f"del_pwd_{row['id']}")
+                            if st.button("確認執行", key=f"del_btn_{row['id']}"):
                                 if pwd == "1111":
                                     requests.delete(f"{FINISH_URL}/{row['id']}.json")
-                                    st.success("已刪除")
+                                    st.success("已刪除紀錄")
                                     st.rerun()
                                 else:
                                     st.error("密碼錯誤")
             else: st.info("目前無紀錄")
-        except: st.error("讀取失敗")
+        except: st.error("讀取資料失敗")
 
     elif menu == "📝 任務派發":
         st.markdown('<h2 style="color:#1e40af;">📝 任務派發 / 內容修正</h2>', unsafe_allow_html=True)
