@@ -16,7 +16,6 @@ def get_now_str():
     return now.strftime("%Y-%m-%d %H:%M:%S")
 
 def get_settings():
-    # 預設設定內容
     default_settings = {
         "all_leaders": ["管理員", "組長A", "組長B"],
         "all_staff": ["徐梓翔", "陳德文", "人員C"], 
@@ -139,8 +138,6 @@ else:
             if db_data:
                 all_logs = [dict(v, id=k) for k, v in db_data.items() if v and isinstance(v, dict)]
                 df = pd.DataFrame(all_logs)
-                
-                # 修正 NaN 導致的連線錯誤
                 df = df.fillna("NA") 
                 
                 unique_orders = df["製令"].unique()
@@ -183,7 +180,6 @@ else:
                                     st.markdown(f'<div class="table-row"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
                                 with row_cols[1]:
                                     if st.button("✅", key=f"fin_{row['id']}"):
-                                        # 轉換為字典並過濾掉不符合 JSON 規範的 nan
                                         finish_data = {k: (v if not (isinstance(v, float) and math.isnan(v)) else "NA") for k, v in row.to_dict().items()}
                                         finish_data["完工時間"] = get_now_str()
                                         finish_data["完工人員"] = st.session_state.user
@@ -207,7 +203,7 @@ else:
         except Exception as e:
             st.error(f"❌ 讀取資料庫失敗")
 
-    # --- 📜 完工紀錄查詢 ---
+    # --- 📜 完工紀錄查詢 (更新部分：顯示人員 1-5，隱藏組長與完工人員) ---
     elif menu == "📜 完工紀錄查詢":
         st.markdown('<h2 style="color:#1e40af;">📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
         try:
@@ -215,13 +211,18 @@ else:
             f_data = r.json()
             if f_data:
                 f_list = [v for k, v in f_data.items() if isinstance(v, dict)]
-                f_df = pd.DataFrame(f_list).fillna("無資料")
-                essential_cols = ["完工時間", "製令", "製造工序", "組長", "人員1", "完工人員"]
-                # 確保欄位存在
-                for col in essential_cols:
-                    if col not in f_df.columns: f_df[col] = "無資料"
+                f_df = pd.DataFrame(f_list)
                 
-                st.dataframe(f_df[essential_cols].sort_values("完工時間", ascending=False), use_container_width=True)
+                # 確保人員 1~5 欄位都存在並處理缺失值
+                display_cols = ["完工時間", "製令", "製造工序", "人員1", "人員2", "人員3", "人員4", "人員5"]
+                for col in display_cols:
+                    if col not in f_df.columns:
+                        f_df[col] = "NA"
+                
+                f_df = f_df.fillna("NA")
+                
+                # 顯示表格，僅包含指定的 8 個欄位
+                st.dataframe(f_df[display_cols].sort_values("完工時間", ascending=False), use_container_width=True)
             else:
                 st.info("目前尚無完工紀錄")
         except:
@@ -275,9 +276,7 @@ else:
                         if res.status_code == 200:
                             st.success(f"✅ 已成功新增製令 {target_o} 派工")
                             st.rerun()
-                        else:
-                            st.error(f"❌ 寫入失敗 (碼: {res.status_code})")
-                except Exception as e:
+                except:
                     st.error(f"❌ 連線異常")
 
         if st.session_state.pending_payload:
