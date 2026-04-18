@@ -195,28 +195,23 @@ else:
         except: 
             st.info("💡 目前無可顯示之歷史資料。")
 
-    # --- 📝 任務派發 (修正：實現組長與人員選單動態連動) ---
+    # --- 📝 任務派發 (修正版發布邏輯) ---
     elif menu == "📝 任務派發":
         st.markdown('<h2 style="color:#1e40af;">📝 任務派發 / 內容修正</h2>', unsafe_allow_html=True)
         
-        # 使用容器而不是 form 來包裹選單，以便實現即時連動 (form 會阻擋選單更新)
         c1, c2, c3, c4 = st.columns(4)
         t_o = c1.selectbox("1. 製令編號", order_list)
         t_p = c2.selectbox("2. 製造工序", process_list)
-        t_l = c3.selectbox("3. 指派組長", all_leaders) # 當這裡改變時，下方 display_staff 會變動
+        t_l = c3.selectbox("3. 指派組長", all_leaders)
         t_d = c4.date_input("4. 通電日期")
         
         st.write("---")
         
-        # 【核心修正】這裡獲取該組長的專屬人員名單
         my_team = leader_map.get(t_l, [])
-        # 如果該組長有綁定人員就顯示綁定名單，否則顯示全部一般人員
         display_staff = my_team if my_team else all_staff
         
-        # 顯示當前可用人員供組長參考
         st.caption(f"💡 目前 {t_l} 的組員名單：{', '.join(display_staff) if display_staff else '未綁定(顯示全部)'}")
         
-        # 人員選單
         pc = st.columns(5)
         workers = []
         for i in range(5):
@@ -226,14 +221,25 @@ else:
         if st.button("🚀 準備發布", type="primary", use_container_width=True):
             payload = {"製令": str(t_o), "製造工序": t_p, "組長": t_l, "通電日期": str(t_d), "提交時間": get_now_str()}
             for i in range(5): payload[f"人員{i+1}"] = workers[i]
+            
             try:
-                r_check = requests.get(f"{DB_URL}.json").json()
-                target_key = next((k for k, v in r_check.items() if v and v.get("製令")==str(t_o) and v.get("製造工序")==t_p), None) if r_check else None
-                if target_key: requests.put(f"{DB_URL}/{target_key}.json", data=json.dumps(payload))
-                else: requests.post(f"{DB_URL}.json", data=json.dumps(payload))
+                # 修正點：確保 r_check 為 dict 才進行搜尋，避免 NoneType 錯誤
+                r = requests.get(f"{DB_URL}.json")
+                r_check = r.json()
+                
+                target_key = None
+                if r_check and isinstance(r_check, dict):
+                    target_key = next((k for k, v in r_check.items() if v and v.get("製令")==str(t_o) and v.get("製造工序")==t_p), None)
+                
+                if target_key:
+                    requests.put(f"{DB_URL}/{target_key}.json", data=json.dumps(payload))
+                else:
+                    requests.post(f"{DB_URL}.json", data=json.dumps(payload))
+                
                 st.success(f"✅ 製令 {t_o} 發布完成！")
                 st.rerun()
-            except: st.error("發布失敗")
+            except Exception as e:
+                st.error(f"發布失敗：{str(e)}")
 
     # --- ⚙️ 設定管理 ---
     elif menu == "⚙️ 設定管理":
