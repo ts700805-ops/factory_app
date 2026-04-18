@@ -5,7 +5,7 @@ import requests
 import json
 import math
 
-# --- 1. 核心資料與設定 (修正隱形字元與路徑) ---
+# --- 1. 核心資料與設定 ---
 DB_BASE_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
 DB_URL = f"{DB_BASE_URL}/work_logs"
 FINISH_URL = f"{DB_BASE_URL}/completed_logs" 
@@ -21,7 +21,8 @@ def get_settings():
         "all_staff": ["徐梓翔", "陳德文", "胡瑄芸", "蕭詩瓊"], 
         "processes": ["骨架作業", "前置作業", "配電作業", "模組作業", "水平調整", "通電作業", "IPQC表單查檢", "S.T作業", "收機清潔", "包機作業", "異常", "欠料", "PACKING", "前置作業(門板組立)"],
         "order_list": ["26M0041-01", "26M0041-02", "26M0051-01", "12345"],
-        "leader_map": {} 
+        "leader_map": {},
+        "process_map": {} # 新增：組長與工序綁定
     }
     try:
         r = requests.get(f"{SETTING_URL}.json", timeout=10)
@@ -32,6 +33,7 @@ def get_settings():
                     if key not in data or not data[key]:
                         data[key] = default_settings[key]
                 if "leader_map" not in data: data["leader_map"] = {}
+                if "process_map" not in data: data["process_map"] = {} # 確保欄位存在
                 return data
         return default_settings
     except:
@@ -65,6 +67,7 @@ all_staff = settings.get("all_staff", [])
 process_list = settings.get("processes", [])
 order_list = settings.get("order_list", [])
 leader_map = settings.get("leader_map", {})
+process_map = settings.get("process_map", {})
 
 if "user" not in st.session_state:
     st.title("⚓ 超慧科技管理系統 - 登入")
@@ -111,12 +114,9 @@ else:
                         st.markdown(f'<div class="order-card"><div class="order-title"><span>📦 製令：{o_id}</span><span class="power-date">⚡ 通電：{p_date}</span></div>', unsafe_allow_html=True)
                         for proc in process_list:
                             match = o_df[o_df["製造工序"] == proc]
-                            
-                            # --- 修正後的顯示邏輯：僅顯示有派工且未完工的項目 ---
                             if not match.empty:
                                 row = match.iloc[0]
                                 row_cols = st.columns([0.85, 0.15]) 
-                                
                                 staff_html = f'<div class="badge-leader">L: {row.get("組長","")}</div>'
                                 for i in range(1, 6):
                                     p_val = row.get(f"人員{i}")
@@ -132,14 +132,10 @@ else:
                                         clean_data = {k: (v if not (isinstance(v, float) and math.isnan(v)) else "NA") for k, v in row.to_dict().items()}
                                         clean_data["完工時間"] = get_now_str()
                                         clean_data["完工人員"] = st.session_state.user
-                                        
-                                        # 先存入完工庫，成功後刪除派工庫
                                         if requests.post(f"{FINISH_URL}.json", data=json.dumps(clean_data)).status_code == 200:
                                             requests.delete(f"{DB_URL}/{row['id']}.json")
-                                            st.rerun() # 立即刷新，該工序就會從畫面上消失
+                                            st.rerun()
                                     st.markdown('</div>', unsafe_allow_html=True)
-                            # --- 原本顯示「未派工」的 else 區塊已移除，以達到完工後自動消失的效果 ---
-
                         st.markdown('</div>', unsafe_allow_html=True)
             else: 
                 st.info("💡 目前資料庫為空，尚無派工紀錄")
@@ -206,18 +202,27 @@ else:
         st.markdown('<h2 style="color:#1e40af;">📝 任務派發 / 內容修正</h2>', unsafe_allow_html=True)
         c1, c2, c3, c4 = st.columns(4)
         t_o = c1.selectbox("1. 製令編號", order_list)
-        t_p = c2.selectbox("2. 製造工序", process_list)
-        t_l = c3.selectbox("3. 指派組長", all_leaders)
+        t_l = c3.selectbox("3. 指派組長", all_leaders) # 調換順序，先選組長
+
+        # --- 邏輯修正：工序連動組長 ---
+        my_processes = process_map.get(t_l, [])
+        display_processes = my_processes if my_processes else process_list
+        t_p = c2.selectbox("2. 製造工序", display_processes)
+        
         t_d = c4.date_input("4. 通電日期")
         st.write("---")
+        
+        # 人員連動組長
         my_team = leader_map.get(t_l, [])
         display_staff = my_team if my_team else all_staff
-        st.caption(f"💡 目前 {t_l} 的組員名單：{', '.join(display_staff) if display_staff else '未綁定(顯示全部)'}")
+        st.caption(f"💡 目前 {t_l} 的組員名單：{', '.join(display_staff) if display_staff else '未綁定'} | 負責工序：{', '.join(my_processes) if my_processes else '全部'}")
+        
         pc = st.columns(5)
         workers = []
         for i in range(5):
             w = pc[i].selectbox(f"人員 {i+1}", ["NA"] + display_staff, key=f"w{i}")
             workers.append(w)
+            
         if st.button("🚀 準備發布", type="primary", use_container_width=True):
             payload = {"製令": str(t_o), "製造工序": t_p, "組長": t_l, "通電日期": str(t_d), "提交時間": get_now_str()}
             for i in range(5): payload[f"人員{i+1}"] = workers[i]
@@ -255,25 +260,46 @@ else:
                     st.rerun()
 
         st.markdown("---")
+        
+        # 新增：組長與工序對應綁定介面
+        st.markdown("### 🛠️ 組長與工序對應綁定 (快速輸入)")
+        p_map_text_list = [f"{leader}:{','.join(procs)}" for leader, procs in process_map.items()]
+        current_p_map_str = "\n".join(p_map_text_list)
+        with st.form("process_binding_form"):
+            st.info("💡 輸入格式範例：\n陳德文:骨架作業,前置作業\n劉志偉:配電作業,模組作業")
+            new_p_map_str = st.text_area("組長負責工序清單區", value=current_p_map_str, height=150)
+            if st.form_submit_button("🔗 儲存工序綁定關係"):
+                new_p_map = {}
+                try:
+                    lines = [l for l in new_p_map_str.split("\n") if l.strip()]
+                    for line in lines:
+                        if ":" in line:
+                            l_part, p_part = line.split(":", 1)
+                            new_p_map[l_part.strip()] = [x.strip() for x in p_part.split(",") if x.strip()]
+                    new_cfg = settings.copy()
+                    new_cfg["process_map"] = new_p_map
+                    requests.put(f"{SETTING_URL}.json", data=json.dumps(new_cfg))
+                    st.success("✅ 組長工序連動設定已更新！")
+                    st.rerun()
+                except: st.error("格式錯誤")
+
+        st.markdown("---")
         st.markdown("### 👥 組長與人員對應綁定 (快速輸入)")
         map_text_list = [f"{leader}:{','.join(staff_list)}" for leader, staff_list in leader_map.items()]
         current_map_str = "\n".join(map_text_list)
         with st.form("leader_binding_quick_form"):
-            st.info("💡 輸入格式範例：\n劉志偉:徐梓翔,牟育玄,林建安\n陳德文:徐梓翔,胡瑄芸")
-            new_map_str = st.text_area("所有組長綁定清單區 (可直接貼上)", value=current_map_str, height=250)
-            if st.form_submit_button("🔗 儲存所有綁定關係"):
+            new_map_str = st.text_area("所有組長綁員名單區", value=current_map_str, height=200)
+            if st.form_submit_button("🔗 儲存人員綁定關係"):
                 new_map = {}
                 try:
-                    lines = new_map_str.split("\n")
+                    lines = [l for l in new_map_str.split("\n") if l.strip()]
                     for line in lines:
                         if ":" in line:
                             leader_part, staff_part = line.split(":", 1)
-                            l_name = leader_part.strip()
-                            s_list = [x.strip() for x in staff_part.split(",") if x.strip()]
-                            if l_name: new_map[l_name] = s_list
+                            new_map[leader_part.strip()] = [x.strip() for x in staff_part.split(",") if x.strip()]
                     new_cfg = settings.copy()
                     new_cfg["leader_map"] = new_map
                     requests.put(f"{SETTING_URL}.json", data=json.dumps(new_cfg))
-                    st.success("✅ 所有組長的人員綁定已更新！")
+                    st.success("✅ 組長人員綁定已更新！")
                     st.rerun()
-                except Exception: st.error("儲存失敗，請確認格式是否正確。")
+                except Exception: st.error("格式錯誤")
