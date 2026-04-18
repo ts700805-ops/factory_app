@@ -77,7 +77,7 @@ if "user" not in st.session_state:
         st.rerun()
 else:
     st.sidebar.markdown(f"👤 **目前使用者：{st.session_state.user}**")
-    menu = st.sidebar.radio("功能導航", ["📊 製造部公佈欄", "📜 完工紀錄查詢", "📝 任務派發", "⚙️ 設定管理"])
+    menu = st.sidebar.radio("功能導航", ["📊 製造部派工專區", "📜 完工紀錄查詢", "📝 任務派發", "⚙️ 設定管理"])
     
     if st.sidebar.button("登出系統"):
         st.session_state.clear()
