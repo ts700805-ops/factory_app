@@ -84,7 +84,7 @@ else:
         st.rerun()
 
     # --- 📊 製造部公佈欄 ---
-    if menu == "📊 製造部公佈欄":
+    if menu == "📊 製造部派工專區":
         st.markdown('<h1 style="text-align:center; color:#1e40af; font-weight:900;">📋 超慧科技製造部派工進度</h1>', unsafe_allow_html=True)
         with st.container():
             st.markdown('<div class="search-panel">', unsafe_allow_html=True)
