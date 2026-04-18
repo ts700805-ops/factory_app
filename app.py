@@ -54,6 +54,8 @@ st.markdown("""
     .badge-leader { background: #f59e0b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
     .badge-main { background: #1e40af; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
     .badge-sub { background: #e2e8f0; color: #475569; padding: 2px 5px; border-radius: 4px; font-size: 10px; border: 1px solid #cbd5e1; }
+    .search-panel { background: white; padding: 15px; border-radius: 10px; border: 1px solid #cbd5e1; margin-bottom: 20px; }
+    .history-header { background: #f1f5f9; font-weight: bold; border-bottom: 2px solid #cbd5e1; padding: 10px 5px; text-align: left; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -80,22 +82,160 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 📊 製造部公佈欄 (省略邏輯保持不變) ---
+    # --- 📊 製造部公佈欄 ---
     if menu == "📊 製造部公佈欄":
         st.markdown('<h1 style="text-align:center; color:#1e40af; font-weight:900;">📋 超慧科技製造部派工進度</h1>', unsafe_allow_html=True)
-        # ... (此部分邏輯與您提供的相同)
+        with st.container():
+            st.markdown('<div class="search-panel">', unsafe_allow_html=True)
+            c1, c2 = st.columns(2)
+            s_order = c1.selectbox("🔍 篩選製令", ["全部"] + sorted(order_list))
+            s_staff = c2.selectbox("👤 篩選人員/組長", ["全部"] + sorted(list(set(all_leaders + all_staff))))
+            st.markdown('</div>', unsafe_allow_html=True)
+
         try:
             r = requests.get(f"{DB_URL}.json", timeout=10)
             db_data = r.json()
             if db_data and isinstance(db_data, dict):
                 all_logs = [dict(v, id=k) for k, v in db_data.items() if v and isinstance(v, dict)]
                 df = pd.DataFrame(all_logs).fillna("NA")
-                # ... (後續渲染邏輯)
-                st.info("資料載入成功，請於介面查看。")
-            else: st.info("💡 目前資料庫為空")
-        except: st.warning("💡 無法連結資料庫。")
+                unique_orders = df["製令"].unique()
+                filtered_orders = [o for o in unique_orders if (s_order == "全部" or str(o) == str(s_order))]
+                
+                cols = st.columns(3)
+                display_count = 0
+                for o_id in filtered_orders:
+                    o_df = df[df["製令"] == o_id]
+                    if s_staff != "全部":
+                        check_cols = ["組長", "人員1", "人員2", "人員3", "人員4", "人員5"]
+                        if not o_df[[c for c in check_cols if c in o_df.columns]].apply(lambda x: s_staff in x.values, axis=1).any(): continue
 
-    # --- ⚙️ 設定管理 (重點修正區) ---
+                    p_date = str(o_df.iloc[0].get("通電日期", "未設定"))
+                    with cols[display_count % 3]:
+                        st.markdown(f'<div class="order-card"><div class="order-title"><span>📦 製令：{o_id}</span><span class="power-date">⚡ 通電：{p_date}</span></div>', unsafe_allow_html=True)
+                        for proc in process_list:
+                            match = o_df[o_df["製造工序"] == proc]
+                            if not match.empty:
+                                row = match.iloc[0]
+                                row_cols = st.columns([0.85, 0.15]) 
+                                staff_html = f'<div class="badge-leader">L: {row.get("組長","")}</div>'
+                                for i in range(1, 6):
+                                    p_val = row.get(f"人員{i}")
+                                    if p_val not in ["NA", ""]:
+                                        badge_class = "badge-main" if i == 1 else "badge-sub"
+                                        staff_html += f'<div class="{badge_class}">{p_val}</div>'
+                                
+                                with row_cols[0]: 
+                                    st.markdown(f'<div class="table-row-container"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
+                                with row_cols[1]:
+                                    if st.button("✅", key=f"fin_{row['id']}"):
+                                        clean_data = {k: (v if not (isinstance(v, float) and math.isnan(v)) else "NA") for k, v in row.to_dict().items()}
+                                        clean_data["完工時間"] = get_now_str()
+                                        clean_data["完工人員"] = st.session_state.user
+                                        if requests.post(f"{FINISH_URL}.json", data=json.dumps(clean_data)).status_code == 200:
+                                            requests.delete(f"{DB_URL}/{row['id']}.json")
+                                            st.rerun()
+                        st.markdown('</div>', unsafe_allow_html=True)
+                    display_count += 1
+            else: st.info("💡 目前資料庫為空，尚無派工紀錄")
+        except: st.warning("💡 系統提示：目前無可顯示之派工資料。")
+
+    # --- 📜 完工紀錄查詢 ---
+    elif menu == "📜 完工紀錄查詢":
+        st.markdown('<h2 style="color:#1e40af;">📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
+        try:
+            r = requests.get(f"{FINISH_URL}.json", timeout=10)
+            f_data = r.json()
+            if f_data and isinstance(f_data, dict):
+                all_finish_logs = [dict(v, id=k) for k, v in f_data.items() if v]
+                f_df = pd.DataFrame(all_finish_logs).fillna("NA")
+                st.markdown('<div class="search-panel">', unsafe_allow_html=True)
+                sc1, sc2 = st.columns(2)
+                f_order_input = sc1.text_input("🔍 搜尋製令 (關鍵字過濾)", key="search_box")
+                f_staff_s = sc2.selectbox("👤 搜尋人員", ["全部"] + sorted(all_staff))
+                st.markdown('</div>', unsafe_allow_html=True)
+
+                filtered_df = f_df.copy()
+                if f_order_input:
+                    filtered_df = filtered_df[filtered_df["製令"].astype(str).str.contains(f_order_input, case=False, na=False)]
+                if f_staff_s != "全部":
+                    staff_cols = ["人員1", "人員2", "人員3", "人員4", "人員5"]
+                    mask = filtered_df[staff_cols].apply(lambda row: f_staff_s in row.values, axis=1)
+                    filtered_df = filtered_df[mask]
+
+                if not filtered_df.empty:
+                    filtered_df = filtered_df.sort_values("完工時間", ascending=False)
+                    col_widths = [1.5, 1.2, 1.2, 0.8, 0.8, 0.8, 0.8, 0.8, 0.6]
+                    h_cols = st.columns(col_widths)
+                    headers = ["完工時間", "製令", "製造工序", "人員1", "人員2", "人員3", "人員4", "人員5", "管理"]
+                    for h_col, h_text in zip(h_cols, headers):
+                        h_col.markdown(f'<div class="history-header">{h_text}</div>', unsafe_allow_html=True)
+
+                    for _, row in filtered_df.iterrows():
+                        r_cols = st.columns(col_widths)
+                        r_cols[0].write(row.get("完工時間", "NA"))
+                        r_cols[1].write(row.get("製令", "NA"))
+                        r_cols[2].write(row.get("製造工序", "NA"))
+                        r_cols[3].write(row.get("人員1", "NA"))
+                        r_cols[4].write(row.get("人員2", "NA"))
+                        r_cols[5].write(row.get("人員3", "NA"))
+                        r_cols[6].write(row.get("人員4", "NA"))
+                        r_cols[7].write(row.get("人員5", "NA"))
+                        with r_cols[8]:
+                            with st.popover("🗑️"):
+                                st.write("確認刪除紀錄？")
+                                pwd = st.text_input("管理密碼", type="password", key=f"pwd_{row['id']}")
+                                if st.button("執行刪除", key=f"btn_{row['id']}"):
+                                    if pwd == "1111":
+                                        requests.delete(f"{FINISH_URL}/{row['id']}.json")
+                                        st.success("已刪除")
+                                        st.rerun()
+                                    else: st.error("錯誤")
+                else: st.warning("⚠️ 查無資料")
+            else: st.info("💡 目前歷史紀錄為空")
+        except Exception as e: st.error(f"讀取失敗：{e}")
+
+    # --- 📝 任務派發 ---
+    elif menu == "📝 任務派發":
+        st.markdown('<h2 style="color:#1e40af;">📝 任務派發 / 內容修正</h2>', unsafe_allow_html=True)
+        c1, c2, c3, c4 = st.columns(4)
+        t_o = c1.selectbox("1. 製令編號", order_list)
+        t_l = c3.selectbox("3. 指派組長", all_leaders)
+
+        my_processes = process_map.get(t_l, [])
+        display_processes = my_processes if my_processes else process_list
+        t_p = c2.selectbox("2. 製造工序", display_processes)
+        t_d = c4.date_input("4. 通電日期")
+        st.write("---")
+        
+        my_team = leader_map.get(t_l, [])
+        display_staff = my_team if my_team else all_staff
+        st.caption(f"💡 目前 {t_l} 的組員名單：{', '.join(display_staff) if display_staff else '未綁定'} | 負責工序：{', '.join(my_processes) if my_processes else '全部'}")
+        
+        pc = st.columns(5)
+        workers = []
+        for i in range(5):
+            w = pc[i].selectbox(f"人員 {i+1}", ["NA"] + display_staff, key=f"w{i}")
+            workers.append(w)
+            
+        if st.button("🚀 準備發布", type="primary", use_container_width=True):
+            payload = {"製令": str(t_o), "製造工序": t_p, "組長": t_l, "通電日期": str(t_d), "提交時間": get_now_str()}
+            for i in range(5): payload[f"人員{i+1}"] = workers[i]
+            try:
+                r = requests.get(f"{DB_URL}.json")
+                r_check = r.json()
+                target_key = None
+                if r_check and isinstance(r_check, dict):
+                    target_key = next((k for k, v in r_check.items() if v and v.get("製令")==str(t_o) and v.get("製造工序")==t_p), None)
+                
+                if target_key: requests.put(f"{DB_URL}/{target_key}.json", data=json.dumps(payload))
+                else: requests.post(f"{DB_URL}.json", data=json.dumps(payload))
+                
+                st.balloons() # 新增氣球效果
+                st.success(f"✅ 製令 {t_o} 發布完成！")
+                st.rerun()
+            except Exception as e: st.error(f"發布失敗：{str(e)}")
+
+    # --- ⚙️ 設定管理 ---
     elif menu == "⚙️ 設定管理":
         st.markdown('<h2 style="color:#1e40af;">⚙️ 系統資料後台管理</h2>', unsafe_allow_html=True)
         
@@ -119,65 +259,49 @@ else:
 
         st.markdown("---")
         
-        # 🛠️ 組長工序綁定修正
+        # 組長工序綁定
         st.markdown("### 🛠️ 組長與工序對應綁定")
         p_map_text_list = [f"{leader}:{','.join(procs)}" for leader, procs in process_map.items()]
         current_p_map_str = "\n".join(p_map_text_list)
-        
         with st.form("process_binding_form"):
             st.info("💡 格式：組長姓名:工序1,工序2 (支援全形符號)")
             new_p_map_str = st.text_area("工序綁定清單區", value=current_p_map_str, height=150)
-            submitted = st.form_submit_button("🔗 儲存工序綁定")
-            
-            if submitted:
+            if st.form_submit_button("🔗 儲存工序綁定"):
                 new_p_map = {}
-                parse_error = False
-                lines = [l.strip() for l in new_p_map_str.split("\n") if l.strip()]
-                for line in lines:
-                    line = line.replace("：", ":")
-                    if ":" in line:
-                        l_part, p_part = line.split(":", 1)
-                        new_p_map[l_part.strip()] = [x.strip() for x in p_part.replace("，", ",").split(",") if x.strip()]
-                    else:
-                        parse_error = True
-                
-                if not parse_error:
+                try:
+                    lines = [l.strip() for l in new_p_map_str.split("\n") if l.strip()]
+                    for line in lines:
+                        line = line.replace("：", ":")
+                        if ":" in line:
+                            l_part, p_part = line.split(":", 1)
+                            new_p_map[l_part.strip()] = [x.strip() for x in p_part.replace("，", ",").split(",") if x.strip()]
                     new_cfg = settings.copy()
                     new_cfg["process_map"] = new_p_map
                     requests.put(f"{SETTING_URL}.json", data=json.dumps(new_cfg))
                     st.success("✅ 工序連動已更新！")
                     st.rerun()
-                else:
-                    st.error("❌ 格式錯誤：請確保每一行都有冒號 (組長姓名:工序)")
+                except: st.error("❌ 格式錯誤，請檢查冒號與逗號")
 
         st.markdown("---")
         
-        # 👥 組長人員綁定修正
+        # 組長人員綁定
         st.markdown("### 👥 組長與人員對應綁定")
         map_text_list = [f"{leader}:{','.join(staff_list)}" for leader, staff_list in leader_map.items()]
         current_map_str = "\n".join(map_text_list)
-        
         with st.form("leader_binding_quick_form"):
             new_map_str = st.text_area("組員綁定清單區", value=current_map_str, height=200)
-            submitted_staff = st.form_submit_button("🔗 儲存人員綁定")
-            
-            if submitted_staff:
+            if st.form_submit_button("🔗 儲存人員綁定"):
                 new_map = {}
-                parse_error = False
-                lines = [l.strip() for l in new_map_str.split("\n") if l.strip()]
-                for line in lines:
-                    line = line.replace("：", ":")
-                    if ":" in line:
-                        leader_part, staff_part = line.split(":", 1)
-                        new_map[leader_part.strip()] = [x.strip() for x in staff_part.replace("，", ",").split(",") if x.strip()]
-                    else:
-                        parse_error = True
-                
-                if not parse_error:
+                try:
+                    lines = [l.strip() for l in new_map_str.split("\n") if l.strip()]
+                    for line in lines:
+                        line = line.replace("：", ":")
+                        if ":" in line:
+                            leader_part, staff_part = line.split(":", 1)
+                            new_map[leader_part.strip()] = [x.strip() for x in staff_part.replace("，", ",").split(",") if x.strip()]
                     new_cfg = settings.copy()
                     new_cfg["leader_map"] = new_map
                     requests.put(f"{SETTING_URL}.json", data=json.dumps(new_cfg))
                     st.success("✅ 人員綁定已更新！")
                     st.rerun()
-                else:
-                    st.error("❌ 格式錯誤：請確保每一行都有冒號 (組長姓名:組員1,組員2)")
+                except: st.error("❌ 格式錯誤，請檢查冒號與逗號")
