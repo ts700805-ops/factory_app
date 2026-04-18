@@ -36,7 +36,7 @@ def get_settings():
         return default_settings
 
 # --- 2. 介面樣式 ---
-st.set_page_config(page_title="大量科技公佈欄", layout="wide")
+st.set_page_config(page_title="超慧科技公佈欄", layout="wide")
 
 st.markdown("""
     <style>
@@ -64,7 +64,7 @@ process_list = settings.get("processes", [])
 order_list = settings.get("order_list", [])
 
 if "user" not in st.session_state:
-    st.title("⚓ 大量科技公佈欄 - 登入")
+    st.title("⚓ 超慧科技公佈欄 - 登入")
     u = st.selectbox("👤 請選擇您的姓名", sorted(list(set(all_leaders + all_staff))))
     if st.button("確認進入"):
         st.session_state.user = u
@@ -79,7 +79,7 @@ else:
 
     # --- 📊 製造部公佈欄 ---
     if menu == "📊 製造部公佈欄":
-        st.markdown('<h1 style="text-align:center; color:#1e40af; font-weight:900;">📋 大量科技製造部派工進度</h1>', unsafe_allow_html=True)
+        st.markdown('<h1 style="text-align:center; color:#1e40af; font-weight:900;">📋 超慧科技製造部派工進度</h1>', unsafe_allow_html=True)
         with st.container():
             st.markdown('<div class="search-panel">', unsafe_allow_html=True)
             c1, c2 = st.columns(2)
@@ -138,7 +138,7 @@ else:
         except Exception as e: 
             st.warning(f"⚠️ 公佈欄讀取暫時中斷：{e}")
 
-    # --- 📜 完工紀錄查詢 (修正版本) ---
+    # --- 📜 完工紀錄查詢 (嚴格保持版本) ---
     elif menu == "📜 完工紀錄查詢":
         st.markdown('<h2 style="color:#1e40af;">📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
         try:
