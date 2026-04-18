@@ -161,7 +161,7 @@ else:
                         
                         for proc in process_list:
                             match = o_df[o_df["製造工序"] == proc]
-                            row_cols = st.columns([0.85, 0.15]) # 分開顯示人員與完工按鈕
+                            row_cols = st.columns([0.85, 0.15])
                             
                             if not match.empty:
                                 row = match.iloc[0]
@@ -177,12 +177,10 @@ else:
                                 with row_cols[0]:
                                     st.markdown(f'<div class="table-row"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
                                 with row_cols[1]:
-                                    # 完工按鈕
                                     if st.button("✅", key=f"fin_{row['id']}", help=f"點擊【{proc}】完工"):
                                         finish_data = row.to_dict()
                                         finish_data["完工時間"] = get_now_str()
                                         finish_data["完工人員"] = st.session_state.user
-                                        # 1. 寫入完工庫 2. 刪除派工庫
                                         requests.post(f"{FINISH_URL}.json", data=json.dumps(finish_data))
                                         requests.delete(f"{DB_BASE_URL}/work_logs/{row['id']}.json")
                                         st.rerun()
@@ -200,9 +198,12 @@ else:
             r = requests.get(f"{FINISH_URL}.json", timeout=5)
             f_data = r.json()
             if f_data:
-                f_list = [v for k, v in f_data.items()]
+                f_list = [v for k, v in f_data.items() if v and isinstance(v, dict)]
                 f_df = pd.DataFrame(f_list)
-                # 整理欄位順序與顯示
+                # 確保必要欄位存在
+                for col in ["完工時間", "製令", "製造工序", "組長", "人員1", "完工人員"]:
+                    if col not in f_df.columns: f_df[col] = "-"
+                
                 show_cols = ["完工時間", "製令", "製造工序", "組長", "人員1", "完工人員"]
                 st.dataframe(f_df[show_cols].sort_values("完工時間", ascending=False), use_container_width=True)
             else:
