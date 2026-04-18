@@ -5,10 +5,10 @@ import requests
 import json
 import math
 
-# --- 1. 核心資料與設定 ---
+# --- 1. 核心資料與設定 (修正隱形字元與路徑) ---
 DB_BASE_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
 DB_URL = f"{DB_BASE_URL}/work_logs"
-FINISH_URL = f"{DB_BASE_URL}/completed_logs"
+FINISH_URL = f"{DB_BASE_URL}/completed_logs" 
 SETTING_URL = f"{DB_BASE_URL}/settings"
 
 def get_now_str():
@@ -111,9 +111,12 @@ else:
                         st.markdown(f'<div class="order-card"><div class="order-title"><span>📦 製令：{o_id}</span><span class="power-date">⚡ 通電：{p_date}</span></div>', unsafe_allow_html=True)
                         for proc in process_list:
                             match = o_df[o_df["製造工序"] == proc]
-                            row_cols = st.columns([0.85, 0.15]) 
+                            
+                            # --- 修正後的顯示邏輯：僅顯示有派工且未完工的項目 ---
                             if not match.empty:
                                 row = match.iloc[0]
+                                row_cols = st.columns([0.85, 0.15]) 
+                                
                                 staff_html = f'<div class="badge-leader">L: {row.get("組長","")}</div>'
                                 for i in range(1, 6):
                                     p_val = row.get(f"人員{i}")
@@ -124,22 +127,19 @@ else:
                                 with row_cols[0]: 
                                     st.markdown(f'<div class="table-row-container"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
                                 with row_cols[1]:
-                                    # 修正：完工按鈕邏輯
+                                    st.markdown('<div class="btn-container">', unsafe_allow_html=True)
                                     if st.button("✅", key=f"fin_{row['id']}"):
                                         clean_data = {k: (v if not (isinstance(v, float) and math.isnan(v)) else "NA") for k, v in row.to_dict().items()}
                                         clean_data["完工時間"] = get_now_str()
                                         clean_data["完工人員"] = st.session_state.user
                                         
-                                        # 1. 寫入完工資料庫
-                                        post_r = requests.post(f"{FINISH_URL}.json", data=json.dumps(clean_data))
-                                        if post_r.status_code == 200:
-                                            # 2. 刪除派工資料庫對應項目
-                                            del_r = requests.delete(f"{DB_URL}/{row['id']}.json")
-                                            # 3. 強制刷新頁面
-                                            st.rerun()
-                            else:
-                                with row_cols[0]: 
-                                    st.markdown(f'<div class="table-row-container"><div class="cell-proc" style="color:#cbd5e1;">{proc}</div><div class="cell-staff" style="color:#cbd5e1; font-size:12px;">未派工</div></div>', unsafe_allow_html=True)
+                                        # 先存入完工庫，成功後刪除派工庫
+                                        if requests.post(f"{FINISH_URL}.json", data=json.dumps(clean_data)).status_code == 200:
+                                            requests.delete(f"{DB_URL}/{row['id']}.json")
+                                            st.rerun() # 立即刷新，該工序就會從畫面上消失
+                                    st.markdown('</div>', unsafe_allow_html=True)
+                            # --- 原本顯示「未派工」的 else 區塊已移除，以達到完工後自動消失的效果 ---
+
                         st.markdown('</div>', unsafe_allow_html=True)
             else: 
                 st.info("💡 目前資料庫為空，尚無派工紀錄")
