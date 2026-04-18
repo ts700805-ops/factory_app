@@ -154,28 +154,18 @@ else:
                         if not o_df[check_cols].apply(lambda x: s_staff in x.values, axis=1).any(): continue
 
                     with cols[idx % 3]:
-                        st.markdown(f'''
-                            <div class="order-card">
-                                <div class="order-title">
-                                    <span>📦 製令：{o_id}</span>
-                                    <span class="power-date">⚡ 通電：{p_date}</span>
-                                </div>
-                        ''', unsafe_allow_html=True)
-                        
+                        st.markdown(f'''<div class="order-card"><div class="order-title"><span>📦 製令：{o_id}</span><span class="power-date">⚡ 通電：{p_date}</span></div>''', unsafe_allow_html=True)
                         for proc in process_list:
                             match = o_df[o_df["製造工序"] == proc]
                             row_cols = st.columns([0.85, 0.15])
-                            
                             if not match.empty:
                                 row = match.iloc[0]
                                 leader = row.get("組長", "-")
                                 w1 = row.get("人員1", "NA")
                                 others = [row.get(f"人員{i}") for i in range(2, 6) if row.get(f"人員{i}") not in ["NA", None, ""]]
-                                
                                 staff_html = f'<div class="badge-leader">L: {leader}</div>'
                                 if w1 != "NA": staff_html += f'<div class="badge-main">{w1}</div>'
                                 staff_html += "".join([f'<div class="badge-sub">{s}</div>' for s in others])
-                                
                                 with row_cols[0]:
                                     st.markdown(f'<div class="table-row"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
                                 with row_cols[1]:
@@ -183,50 +173,92 @@ else:
                                         finish_data = {k: (v if not (isinstance(v, float) and math.isnan(v)) else "NA") for k, v in row.to_dict().items()}
                                         finish_data["完工時間"] = get_now_str()
                                         finish_data["完工人員"] = st.session_state.user
-                                        
                                         try:
                                             res_post = requests.post(f"{FINISH_URL}.json", data=json.dumps(finish_data), timeout=10)
                                             if res_post.status_code == 200:
                                                 requests.delete(f"{DB_URL}/{row['id']}.json", timeout=10)
                                                 st.success("完工成功！")
                                                 st.rerun()
-                                            else:
-                                                st.error(f"寫入失敗: {res_post.status_code}")
-                                        except Exception as e:
-                                            st.error(f"連線失敗: {str(e)}")
+                                        except: st.error("連線失敗")
                             else:
                                 with row_cols[0]:
                                     st.markdown(f'<div class="table-row"><div class="cell-proc" style="color:#cbd5e1;">{proc}</div><div class="cell-staff" style="color:#cbd5e1; font-size:11px;">未派工</div></div>', unsafe_allow_html=True)
                         st.markdown('</div>', unsafe_allow_html=True)
-            else:
-                st.info("💡 目前沒有任何派工紀錄。")
-        except Exception as e:
-            st.error(f"❌ 讀取資料庫失敗")
+            else: st.info("💡 目前沒有任何派工紀錄。")
+        except: st.error("❌ 讀取資料庫失敗")
 
-    # --- 📜 完工紀錄查詢 (更新部分：顯示人員 1-5，隱藏組長與完工人員) ---
+    # --- 📜 完工紀錄查詢 (新增篩選與刪除功能) ---
     elif menu == "📜 完工紀錄查詢":
         st.markdown('<h2 style="color:#1e40af;">📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
+        
         try:
             r = requests.get(f"{FINISH_URL}.json", timeout=10)
             f_data = r.json()
             if f_data:
-                f_list = [v for k, v in f_data.items() if isinstance(v, dict)]
+                # 轉化為清單並包含 ID 供刪除使用
+                f_list = [dict(v, id=k) for k, v in f_data.items() if isinstance(v, dict)]
                 f_df = pd.DataFrame(f_list)
                 
-                # 確保人員 1~5 欄位都存在並處理缺失值
+                # 確保欄位存在
                 display_cols = ["完工時間", "製令", "製造工序", "人員1", "人員2", "人員3", "人員4", "人員5"]
                 for col in display_cols:
-                    if col not in f_df.columns:
-                        f_df[col] = "NA"
-                
+                    if col not in f_df.columns: f_df[col] = "NA"
                 f_df = f_df.fillna("NA")
-                
-                # 顯示表格，僅包含指定的 8 個欄位
-                st.dataframe(f_df[display_cols].sort_values("完工時間", ascending=False), use_container_width=True)
-            else:
-                st.info("目前尚無完工紀錄")
-        except:
-            st.error("無法取得完工紀錄")
+
+                # --- 篩選介面 ---
+                st.markdown('<div class="search-panel">', unsafe_allow_html=True)
+                sc1, sc2 = st.columns(2)
+                filter_o = sc1.selectbox("🔍 搜尋製令", ["全部"] + sorted(f_df["製令"].unique().tolist()))
+                filter_s = sc2.selectbox("👤 搜尋人員", ["全部"] + sorted(all_staff))
+                st.markdown('</div>', unsafe_allow_html=True)
+
+                # 執行篩選邏輯
+                if filter_o != "全部":
+                    f_df = f_df[f_df["製令"] == filter_o]
+                if filter_s != "全部":
+                    p_cols = ["人員1", "人員2", "人員3", "人員4", "人員5"]
+                    f_df = f_df[f_df[p_cols].apply(lambda x: filter_s in x.values, axis=1)]
+
+                # --- 表格顯示與刪除邏輯 ---
+                # 使用循環生成表格列，以便加入刪除按鈕
+                st.markdown("---")
+                header_cols = st.columns([1.5, 1, 1, 1, 1, 1, 1, 1, 0.5])
+                headers = ["完工時間", "製令", "工序", "人員1", "人員2", "人員3", "人員4", "人員5", "操作"]
+                for i, h in enumerate(headers): header_cols[i].write(f"**{h}**")
+
+                for _, row in f_df.sort_values("完工時間", ascending=False).iterrows():
+                    r_cols = st.columns([1.5, 1, 1, 1, 1, 1, 1, 1, 0.5])
+                    r_cols[0].write(row["完工時間"])
+                    r_cols[1].write(row["製令"])
+                    r_cols[2].write(row["製造工序"])
+                    r_cols[3].write(row["人員1"])
+                    r_cols[4].write(row["人員2"])
+                    r_cols[5].write(row["人員3"])
+                    r_cols[6].write(row["人員4"])
+                    r_cols[7].write(row["人員5"])
+                    
+                    if r_cols[8].button("🗑️", key=f"del_{row['id']}"):
+                        st.session_state.delete_target = row['id']
+                        st.session_state.delete_info = f"{row['製令']} - {row['製造工序']}"
+
+                # 彈出刪除確認對話框
+                if "delete_target" in st.session_state:
+                    st.error(f"⚠️ 確定要刪除紀錄：{st.session_state.delete_info} 嗎？")
+                    pwd = st.text_input("🔑 請輸入刪除密碼", type="password", help="請輸入 1111")
+                    dc1, dc2, _ = st.columns([1, 1, 4])
+                    if dc1.button("🔥 確認刪除", type="primary"):
+                        if pwd == "1111":
+                            res = requests.delete(f"{FINISH_URL}/{st.session_state.delete_target}.json", timeout=10)
+                            if res.status_code == 200:
+                                st.success("已成功刪除！")
+                                del st.session_state.delete_target
+                                st.rerun()
+                        else: st.warning("❌ 密碼錯誤，請輸入 1111")
+                    if dc2.button("取消"):
+                        del st.session_state.delete_target
+                        st.rerun()
+            else: st.info("目前尚無完工紀錄")
+        except: st.error("無法取得完工紀錄")
 
     # --- 📝 任務派發 ---
     elif menu == "📝 任務派發":
@@ -241,14 +273,11 @@ else:
             target_p = c2.selectbox("2. 製造工序", process_list)
             target_l = c3.selectbox("3. 指派組長", all_leaders)
             target_d = c4.date_input("4. 通電日期", datetime.date.today())
-            
             st.write("---")
             st.write("🔧 分派組員 (人員 1 為主要標籤)")
             pc = st.columns(5)
             workers = [pc[i].selectbox(f"人員 {i+1}", ["NA"] + all_staff, key=f"ws_{i}") for i in range(5)]
-            submit_clicked = st.form_submit_button("🚀 準備發布")
-            
-            if submit_clicked:
+            if st.form_submit_button("🚀 準備發布"):
                 try:
                     r = requests.get(f"{DB_URL}.json", timeout=10)
                     db_data = r.json()
@@ -258,39 +287,30 @@ else:
                             if str(val.get("製令")) == str(target_o) and val.get("製造工序") == target_p:
                                 target_key = key
                                 break
-                    
                     payload = {
-                        "製令": str(target_o), 
-                        "製造工序": target_p, 
-                        "組長": target_l,
-                        "通電日期": str(target_d),
+                        "製令": str(target_o), "製造工序": target_p, "組長": target_l, "通電日期": str(target_d),
                         "人員1": workers[0], "人員2": workers[1], "人員3": workers[2], "人員4": workers[3], "人員5": workers[4],
                         "提交時間": get_now_str()
                     }
-
                     if target_key:
                         st.session_state.pending_payload = payload
                         st.session_state.pending_key = target_key
+                        st.rerun()
                     else:
-                        res = requests.post(f"{DB_URL}.json", data=json.dumps(payload), timeout=10)
-                        if res.status_code == 200:
-                            st.success(f"✅ 已成功新增製令 {target_o} 派工")
-                            st.rerun()
-                except:
-                    st.error(f"❌ 連線異常")
+                        requests.post(f"{DB_URL}.json", data=json.dumps(payload), timeout=10)
+                        st.success(f"✅ 已成功新增製令 {target_o}")
+                        st.rerun()
+                except: st.error("連線異常")
 
         if st.session_state.pending_payload:
-            st.warning(f"⚠️ 是否覆蓋製令【{st.session_state.pending_payload['製令']}】的【{st.session_state.pending_payload['製造工序']}】紀錄？")
+            st.warning(f"⚠️ 是否覆蓋紀錄？")
             cc1, cc2, _ = st.columns([1, 1, 2])
             if cc1.button("✅ 確認覆蓋", type="primary"):
-                res = requests.put(f"{DB_URL}/{st.session_state.pending_key}.json", data=json.dumps(st.session_state.pending_payload))
-                if res.status_code == 200:
-                    st.session_state.pending_payload = None
-                    st.session_state.pending_key = None
-                    st.rerun()
+                requests.put(f"{DB_URL}/{st.session_state.pending_key}.json", data=json.dumps(st.session_state.pending_payload))
+                st.session_state.pending_payload = None
+                st.rerun()
             if cc2.button("❌ 取消"):
                 st.session_state.pending_payload = None
-                st.session_state.pending_key = None
                 st.rerun()
 
     # --- ⚙️ 設定管理 ---
