@@ -90,7 +90,7 @@ else:
         try:
             r = requests.get(f"{DB_URL}.json", timeout=10)
             db_data = r.json()
-            if db_data:
+            if db_data and isinstance(db_data, dict):
                 all_logs = [dict(v, id=k) for k, v in db_data.items() if v and isinstance(v, dict)]
                 df = pd.DataFrame(all_logs).fillna("NA")
                 unique_orders = df["製令"].unique()
@@ -133,16 +133,18 @@ else:
                                 with row_cols[0]: 
                                     st.markdown(f'<div class="table-row-container"><div class="cell-proc" style="color:#cbd5e1;">{proc}</div><div class="cell-staff" style="color:#cbd5e1; font-size:12px;">未派工</div></div>', unsafe_allow_html=True)
                         st.markdown('</div>', unsafe_allow_html=True)
-            else: st.info("💡 目前無派工紀錄")
-        except: st.error("❌ 連線異常")
+            else: 
+                st.info("💡 目前資料庫為空，尚無派工紀錄")
+        except Exception as e: 
+            st.warning(f"⚠️ 公佈欄讀取暫時中斷：{e}")
 
-    # --- 📜 完工紀錄查詢 (修正刪除報錯版本) ---
+    # --- 📜 完工紀錄查詢 (修正版本) ---
     elif menu == "📜 完工紀錄查詢":
         st.markdown('<h2 style="color:#1e40af;">📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
         try:
             r = requests.get(f"{FINISH_URL}.json", timeout=10)
             f_data = r.json()
-            if f_data:
+            if f_data and isinstance(f_data, dict):
                 all_finish_logs = [dict(v, id=k) for k, v in f_data.items() if v]
                 f_df = pd.DataFrame(all_finish_logs).fillna("NA")
 
@@ -158,13 +160,11 @@ else:
                 f_df = f_df.sort_values("完工時間", ascending=False)
                 col_widths = [1.5, 1.2, 1.2, 0.8, 0.8, 0.8, 0.8, 0.8, 0.6]
                 
-                # 繪製表頭
                 h_cols = st.columns(col_widths)
                 headers = ["完工時間", "製令", "製造工序", "人員1", "人員2", "人員3", "人員4", "人員5", "管理"]
                 for h_col, h_text in zip(h_cols, headers):
                     h_col.markdown(f'<div class="history-header">{h_text}</div>', unsafe_allow_html=True)
 
-                # 繪製內容
                 for _, row in f_df.iterrows():
                     r_cols = st.columns(col_widths)
                     r_cols[0].write(row.get("完工時間", "NA"))
@@ -177,7 +177,6 @@ else:
                     r_cols[7].write(row.get("人員5", "NA"))
                     
                     with r_cols[8]:
-                        # 修正：刪除邏輯改為直接執行並 rerun，避免 ID 殘留導致讀取失敗
                         with st.popover("🗑️"):
                             st.write("確認刪除？")
                             pwd = st.text_input("密碼", type="password", key=f"pwd_{row['id']}")
@@ -185,13 +184,15 @@ else:
                                 if pwd == "1111":
                                     del_res = requests.delete(f"{FINISH_URL}/{row['id']}.json")
                                     if del_res.status_code == 200:
-                                        st.rerun() # 立即重整，防止程式試圖渲染已不存在的資料
+                                        st.rerun()
                                     else:
                                         st.error("刪除失敗")
                                 else:
                                     st.error("密碼錯誤")
-            else: st.info("目前無紀錄")
-        except: st.error("資料讀取異常")
+            else: 
+                st.info("💡 目前歷史紀錄為空")
+        except Exception as e: 
+            st.warning(f"⚠️ 歷史紀錄讀取暫時中斷：{e}")
 
     # --- 📝 任務派發 ---
     elif menu == "📝 任務派發":
@@ -209,8 +210,8 @@ else:
                 payload = {"製令": str(t_o), "製造工序": t_p, "組長": t_l, "通電日期": str(t_d), "提交時間": get_now_str()}
                 for i in range(5): payload[f"人員{i+1}"] = workers[i]
                 try:
-                    exist_r = requests.get(f"{DB_URL}.json").json()
-                    target_key = next((k for k, v in exist_r.items() if v.get("製令")==str(t_o) and v.get("製造工序")==t_p), None) if exist_r else None
+                    r_check = requests.get(f"{DB_URL}.json").json()
+                    target_key = next((k for k, v in r_check.items() if v and v.get("製令")==str(t_o) and v.get("製造工序")==t_p), None) if r_check else None
                     if target_key: requests.put(f"{DB_URL}/{target_key}.json", data=json.dumps(payload))
                     else: requests.post(f"{DB_URL}.json", data=json.dumps(payload))
                     st.success(f"✅ 製令 {t_o} 發布完成！")
