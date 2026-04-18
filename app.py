@@ -32,7 +32,7 @@ def get_settings():
     except:
         return default_settings
 
-# --- 2. 介面樣式 (針對顯示進行優化) ---
+# --- 2. 介面樣式 (針對格線對齊與連結感優化) ---
 st.set_page_config(page_title="超慧科技公佈欄", layout="wide")
 
 st.markdown("""
@@ -42,68 +42,76 @@ st.markdown("""
     /* 製令卡片主體 */
     .order-card { 
         background: white; 
-        border-radius: 12px; 
-        border: 1px solid #e2e8f0; 
-        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        border-radius: 8px; 
+        border: 2px solid #1e40af; 
         margin-bottom: 25px; 
         overflow: hidden; 
     }
     
-    /* 標題列：深藍背景與黃色電日期 */
+    /* 標題列 */
     .order-title { 
-        background: #2563eb; 
+        background: #1e40af; 
         color: white; 
-        padding: 12px 15px; 
-        font-weight: 800; 
-        font-size: 1.1rem;
+        padding: 10px 15px; 
+        font-weight: 900; 
         display: flex; 
         justify-content: space-between; 
         align-items: center;
+        border-bottom: 2px solid #1e40af;
     }
     .power-date { 
         background: #fbbf24; 
         color: #1e40af; 
-        padding: 4px 12px; 
-        border-radius: 6px; 
-        font-size: 14px; 
-        font-weight: 700;
+        padding: 2px 10px; 
+        border-radius: 4px; 
+        font-size: 13px; 
+        font-weight: bold;
     }
     
-    /* 表格列樣式 */
+    /* 表格列與格線設計：確保格子大小一樣且連結在一起 */
     .table-row { 
         display: flex; 
-        border-bottom: 1px solid #f1f5f9; 
-        min-height: 55px; 
-        align-items: center; 
+        border-bottom: 1px solid #dee2e6; /* 底部邊框連結下一行 */
+        height: 50px; /* 固定高度確保格子大小一致 */
+        align-items: stretch; 
     }
+    .table-row:last-child { border-bottom: none; } /* 最後一行不需底線 */
+
     .cell-proc { 
-        width: 125px; 
-        background: #f8fafc; 
+        width: 120px; 
+        background: #f1f5f9; 
         color: #1e40af; 
-        font-weight: 700; 
-        padding-left: 15px;
+        font-weight: 800; 
+        padding: 0 10px;
         display: flex;
         align-items: center;
-        height: 100%;
-        border-right: 1px solid #f1f5f9;
+        border-right: 1px solid #dee2e6; /* 垂直分隔線 */
+        font-size: 14px;
     }
     .cell-staff { 
         flex-grow: 1; 
-        padding: 8px 15px; 
+        padding: 5px 10px; 
         display: flex; 
+        align-items: center; 
         flex-wrap: wrap; 
-        gap: 8px; 
+        gap: 6px; 
+        background: white;
     }
     
-    /* 人員標籤樣式 */
-    .badge-leader { background: #f59e0b; color: white; padding: 3px 10px; border-radius: 6px; font-size: 13px; font-weight: 600; }
-    .badge-main { background: #1e40af; color: white; padding: 3px 10px; border-radius: 6px; font-size: 13px; font-weight: 600; }
-    .badge-sub { background: #f1f5f9; color: #475569; padding: 3px 10px; border-radius: 6px; font-size: 13px; border: 1px solid #cbd5e1; }
+    /* 人員標籤 */
+    .badge-leader { background: #f59e0b; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+    .badge-main { background: #1e40af; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+    .badge-sub { background: #e2e8f0; color: #475569; padding: 2px 6px; border-radius: 4px; font-size: 11px; border: 1px solid #cbd5e1; }
     
-    /* 未派工狀態樣式 */
-    .no-dispatch { color: #94a3b8; font-size: 13px; font-style: italic; }
+    .no-dispatch { color: #cbd5e1; font-size: 12px; }
+    .search-panel { background: white; padding: 15px; border-radius: 10px; border: 1px solid #cbd5e1; margin-bottom: 20px; }
     
-    .search-panel { background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 25px; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1); }
+    /* 修正按鈕在格子內的間距 */
+    .stButton>button {
+        margin-top: 5px !important;
+        padding: 0px 10px !important;
+        height: 35px !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -128,9 +136,9 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 📊 製造部公佈欄 (顯示優化重點區) ---
+    # --- 📊 製造部公佈欄 (顯示修正：格子大小一致與格線連結) ---
     if menu == "📊 製造部公佈欄":
-        st.markdown('<h1 style="text-align:center; color:#1e40af; font-weight:900; margin-bottom:30px;">📋 超慧科技製造部派工進度</h1>', unsafe_allow_html=True)
+        st.markdown('<h1 style="text-align:center; color:#1e40af; font-weight:900;">📋 超慧科技製造部派工進度</h1>', unsafe_allow_html=True)
         
         with st.container():
             st.markdown('<div class="search-panel">', unsafe_allow_html=True)
@@ -149,7 +157,6 @@ else:
                 unique_orders = df["製令"].unique()
                 filtered_orders = [o for o in unique_orders if (s_order == "全部" or str(o) == str(s_order))]
                 
-                # 使用每排兩個或三個卡片，根據螢幕寬度調整
                 cols = st.columns(3)
                 for idx, o_id in enumerate(filtered_orders):
                     o_df = df[df["製令"] == o_id]
@@ -159,36 +166,26 @@ else:
 
                     p_date = str(o_df.iloc[0].get("通電日期", "未設定"))
                     with cols[idx % 3]:
-                        # 製令卡片頭部
-                        st.markdown(f'''
-                            <div class="order-card">
-                                <div class="order-title">
-                                    <span>📦 製令：{o_id}</span>
-                                    <span class="power-date">⚡ 通電：{p_date}</span>
-                                </div>
-                        ''', unsafe_allow_html=True)
+                        # 製令標題
+                        st.markdown(f'<div class="order-card"><div class="order-title"><span>📦 製令：{o_id}</span><span class="power-date">⚡ 通電：{p_date}</span></div>', unsafe_allow_html=True)
                         
-                        # 逐一顯示工序
+                        # 內容格子（緊密相連）
                         for proc in process_list:
                             match = o_df[o_df["製造工序"] == proc]
-                            row_cols = st.columns([0.82, 0.18])
+                            row_cols = st.columns([0.85, 0.15]) # 左右格子對齊
                             
                             if not match.empty:
                                 row = match.iloc[0]
-                                # 組合人員標籤 HTML
                                 staff_html = f'<div class="badge-leader">L: {row.get("組長","")}</div>'
-                                if row.get("人員1") not in ["NA", ""]: 
-                                    staff_html += f'<div class="badge-main">{row.get("人員1")}</div>'
+                                if row.get("人員1") not in ["NA", ""]: staff_html += f'<div class="badge-main">{row.get("人員1")}</div>'
                                 for i in range(2, 6):
                                     p_val = row.get(f"人員{i}")
-                                    if p_val not in ["NA", ""]: 
-                                        staff_html += f'<div class="badge-sub">{p_val}</div>'
+                                    if p_val not in ["NA", ""]: staff_html += f'<div class="badge-sub">{p_val}</div>'
                                 
                                 with row_cols[0]: 
                                     st.markdown(f'<div class="table-row"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
                                 with row_cols[1]:
-                                    # 垂直居中對齊按鈕
-                                    st.write("")
+                                    # ✅ 按鈕放在獨立列，但視覺上緊貼右側格子
                                     if st.button("✅", key=f"fin_{row['id']}"):
                                         clean_data = {k: (v if not (isinstance(v, float) and math.isnan(v)) else "NA") for k, v in row.to_dict().items()}
                                         clean_data["完工時間"] = get_now_str()
@@ -199,13 +196,12 @@ else:
                                             st.rerun()
                             else:
                                 with row_cols[0]: 
-                                    st.markdown(f'<div class="table-row"><div class="cell-proc" style="color:#94a3b8;">{proc}</div><div class="cell-staff no-dispatch">未派工</div></div>', unsafe_allow_html=True)
-                        
+                                    st.markdown(f'<div class="table-row"><div class="cell-proc" style="color:#cbd5e1;">{proc}</div><div class="cell-staff no-dispatch">未派工</div></div>', unsafe_allow_html=True)
                         st.markdown('</div>', unsafe_allow_html=True)
             else: st.info("💡 目前無派工紀錄")
         except: st.error("❌ 連線異常，請檢查網路或資料庫設定")
 
-    # --- 其餘功能模組 (保持原樣，僅確保 UI 一致性) ---
+    # --- 其餘功能模組 (保持原樣) ---
     elif menu == "📜 完工紀錄查詢":
         st.markdown('<h2 style="color:#1e40af;">📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
         try:
@@ -224,7 +220,6 @@ else:
                 if f_staff != "全部": 
                     f_df = f_df[f_df[["人員1", "人員2", "人員3", "人員4", "人員5"]].apply(lambda x: f_staff in x.values, axis=1)]
 
-                # 顯示表格
                 st.dataframe(f_df.sort_values("完工時間", ascending=False), use_container_width=True)
             else: st.info("目前無紀錄")
         except: st.error("讀取失敗")
