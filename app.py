@@ -18,7 +18,7 @@ def get_now_str():
 def get_settings():
     default_settings = {
         "all_leaders": ["管理員", "組長A", "組長B"],
-        "all_staff": ["徐梓翔", "陳德文", "人員C"], 
+        "all_staff": ["徐梓翔", "陳傳文", "人員C"], 
         "processes": ["骨架作業", "前置作業", "配電作業", "模組作業", "水平調整", "通電作業", "IPQC表單查檢", "S.T作業", "收機清潔", "包機作業", "異常", "欠料", "PACKING", "前置作業(門板組立)"],
         "order_list": ["26M0041-01", "26M0041-02", "26M0051-01", "12345"]
     }
@@ -32,7 +32,7 @@ def get_settings():
     except:
         return default_settings
 
-# --- 2. 介面樣式 (針對格線對齊與連結感優化) ---
+# --- 2. 介面樣式 (修正按鈕對齊與格線) ---
 st.set_page_config(page_title="超慧科技公佈欄", layout="wide")
 
 st.markdown("""
@@ -68,23 +68,21 @@ st.markdown("""
         font-weight: bold;
     }
     
-    /* 表格列與格線設計：強制固定高度與對齊 */
-    .table-row { 
-        display: flex; 
-        border-bottom: 1px solid #dee2e6; 
-        height: 60px; /* 增加一點高度確保人員標籤多時不會溢出 */
-        align-items: stretch; 
-        width: 100%;
+    /* 表格列設計：移除固定高度，讓內容決定高度，但保持水平對齊 */
+    .table-row-container {
+        border-bottom: 1px solid #dee2e6;
+        display: flex;
+        align-items: stretch; /* 讓左右兩欄高度一致 */
     }
-    .table-row:last-child { border-bottom: none; } 
+    .table-row-container:last-child { border-bottom: none; }
 
     .cell-proc { 
-        width: 110px; 
-        min-width: 110px;
+        width: 100px; 
+        min-width: 100px;
         background: #f1f5f9; 
         color: #1e40af; 
         font-weight: 800; 
-        padding: 0 10px;
+        padding: 10px;
         display: flex;
         align-items: center;
         border-right: 1px solid #dee2e6; 
@@ -92,41 +90,42 @@ st.markdown("""
     }
     .cell-staff { 
         flex-grow: 1; 
-        padding: 5px 10px; 
+        padding: 10px; 
         display: flex; 
         align-items: center; 
         flex-wrap: wrap; 
-        gap: 4px; 
+        gap: 6px; 
         background: white;
-        overflow: hidden; /* 防止內容撐開高度 */
     }
     
-    /* 人員標籤 */
-    .badge-leader { background: #f59e0b; color: white; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
-    .badge-main { background: #1e40af; color: white; padding: 1px 6px; border-radius: 4px; font-size: 11px; }
-    .badge-sub { background: #e2e8f0; color: #475569; padding: 1px 5px; border-radius: 4px; font-size: 10px; border: 1px solid #cbd5e1; }
+    /* 按鈕容器：確保與左側格線連貫 */
+    .btn-container {
+        width: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: white;
+        border-left: 1px solid #dee2e6;
+        padding: 0 5px;
+    }
+    
+    /* 人員標籤樣式 */
+    .badge-leader { background: #f59e0b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+    .badge-main { background: #1e40af; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+    .badge-sub { background: #e2e8f0; color: #475569; padding: 2px 5px; border-radius: 4px; font-size: 10px; border: 1px solid #cbd5e1; }
     
     .no-dispatch { color: #cbd5e1; font-size: 12px; }
     .search-panel { background: white; padding: 15px; border-radius: 10px; border: 1px solid #cbd5e1; margin-bottom: 20px; }
     
-    /* 修正按鈕欄位的高度對齊 */
-    .btn-container {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        height: 60px; /* 與 table-row 同高 */
-        border-bottom: 1px solid #dee2e6;
-    }
-    
-    .stButton>button {
-        padding: 0px 5px !important;
-        height: 30px !important;
-        font-size: 12px !important;
+    /* 調整 Streamlit 按鈕原生間距 */
+    div[data-testid="column"] > div > div > div > div > button {
+        margin-top: 0px !important;
+        margin-bottom: 0px !important;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. 核心邏輯讀取 (功能保持不變) ---
+# --- 3. 核心邏輯讀取 ---
 settings = get_settings()
 all_leaders = settings.get("all_leaders", [])
 all_staff = settings.get("all_staff", [])
@@ -181,7 +180,9 @@ else:
                         
                         for proc in process_list:
                             match = o_df[o_df["製造工序"] == proc]
-                            row_cols = st.columns([0.82, 0.18]) 
+                            
+                            # 使用 columns 佈局，將按鈕放在最後一欄
+                            row_cols = st.columns([0.85, 0.15]) 
                             
                             if not match.empty:
                                 row = match.iloc[0]
@@ -192,8 +193,14 @@ else:
                                     if p_val not in ["NA", ""]: staff_html += f'<div class="badge-sub">{p_val}</div>'
                                 
                                 with row_cols[0]: 
-                                    st.markdown(f'<div class="table-row"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
+                                    st.markdown(f'''
+                                        <div class="table-row-container">
+                                            <div class="cell-proc">{proc}</div>
+                                            <div class="cell-staff">{staff_html}</div>
+                                        </div>
+                                    ''', unsafe_allow_html=True)
                                 with row_cols[1]:
+                                    # 利用 CSS class 讓按鈕垂直置中並維持在同一橫排
                                     st.markdown('<div class="btn-container">', unsafe_allow_html=True)
                                     if st.button("✅", key=f"fin_{row['id']}"):
                                         clean_data = {k: (v if not (isinstance(v, float) and math.isnan(v)) else "NA") for k, v in row.to_dict().items()}
@@ -206,7 +213,12 @@ else:
                                     st.markdown('</div>', unsafe_allow_html=True)
                             else:
                                 with row_cols[0]: 
-                                    st.markdown(f'<div class="table-row"><div class="cell-proc" style="color:#cbd5e1;">{proc}</div><div class="cell-staff no-dispatch">未派工</div></div>', unsafe_allow_html=True)
+                                    st.markdown(f'''
+                                        <div class="table-row-container">
+                                            <div class="cell-proc" style="color:#cbd5e1;">{proc}</div>
+                                            <div class="cell-staff no-dispatch">未派工</div>
+                                        </div>
+                                    ''', unsafe_allow_html=True)
                                 with row_cols[1]:
                                     st.markdown('<div class="btn-container"></div>', unsafe_allow_html=True)
                         st.markdown('</div>', unsafe_allow_html=True)
