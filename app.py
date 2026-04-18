@@ -69,13 +69,13 @@ st.markdown("""
         font-size: 13px;
         font-weight: 900;
     }
-    .table-row-container { 
-        display: flex; 
-        border-bottom: 1px solid #dee2e6; 
-        min-height: 48px; 
-        align-items: stretch; 
+    .table-row {
+        display: flex;
+        border-bottom: 1px solid #dee2e6;
+        min-height: 48px;
+        align-items: center;
     }
-    .table-row-container:last-child { border-bottom: none; }
+    .table-row:last-child { border-bottom: none; }
     .cell-proc {
         width: 110px;
         background-color: #f1f5f9;
@@ -84,8 +84,7 @@ st.markdown("""
         font-size: 13px;
         padding: 8px;
         border-right: 1px solid #dee2e6;
-        display: flex;
-        align-items: center;
+        flex-shrink: 0;
     }
     .cell-staff {
         flex-grow: 1;
@@ -95,18 +94,10 @@ st.markdown("""
         gap: 6px;
         align-items: center;
     }
-    .btn-container { 
-        width: 50px; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center; 
-        border-left: 1px solid #dee2e6; 
-    }
     .badge-leader { background: #f59e0b; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 900; }
     .badge-main { background: #1e40af; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 900; }
     .badge-sub { background: #e2e8f0; color: #475569; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; border: 1px solid #cbd5e1; }
     .search-panel { background: white; padding: 15px; border-radius: 10px; border: 1px solid #cbd5e1; margin-bottom: 20px; }
-    .history-header { background: #f1f5f9; font-weight: bold; border-bottom: 2px solid #cbd5e1; padding: 10px 5px; text-align: left; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -119,7 +110,7 @@ order_list = settings["order_list"]
 
 if "user" not in st.session_state:
     st.title("⚓ 大量科技公佈欄 - 登入")
-    u = st.selectbox("👤 請選擇您的姓名", sorted(list(set(all_leaders + all_staff))))
+    u = st.selectbox("👤 請選擇您的姓名", sorted(all_leaders + all_staff))
     if st.button("確認進入"):
         st.session_state.user = u
         st.rerun()
@@ -139,7 +130,7 @@ else:
             st.markdown('<div class="search-panel">', unsafe_allow_html=True)
             c1, c2 = st.columns(2)
             s_order = c1.selectbox("🔍 篩選製令", ["全部"] + sorted(order_list))
-            s_staff = c2.selectbox("👤 篩選人員/組長", ["全部"] + sorted(list(set(all_leaders + all_staff))))
+            s_staff = c2.selectbox("👤 篩選人員/組長", ["全部"] + sorted(all_leaders + all_staff))
             st.markdown('</div>', unsafe_allow_html=True)
 
         try:
@@ -147,7 +138,10 @@ else:
             db_data = r.json()
             if db_data:
                 all_logs = [dict(v, id=k) for k, v in db_data.items() if v and isinstance(v, dict)]
-                df = pd.DataFrame(all_logs).fillna("NA") 
+                df = pd.DataFrame(all_logs)
+                
+                # 修正 NaN 導致的連線錯誤
+                df = df.fillna("NA") 
                 
                 unique_orders = df["製令"].unique()
                 filtered_orders = [o for o in unique_orders if (s_order == "全部" or str(o) == str(s_order))]
@@ -155,12 +149,12 @@ else:
                 cols = st.columns(3)
                 for idx, o_id in enumerate(filtered_orders):
                     o_df = df[df["製令"] == o_id]
-                    
+                    p_date_val = o_df.sort_values("提交時間", ascending=False).iloc[0].get("通電日期", "未設定")
+                    p_date = str(p_date_val) if p_date_val != "nan" else "未設定"
+
                     if s_staff != "全部":
                         check_cols = ["組長"] + [f"人員{i}" for i in range(1, 6) if f"人員{i}" in o_df.columns]
                         if not o_df[check_cols].apply(lambda x: s_staff in x.values, axis=1).any(): continue
-
-                    p_date = str(o_df.iloc[0].get("通電日期", "未設定"))
 
                     with cols[idx % 3]:
                         st.markdown(f'''
@@ -178,31 +172,39 @@ else:
                             if not match.empty:
                                 row = match.iloc[0]
                                 leader = row.get("組長", "-")
+                                w1 = row.get("人員1", "NA")
+                                others = [row.get(f"人員{i}") for i in range(2, 6) if row.get(f"人員{i}") not in ["NA", None, ""]]
+                                
                                 staff_html = f'<div class="badge-leader">L: {leader}</div>'
-                                if row.get("人員1") not in ["NA", ""]: staff_html += f'<div class="badge-main">{row.get("人員1")}</div>'
-                                for i in range(2, 6):
-                                    p_val = row.get(f"人員{i}")
-                                    if p_val not in ["NA", ""]: staff_html += f'<div class="badge-sub">{p_val}</div>'
+                                if w1 != "NA": staff_html += f'<div class="badge-main">{w1}</div>'
+                                staff_html += "".join([f'<div class="badge-sub">{s}</div>' for s in others])
                                 
                                 with row_cols[0]:
-                                    st.markdown(f'<div class="table-row-container"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
+                                    st.markdown(f'<div class="table-row"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
                                 with row_cols[1]:
-                                    st.markdown('<div class="btn-container">', unsafe_allow_html=True)
                                     if st.button("✅", key=f"fin_{row['id']}"):
+                                        # 轉換為字典並過濾掉不符合 JSON 規範的 nan
                                         finish_data = {k: (v if not (isinstance(v, float) and math.isnan(v)) else "NA") for k, v in row.to_dict().items()}
                                         finish_data["完工時間"] = get_now_str()
                                         finish_data["完工人員"] = st.session_state.user
-                                        if requests.post(f"{FINISH_URL}.json", data=json.dumps(finish_data)).status_code == 200:
-                                            requests.delete(f"{DB_URL}/{row['id']}.json")
-                                            st.rerun()
-                                    st.markdown('</div>', unsafe_allow_html=True)
+                                        
+                                        try:
+                                            res_post = requests.post(f"{FINISH_URL}.json", data=json.dumps(finish_data), timeout=10)
+                                            if res_post.status_code == 200:
+                                                requests.delete(f"{DB_URL}/{row['id']}.json", timeout=10)
+                                                st.success("完工成功！")
+                                                st.rerun()
+                                            else:
+                                                st.error(f"寫入失敗: {res_post.status_code}")
+                                        except Exception as e:
+                                            st.error(f"連線失敗: {str(e)}")
                             else:
                                 with row_cols[0]:
-                                    st.markdown(f'<div class="table-row-container"><div class="cell-proc" style="color:#cbd5e1;">{proc}</div><div class="cell-staff" style="color:#cbd5e1; font-size:11px;">未派工</div></div>', unsafe_allow_html=True)
+                                    st.markdown(f'<div class="table-row"><div class="cell-proc" style="color:#cbd5e1;">{proc}</div><div class="cell-staff" style="color:#cbd5e1; font-size:11px;">未派工</div></div>', unsafe_allow_html=True)
                         st.markdown('</div>', unsafe_allow_html=True)
             else:
                 st.info("💡 目前沒有任何派工紀錄。")
-        except:
+        except Exception as e:
             st.error(f"❌ 讀取資料庫失敗")
 
     # --- 📜 完工紀錄查詢 ---
@@ -212,54 +214,26 @@ else:
             r = requests.get(f"{FINISH_URL}.json", timeout=10)
             f_data = r.json()
             if f_data:
-                all_finish_logs = [dict(v, id=k) for k, v in f_data.items() if v]
-                f_df = pd.DataFrame(all_finish_logs).fillna("NA")
-
-                st.markdown('<div class="search-panel">', unsafe_allow_html=True)
-                sc1, sc2 = st.columns(2)
-                f_order_input = sc1.text_input("🔍 搜尋製令", placeholder="輸入製令關鍵字...")
-                f_staff_s = sc2.selectbox("👤 搜尋人員", ["全部"] + sorted(all_staff))
-                st.markdown('</div>', unsafe_allow_html=True)
+                f_list = [v for k, v in f_data.items() if isinstance(v, dict)]
+                f_df = pd.DataFrame(f_list).fillna("無資料")
+                essential_cols = ["完工時間", "製令", "製造工序", "組長", "人員1", "完工人員"]
+                # 確保欄位存在
+                for col in essential_cols:
+                    if col not in f_df.columns: f_df[col] = "無資料"
                 
-                if f_order_input: f_df = f_df[f_df["製令"].astype(str).str.contains(f_order_input, case=False)]
-                if f_staff_s != "全部": f_df = f_df[f_df[["人員1", "人員2", "人員3", "人員4", "人員5"]].apply(lambda x: f_staff_s in x.values, axis=1)]
-
-                f_df = f_df.sort_values("完工時間", ascending=False)
-                col_widths = [1.5, 1.2, 1.2, 0.8, 0.8, 0.8, 0.8, 0.8, 0.6]
-                
-                h_cols = st.columns(col_widths)
-                headers = ["完工時間", "製令", "製造工序", "人員1", "人員2", "人員3", "人員4", "人員5", "管理"]
-                for h_col, h_text in zip(h_cols, headers):
-                    h_col.markdown(f'<div class="history-header">{h_text}</div>', unsafe_allow_html=True)
-
-                for _, row in f_df.iterrows():
-                    r_cols = st.columns(col_widths)
-                    r_cols[0].write(row.get("完工時間", "NA"))
-                    r_cols[1].write(row.get("製令", "NA"))
-                    r_cols[2].write(row.get("製造工序", "NA"))
-                    r_cols[3].write(row.get("人員1", "NA"))
-                    r_cols[4].write(row.get("人員2", "NA"))
-                    r_cols[5].write(row.get("人員3", "NA"))
-                    r_cols[6].write(row.get("人員4", "NA"))
-                    r_cols[7].write(row.get("人員5", "NA"))
-                    
-                    with r_cols[8]:
-                        with st.popover("🗑️"):
-                            st.write("確認刪除紀錄？")
-                            pwd = st.text_input("輸入密碼", type="password", key=f"pwd_{row['id']}")
-                            if st.button("執行", key=f"btn_{row['id']}"):
-                                if pwd == "1111":
-                                    if requests.delete(f"{FINISH_URL}/{row['id']}.json").status_code == 200:
-                                        st.success("成功")
-                                        st.rerun()
-                                    else: st.error("刪除失敗")
-                                else: st.error("錯誤")
-            else: st.info("目前無紀錄")
-        except: st.error("無法取得完工紀錄")
+                st.dataframe(f_df[essential_cols].sort_values("完工時間", ascending=False), use_container_width=True)
+            else:
+                st.info("目前尚無完工紀錄")
+        except:
+            st.error("無法取得完工紀錄")
 
     # --- 📝 任務派發 ---
     elif menu == "📝 任務派發":
         st.markdown('<h2 style="color:#1e40af;">📝 任務派發 / 內容修正</h2>', unsafe_allow_html=True)
+        if "pending_payload" not in st.session_state:
+            st.session_state.pending_payload = None
+            st.session_state.pending_key = None
+
         with st.form("dispatch_form"):
             c1, c2, c3, c4 = st.columns(4)
             target_o = c1.selectbox("1. 製令編號", order_list)
@@ -268,24 +242,57 @@ else:
             target_d = c4.date_input("4. 通電日期", datetime.date.today())
             
             st.write("---")
+            st.write("🔧 分派組員 (人員 1 為主要標籤)")
             pc = st.columns(5)
             workers = [pc[i].selectbox(f"人員 {i+1}", ["NA"] + all_staff, key=f"ws_{i}") for i in range(5)]
+            submit_clicked = st.form_submit_button("🚀 準備發布")
             
-            if st.form_submit_button("🚀 準備發布"):
-                payload = {
-                    "製令": str(target_o), "製造工序": target_p, "組長": target_l, 
-                    "通電日期": str(target_d), "提交時間": get_now_str()
-                }
-                for i in range(5): payload[f"人員{i+1}"] = workers[i]
-                
+            if submit_clicked:
                 try:
-                    exist_r = requests.get(f"{DB_URL}.json").json()
-                    target_key = next((k for k, v in exist_r.items() if v.get("製令")==str(target_o) and v.get("製造工序")==target_p), None) if exist_r else None
-                    if target_key: requests.put(f"{DB_URL}/{target_key}.json", data=json.dumps(payload))
-                    else: requests.post(f"{DB_URL}.json", data=json.dumps(payload))
-                    st.success(f"✅ 製令 {target_o} 發布完成！")
+                    r = requests.get(f"{DB_URL}.json", timeout=10)
+                    db_data = r.json()
+                    target_key = None
+                    if db_data:
+                        for key, val in db_data.items():
+                            if str(val.get("製令")) == str(target_o) and val.get("製造工序") == target_p:
+                                target_key = key
+                                break
+                    
+                    payload = {
+                        "製令": str(target_o), 
+                        "製造工序": target_p, 
+                        "組長": target_l,
+                        "通電日期": str(target_d),
+                        "人員1": workers[0], "人員2": workers[1], "人員3": workers[2], "人員4": workers[3], "人員5": workers[4],
+                        "提交時間": get_now_str()
+                    }
+
+                    if target_key:
+                        st.session_state.pending_payload = payload
+                        st.session_state.pending_key = target_key
+                    else:
+                        res = requests.post(f"{DB_URL}.json", data=json.dumps(payload), timeout=10)
+                        if res.status_code == 200:
+                            st.success(f"✅ 已成功新增製令 {target_o} 派工")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ 寫入失敗 (碼: {res.status_code})")
+                except Exception as e:
+                    st.error(f"❌ 連線異常")
+
+        if st.session_state.pending_payload:
+            st.warning(f"⚠️ 是否覆蓋製令【{st.session_state.pending_payload['製令']}】的【{st.session_state.pending_payload['製造工序']}】紀錄？")
+            cc1, cc2, _ = st.columns([1, 1, 2])
+            if cc1.button("✅ 確認覆蓋", type="primary"):
+                res = requests.put(f"{DB_URL}/{st.session_state.pending_key}.json", data=json.dumps(st.session_state.pending_payload))
+                if res.status_code == 200:
+                    st.session_state.pending_payload = None
+                    st.session_state.pending_key = None
                     st.rerun()
-                except: st.error("發布失敗")
+            if cc2.button("❌ 取消"):
+                st.session_state.pending_payload = None
+                st.session_state.pending_key = None
+                st.rerun()
 
     # --- ⚙️ 設定管理 ---
     elif menu == "⚙️ 設定管理":
