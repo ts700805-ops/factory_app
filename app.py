@@ -33,7 +33,7 @@ def get_settings():
         return default_settings
 
 # --- 2. 介面樣式 ---
-st.set_page_config(page_title="大量科技公佈欄", layout="wide")
+st.set_page_config(page_title="超慧科技公佈欄", layout="wide")
 
 st.markdown("""
     <style>
@@ -59,7 +59,7 @@ process_list = settings.get("processes", [])
 order_list = settings.get("order_list", [])
 
 if "user" not in st.session_state:
-    st.title("⚓ 大量科技公佈欄 - 登入")
+    st.title("⚓ 超慧科技公佈欄 - 登入")
     u = st.selectbox("👤 請選擇您的姓名", sorted(list(set(all_leaders + all_staff))))
     if st.button("確認進入"):
         st.session_state.user = u
@@ -74,7 +74,7 @@ else:
 
     # --- 📊 製造部公佈欄 ---
     if menu == "📊 製造部公佈欄":
-        st.markdown('<h1 style="text-align:center; color:#1e40af; font-weight:900;">📋 大量科技製造部派工進度</h1>', unsafe_allow_html=True)
+        st.markdown('<h1 style="text-align:center; color:#1e40af; font-weight:900;">📋 超慧科技製造部派工進度</h1>', unsafe_allow_html=True)
         with st.container():
             st.markdown('<div class="search-panel">', unsafe_allow_html=True)
             c1, c2 = st.columns(2)
@@ -115,7 +115,6 @@ else:
                                 with row_cols[0]: st.markdown(f'<div class="table-row"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
                                 with row_cols[1]:
                                     if st.button("✅", key=f"fin_{row['id']}"):
-                                        # 修正連線錯誤：確保數值非 NaN 再發送
                                         clean_data = {k: (v if not (isinstance(v, float) and math.isnan(v)) else "NA") for k, v in row.to_dict().items()}
                                         clean_data["完工時間"] = get_now_str()
                                         clean_data["完工人員"] = st.session_state.user
@@ -129,7 +128,7 @@ else:
             else: st.info("💡 目前無派工紀錄")
         except: st.error("❌ 連線異常，請檢查網路或資料庫設定")
 
-    # --- 📜 完工紀錄查詢 (含篩選與密碼刪除) ---
+    # --- 📜 完工紀錄查詢 ---
     elif menu == "📜 完工紀錄查詢":
         st.markdown('<h2 style="color:#1e40af;">📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
         try:
@@ -137,8 +136,6 @@ else:
             f_data = r.json()
             if f_data:
                 f_df = pd.DataFrame([dict(v, id=k) for k, v in f_data.items()]).fillna("NA")
-                
-                # 篩選區
                 sc1, sc2 = st.columns(2)
                 f_order = sc1.selectbox("🔍 搜尋製令", ["全部"] + sorted(f_df["製令"].unique().tolist()))
                 f_staff = sc2.selectbox("👤 搜尋人員", ["全部"] + sorted(all_staff))
@@ -146,7 +143,6 @@ else:
                 if f_order != "全部": f_df = f_df[f_df["製令"] == f_order]
                 if f_staff != "全部": f_df = f_df[f_df[["人員1", "人員2", "人員3", "人員4", "人員5"]].apply(lambda x: f_staff in x.values, axis=1)]
 
-                # 表格標頭
                 cols = st.columns([1.5, 1, 1, 1, 1, 1, 1, 1, 0.5])
                 names = ["完工時間", "製令", "工序", "人員1", "人員2", "人員3", "人員4", "人員5", "刪除"]
                 for i, n in enumerate(names): cols[i].write(f"**{n}**")
@@ -175,7 +171,7 @@ else:
             else: st.info("目前無紀錄")
         except: st.error("讀取失敗")
 
-    # --- 📝 任務派發 (新增氣球特效) ---
+    # --- 📝 任務派發 ---
     elif menu == "📝 任務派發":
         st.markdown('<h2 style="color:#1e40af;">📝 任務派發 / 內容修正</h2>', unsafe_allow_html=True)
         with st.form("dispatch_form"):
@@ -188,21 +184,14 @@ else:
             pc = st.columns(5)
             workers = [pc[i].selectbox(f"人員 {i+1}", ["NA"] + all_staff, key=f"w{i}") for i in range(5)]
             if st.form_submit_button("🚀 準備發布"):
-                # 修正連線錯誤：發送前檢查現有資料以決定是 POST 還是 PUT
                 payload = {"製令": str(t_o), "製造工序": t_p, "組長": t_l, "通電日期": str(t_d), "提交時間": get_now_str()}
                 for i in range(5): payload[f"人員{i+1}"] = workers[i]
-                
                 try:
-                    # 先找有沒有重複的
                     exist_r = requests.get(f"{DB_URL}.json").json()
                     target_key = next((k for k, v in exist_r.items() if v.get("製令")==str(t_o) and v.get("製造工序")==t_p), None) if exist_r else None
-                    
-                    if target_key:
-                        requests.put(f"{DB_URL}/{target_key}.json", data=json.dumps(payload))
-                    else:
-                        requests.post(f"{DB_URL}.json", data=json.dumps(payload))
-                    
-                    st.balloons() # 新增氣球特效
+                    if target_key: requests.put(f"{DB_URL}/{target_key}.json", data=json.dumps(payload))
+                    else: requests.post(f"{DB_URL}.json", data=json.dumps(payload))
+                    st.balloons()
                     st.success(f"✅ 製令 {t_o} 發布完成！")
                 except: st.error("發布失敗，請檢查連線")
 
