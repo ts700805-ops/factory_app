@@ -18,7 +18,8 @@ def get_now_str():
 def get_settings():
     default_settings = {
         "all_leaders": ["管理員", "組長A", "組長B"],
-        "all_staff": ["徐梓翔", "陳德文", "人員C"], 
+  all_staff = ["徐梓翔", "陳德文", "人員C"]
+import streamlit as st
         "processes": ["骨架作業", "前置作業", "配電作業", "模組作業", "水平調整", "通電作業", "IPQC表單查檢", "S.T作業", "收機清潔", "包機作業", "異常", "欠料", "PACKING", "前置作業(門板組立)"],
         "order_list": ["26M0041-01", "26M0041-02", "26M0051-01", "12345"]
     }
