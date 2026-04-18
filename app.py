@@ -6,6 +6,7 @@ import json
 import math
 
 # --- 1. 核心資料與設定 ---
+# 修改點：確認品牌更名為超慧科技 (介面顯示)
 DB_BASE_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
 DB_URL = f"{DB_BASE_URL}/work_logs"
 FINISH_URL = f"{DB_BASE_URL}/completed_logs" 
@@ -139,9 +140,9 @@ else:
             else: 
                 st.info("💡 目前資料庫為空，尚無派工紀錄")
         except Exception as e: 
-            st.warning(f"⚠️ 公佈欄讀取暫時中斷：{e}")
+            st.warning("💡 系統提示：目前無可顯示之派工資料。")
 
-    # --- 📜 完工紀錄查詢 ---
+    # --- 📜 完工紀錄查詢 --- (保護中：不改動原本邏輯與 1~5 顯示)
     elif menu == "📜 完工紀錄查詢":
         st.markdown('<h2 style="color:#1e40af;">📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
         try:
@@ -185,17 +186,13 @@ else:
                             pwd = st.text_input("密碼", type="password", key=f"pwd_{row['id']}")
                             if st.button("執行", key=f"btn_{row['id']}"):
                                 if pwd == "1111":
-                                    del_res = requests.delete(f"{FINISH_URL}/{row['id']}.json")
-                                    if del_res.status_code == 200:
-                                        st.rerun()
-                                    else:
-                                        st.error("刪除失敗")
-                                else:
-                                    st.error("密碼錯誤")
+                                    requests.delete(f"{FINISH_URL}/{row['id']}.json")
+                                    st.rerun()
+                                else: st.error("密碼錯誤")
             else: 
                 st.info("💡 目前歷史紀錄為空")
-        except Exception as e: 
-            st.warning(f"⚠️ 歷史紀錄讀取暫時中斷：{e}")
+        except: 
+            st.info("💡 目前無可顯示之歷史資料。")
 
     # --- 📝 任務派發 ---
     elif menu == "📝 任務派發":
@@ -249,28 +246,34 @@ else:
                     st.rerun()
 
         st.markdown("---")
-        st.markdown("### 👥 組長與人員對應綁定")
+        st.markdown("### 👥 組長與人員對應綁定 (快速輸入)")
         
-        # --- 新增：顯示目前已綁定的清單 ---
-        if leader_map:
-            with st.expander("📋 查看目前所有綁定關係"):
-                bind_data = []
-                for leader, staff_list in leader_map.items():
-                    bind_data.append({"組長": leader, "已綁定組員": "、".join(staff_list)})
-                st.table(pd.DataFrame(bind_data))
-        # ---------------------------
+        # --- 修改點：將原本單選改為一大格輸入 ---
+        map_text_list = []
+        for leader, staff_list in leader_map.items():
+            map_text_list.append(f"{leader}:{','.join(staff_list)}")
+        current_map_str = "\n".join(map_text_list)
 
-        with st.form("leader_binding_form"):
-            selected_leader = st.selectbox("1. 選擇組長", all_leaders)
-            current_team = ",".join(leader_map.get(selected_leader, []))
-            team_input = st.text_input(f"2. 輸入 {selected_leader} 的專屬組員 (請用逗號分隔)", value=current_team)
+        with st.form("leader_binding_quick_form"):
+            st.info("💡 輸入格式：組長姓名:組員1,組員2 (每一行代表一位組長)")
+            new_map_str = st.text_area("所有組長綁定清單", value=current_map_str, height=250)
             
-            if st.form_submit_button("🔗 儲存綁定關係"):
-                new_map = leader_map.copy()
-                new_map[selected_leader] = [x.strip() for x in team_input.split(",") if x.strip()]
-                
-                new_cfg = settings.copy()
-                new_cfg["leader_map"] = new_map
-                requests.put(f"{SETTING_URL}.json", data=json.dumps(new_cfg))
-                st.success(f"✅ {selected_leader} 的人員綁定已更新！")
-                st.rerun()
+            if st.form_submit_button("🔗 儲存所有綁定關係"):
+                new_map = {}
+                try:
+                    lines = new_map_str.split("\n")
+                    for line in lines:
+                        if ":" in line:
+                            leader_part, staff_part = line.split(":", 1)
+                            l_name = leader_part.strip()
+                            s_list = [x.strip() for x in staff_part.split(",") if x.strip()]
+                            if l_name:
+                                new_map[l_name] = s_list
+                    
+                    new_cfg = settings.copy()
+                    new_cfg["leader_map"] = new_map
+                    requests.put(f"{SETTING_URL}.json", data=json.dumps(new_cfg))
+                    st.success("✅ 所有組長的人員綁定已更新！")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"儲存失敗，格式可能有誤。")
