@@ -5,10 +5,10 @@ import requests
 import json
 import math
 
-# --- 1. 核心資料與設定 (品牌更名：超慧科技) ---
+# --- 1. 核心資料與設定 (修正隱形字元與路徑) ---
 DB_BASE_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
 DB_URL = f"{DB_BASE_URL}/work_logs"
-FINISH_URL = f"{DB_BASE_URL}/completed_logs" 
+FINISH_URL = f"{DB_BASE_URL}/completed_logs" # 已剔除結尾特殊空元
 SETTING_URL = f"{DB_BASE_URL}/settings"
 
 def get_now_str():
@@ -142,65 +142,80 @@ else:
         except: 
             st.warning("💡 系統提示：目前無可顯示之派工資料。")
 
-    # --- 📜 完工紀錄查詢 ---
+    # --- 📜 完工紀錄查詢 (優化即時搜尋邏輯) ---
     elif menu == "📜 完工紀錄查詢":
         st.markdown('<h2 style="color:#1e40af;">📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
+        
+        # 先抓資料，再做過濾
         try:
             r = requests.get(f"{FINISH_URL}.json", timeout=10)
             f_data = r.json()
+            
             if f_data and isinstance(f_data, dict):
                 all_finish_logs = [dict(v, id=k) for k, v in f_data.items() if v]
                 f_df = pd.DataFrame(all_finish_logs).fillna("NA")
 
+                # 搜尋面板
                 st.markdown('<div class="search-panel">', unsafe_allow_html=True)
                 sc1, sc2 = st.columns(2)
-                # 即時模糊搜尋：這格只要一打字，程式就會重新運行並過濾
-                f_order_input = sc1.text_input("🔍 搜尋製令 (輸入即時過濾)", value="", placeholder="輸入關鍵字...")
+                # 重要：這裡的 text_input 在輸入時會導致 app 重新跑一次，進而過濾資料
+                f_order_input = sc1.text_input("🔍 搜尋製令 (輸入關鍵字即時過濾)", key="search_box")
                 f_staff_s = sc2.selectbox("👤 搜尋人員", ["全部"] + sorted(all_staff))
                 st.markdown('</div>', unsafe_allow_html=True)
+
+                # --- 執行過濾邏輯 ---
+                filtered_df = f_df.copy()
                 
-                # 模糊搜尋邏輯
+                # 1. 處理製令模糊搜尋 (轉成字串後過濾)
                 if f_order_input:
-                    f_df = f_df[f_df["製令"].astype(str).str.contains(f_order_input, case=False, na=False)]
+                    filtered_df = filtered_df[filtered_df["製令"].astype(str).str.contains(f_order_input, case=False, na=False)]
                 
+                # 2. 處理人員選擇
                 if f_staff_s != "全部":
-                    f_df = f_df[f_df[["人員1", "人員2", "人員3", "人員4", "人員5"]].apply(lambda x: f_staff_s in x.values, axis=1)]
+                    staff_cols = ["人員1", "人員2", "人員3", "人員4", "人員5"]
+                    mask = filtered_df[staff_cols].apply(lambda row: f_staff_s in row.values, axis=1)
+                    filtered_df = filtered_df[mask]
 
-                f_df = f_df.sort_values("完工時間", ascending=False)
-                col_widths = [1.5, 1.2, 1.2, 0.8, 0.8, 0.8, 0.8, 0.8, 0.6]
-                
-                h_cols = st.columns(col_widths)
-                headers = ["完工時間", "製令", "製造工序", "人員1", "人員2", "人員3", "人員4", "人員5", "管理"]
-                for h_col, h_text in zip(h_cols, headers):
-                    h_col.markdown(f'<div class="history-header">{h_text}</div>', unsafe_allow_html=True)
-
-                for _, row in f_df.iterrows():
-                    r_cols = st.columns(col_widths)
-                    r_cols[0].write(row.get("完工時間", "NA"))
-                    r_cols[1].write(row.get("製令", "NA"))
-                    r_cols[2].write(row.get("製造工序", "NA"))
-                    r_cols[3].write(row.get("人員1", "NA"))
-                    r_cols[4].write(row.get("人員2", "NA"))
-                    r_cols[5].write(row.get("人員3", "NA"))
-                    r_cols[6].write(row.get("人員4", "NA"))
-                    r_cols[7].write(row.get("人員5", "NA"))
+                # 排序
+                if not filtered_df.empty:
+                    filtered_df = filtered_df.sort_values("完工時間", ascending=False)
                     
-                    with r_cols[8]:
-                        with st.popover("🗑️"):
-                            st.write("確認刪除紀錄？")
-                            pwd = st.text_input("輸入管理密碼", type="password", key=f"pwd_{row['id']}")
-                            if st.button("確認執行", key=f"btn_{row['id']}"):
-                                if pwd == "1111":
-                                    requests.delete(f"{FINISH_URL}/{row['id']}.json")
-                                    st.success("已刪除紀錄")
-                                    st.rerun()
-                                else: st.error("密碼錯誤")
+                    # 顯示表格
+                    col_widths = [1.5, 1.2, 1.2, 0.8, 0.8, 0.8, 0.8, 0.8, 0.6]
+                    h_cols = st.columns(col_widths)
+                    headers = ["完工時間", "製令", "製造工序", "人員1", "人員2", "人員3", "人員4", "人員5", "管理"]
+                    for h_col, h_text in zip(h_cols, headers):
+                        h_col.markdown(f'<div class="history-header">{h_text}</div>', unsafe_allow_html=True)
+
+                    for _, row in filtered_df.iterrows():
+                        r_cols = st.columns(col_widths)
+                        r_cols[0].write(row.get("完工時間", "NA"))
+                        r_cols[1].write(row.get("製令", "NA"))
+                        r_cols[2].write(row.get("製造工序", "NA"))
+                        r_cols[3].write(row.get("人員1", "NA"))
+                        r_cols[4].write(row.get("人員2", "NA"))
+                        r_cols[5].write(row.get("人員3", "NA"))
+                        r_cols[6].write(row.get("人員4", "NA"))
+                        r_cols[7].write(row.get("人員5", "NA"))
+                        
+                        with r_cols[8]:
+                            with st.popover("🗑️"):
+                                st.write("確認刪除紀錄？")
+                                pwd = st.text_input("輸入管理密碼", type="password", key=f"pwd_{row['id']}")
+                                if st.button("確認執行", key=f"btn_{row['id']}"):
+                                    if pwd == "1111":
+                                        requests.delete(f"{FINISH_URL}/{row['id']}.json")
+                                        st.success("已刪除紀錄")
+                                        st.rerun()
+                                    else: st.error("密碼錯誤")
+                else:
+                    st.warning("⚠️ 查無符合條件的資料")
             else: 
                 st.info("💡 目前歷史紀錄為空")
-        except: 
-            st.info("💡 目前無可顯示之歷史資料。")
+        except Exception as e: 
+            st.error(f"資料讀取失敗，請確認 Firebase 設定。錯誤：{e}")
 
-    # --- 📝 任務派發 ---
+    # --- 📝 任務派發 (保持原樣，僅修正路徑連線) ---
     elif menu == "📝 任務派發":
         st.markdown('<h2 style="color:#1e40af;">📝 任務派發 / 內容修正</h2>', unsafe_allow_html=True)
         
