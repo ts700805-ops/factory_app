@@ -4,11 +4,10 @@ import datetime
 import requests
 import json
 
-# --- 1. 核心資料與設定 ---
-# 提醒：根據您的 Firebase 截圖，完工節點名稱為 completed_logs
+# --- 1. 核心資料與設定 (統一使用與成功版相同的路徑格式) ---
 DB_BASE_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
 DB_URL = f"{DB_BASE_URL}/work_logs"
-FINISH_URL = f"{DB_BASE_URL}/completed_logs"  # 已修正為截圖中的名稱
+FINISH_URL = f"{DB_BASE_URL}/completed_logs"  # 與成功版 DONE_URL 邏輯一致
 SETTING_URL = f"{DB_BASE_URL}/settings"
 
 def get_now_str():
@@ -23,10 +22,12 @@ def get_settings():
         "order_list": ["26M0041-01", "26M0041-02", "26M0051-01", "12345"]
     }
     try:
+        # 加上 .json 並設定 timeout，這是成功版的標準做法
         r = requests.get(f"{SETTING_URL}.json", timeout=10)
         if r.status_code == 200:
             data = r.json()
             if data and isinstance(data, dict):
+                # 確保必要 key 存在
                 for key in ["all_leaders", "all_staff", "processes", "order_list"]:
                     if key not in data or not data[key]:
                         data[key] = default_settings[key]
@@ -89,9 +90,7 @@ st.markdown("""
         flex-grow: 1;
         padding: 5px 10px;
         display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-        align-items: center;
+        flex-wrap: wrap; gap: 6px; align-items: center;
     }
     .badge-leader { background: #f59e0b; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 900; }
     .badge-main { background: #1e40af; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 900; }
@@ -136,6 +135,7 @@ else:
             r = requests.get(f"{DB_URL}.json", timeout=10)
             db_data = r.json()
             if db_data:
+                # 確保將資料庫 ID 抓出來供刪除使用
                 all_logs = [dict(v, id=k) for k, v in db_data.items() if v and isinstance(v, dict)]
                 df = pd.DataFrame(all_logs)
                 
@@ -148,6 +148,7 @@ else:
                     p_date_val = o_df.sort_values("提交時間", ascending=False).iloc[0].get("通電日期", "未設定")
                     p_date = str(p_date_val) if pd.notnull(p_date_val) else "未設定"
 
+                    # 人員篩選邏輯
                     if s_staff != "全部":
                         check_cols = ["組長"] + [f"人員{i}" for i in range(1, 6) if f"人員{i}" in o_df.columns]
                         if not o_df[check_cols].apply(lambda x: s_staff in x.values, axis=1).any(): continue
@@ -179,15 +180,17 @@ else:
                                     st.markdown(f'<div class="table-row"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
                                 with row_cols[1]:
                                     if st.button("✅", key=f"fin_{row['id']}"):
+                                        # 核心修復：資料轉換與寫入
                                         finish_data = row.to_dict()
+                                        db_key = finish_data.pop('id') # 移除 ID 不存入歷史
                                         finish_data["完工時間"] = get_now_str()
                                         finish_data["完工人員"] = st.session_state.user
                                         
+                                        # 依照成功版邏輯：先 Post 到完工，再 Delete 原紀錄
                                         try:
-                                            # 注意：這裡使用修正後的 FINISH_URL (completed_logs)
-                                            res_post = requests.post(f"{FINISH_URL}.json", data=json.dumps(finish_data), timeout=10)
+                                            res_post = requests.post(f"{FINISH_URL}.json", json=finish_data, timeout=10)
                                             if res_post.status_code == 200:
-                                                requests.delete(f"{DB_URL}/{row['id']}.json", timeout=10)
+                                                requests.delete(f"{DB_URL}/{db_key}.json", timeout=10)
                                                 st.success("完工成功！")
                                                 st.rerun()
                                             else:
@@ -213,10 +216,11 @@ else:
                 f_list = [v for k, v in f_data.items() if isinstance(v, dict)]
                 f_df = pd.DataFrame(f_list)
                 essential_cols = ["完工時間", "製令", "製造工序", "組長", "人員1", "完工人員"]
+                # 補齊可能缺失的欄位避錯
                 for col in essential_cols:
                     if col not in f_df.columns: f_df[col] = "無資料"
                 
-                st.dataframe(f_df[essential_cols].sort_values("完工時間", ascending=False), use_container_width=True)
+                st.dataframe(f_df[essential_cols].sort_values("完工時間", ascending=False), use_container_width=True, hide_index=True)
             else:
                 st.info("目前尚無完工紀錄")
         except:
@@ -264,20 +268,19 @@ else:
                         st.session_state.pending_payload = payload
                         st.session_state.pending_key = target_key
                     else:
-                        res = requests.post(f"{DB_URL}.json", data=json.dumps(payload), timeout=10)
+                        res = requests.post(f"{DB_URL}.json", json=payload, timeout=10)
                         if res.status_code == 200:
                             st.success(f"✅ 已成功新增製令 {target_o} 派工")
                             st.rerun()
-                        else:
-                            st.error(f"❌ 寫入失敗 (碼: {res.status_code})")
                 except Exception as e:
                     st.error(f"❌ 連線異常")
 
+        # 覆蓋確認邏輯
         if st.session_state.pending_payload:
             st.warning(f"⚠️ 是否覆蓋製令【{st.session_state.pending_payload['製令']}】的【{st.session_state.pending_payload['製造工序']}】紀錄？")
             cc1, cc2, _ = st.columns([1, 1, 2])
             if cc1.button("✅ 確認覆蓋", type="primary"):
-                res = requests.put(f"{DB_URL}/{st.session_state.pending_key}.json", data=json.dumps(st.session_state.pending_payload))
+                res = requests.put(f"{DB_URL}/{st.session_state.pending_key}.json", json=st.session_state.pending_payload)
                 if res.status_code == 200:
                     st.session_state.pending_payload = None
                     st.session_state.pending_key = None
@@ -302,6 +305,6 @@ else:
                     "all_staff": [x.strip() for x in edit_s.split(",") if x.strip()],
                     "processes": [x.strip() for x in edit_p.split(",") if x.strip()]
                 }
-                requests.put(f"{SETTING_URL}.json", data=json.dumps(updated_cfg))
+                requests.put(f"{SETTING_URL}.json", json=updated_cfg)
                 st.success("✅ 設定已更新")
                 st.rerun()
