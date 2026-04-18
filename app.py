@@ -5,8 +5,7 @@ import requests
 import json
 import math
 
-# --- 1. 核心資料與設定 ---
-# 修改點：確認品牌更名為超慧科技 (介面顯示)
+# --- 1. 核心資料與設定 (品牌更名：超慧科技) ---
 DB_BASE_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
 DB_URL = f"{DB_BASE_URL}/work_logs"
 FINISH_URL = f"{DB_BASE_URL}/completed_logs" 
@@ -19,7 +18,7 @@ def get_now_str():
 def get_settings():
     default_settings = {
         "all_leaders": ["管理員", "組長A", "組長B"],
-        "all_staff": ["徐梓翔", "陳德文", "人員C"], 
+        "all_staff": ["徐梓翔", "陳德文", "胡瑄芸", "蕭詩瓊"], 
         "processes": ["骨架作業", "前置作業", "配電作業", "模組作業", "水平調整", "通電作業", "IPQC表單查檢", "S.T作業", "收機清潔", "包機作業", "異常", "欠料", "PACKING", "前置作業(門板組立)"],
         "order_list": ["26M0041-01", "26M0041-02", "26M0051-01", "12345"],
         "leader_map": {} 
@@ -39,7 +38,7 @@ def get_settings():
         return default_settings
 
 # --- 2. 介面樣式 ---
-st.set_page_config(page_title="超慧科技公佈欄", layout="wide")
+st.set_page_config(page_title="超慧科技管理系統", layout="wide")
 
 st.markdown("""
     <style>
@@ -68,7 +67,7 @@ order_list = settings.get("order_list", [])
 leader_map = settings.get("leader_map", {})
 
 if "user" not in st.session_state:
-    st.title("⚓ 超慧科技公佈欄 - 登入")
+    st.title("⚓ 超慧科技管理系統 - 登入")
     u = st.selectbox("👤 請選擇您的姓名", sorted(list(set(all_leaders + all_staff))))
     if st.button("確認進入"):
         st.session_state.user = u
@@ -116,10 +115,11 @@ else:
                             if not match.empty:
                                 row = match.iloc[0]
                                 staff_html = f'<div class="badge-leader">L: {row.get("組長","")}</div>'
-                                if row.get("人員1") not in ["NA", ""]: staff_html += f'<div class="badge-main">{row.get("人員1")}</div>'
-                                for i in range(2, 6):
+                                for i in range(1, 6):
                                     p_val = row.get(f"人員{i}")
-                                    if p_val not in ["NA", ""]: staff_html += f'<div class="badge-sub">{p_val}</div>'
+                                    if p_val not in ["NA", ""]:
+                                        badge_class = "badge-main" if i == 1 else "badge-sub"
+                                        staff_html += f'<div class="{badge_class}">{p_val}</div>'
                                 
                                 with row_cols[0]: 
                                     st.markdown(f'<div class="table-row-container"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
@@ -139,10 +139,10 @@ else:
                         st.markdown('</div>', unsafe_allow_html=True)
             else: 
                 st.info("💡 目前資料庫為空，尚無派工紀錄")
-        except Exception as e: 
+        except: 
             st.warning("💡 系統提示：目前無可顯示之派工資料。")
 
-    # --- 📜 完工紀錄查詢 --- (保護中：不改動原本邏輯與 1~5 顯示)
+    # --- 📜 完工紀錄查詢 (嚴格保護：不改動顯示邏輯與 1~5 欄位) ---
     elif menu == "📜 完工紀錄查詢":
         st.markdown('<h2 style="color:#1e40af;">📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
         try:
@@ -182,11 +182,12 @@ else:
                     
                     with r_cols[8]:
                         with st.popover("🗑️"):
-                            st.write("確認刪除？")
-                            pwd = st.text_input("密碼", type="password", key=f"pwd_{row['id']}")
-                            if st.button("執行", key=f"btn_{row['id']}"):
+                            st.write("確認刪除紀錄？")
+                            pwd = st.text_input("輸入管理密碼", type="password", key=f"pwd_{row['id']}")
+                            if st.button("確認執行", key=f"btn_{row['id']}"):
                                 if pwd == "1111":
                                     requests.delete(f"{FINISH_URL}/{row['id']}.json")
+                                    st.success("已刪除紀錄")
                                     st.rerun()
                                 else: st.error("密碼錯誤")
             else: 
@@ -205,6 +206,7 @@ else:
             t_d = c4.date_input("4. 通電日期")
             st.write("---")
             
+            # 這裡實現人員選單的自動連動
             my_team = leader_map.get(t_l, [])
             display_staff = my_team if my_team else all_staff
             
@@ -223,17 +225,17 @@ else:
                     st.rerun()
                 except: st.error("發布失敗")
 
-    # --- ⚙️ 設定管理 ---
+    # --- ⚙️ 設定管理 (優化：大區塊輸入組長綁定) ---
     elif menu == "⚙️ 設定管理":
         st.markdown('<h2 style="color:#1e40af;">⚙️ 系統資料後台管理</h2>', unsafe_allow_html=True)
         
-        with st.expander("📌 基本名單設定", expanded=True):
+        with st.expander("📌 基本名單設定", expanded=False):
             with st.form("admin_settings"):
                 e_o = st.text_area("製令編號 (逗號分隔)", value=",".join(order_list))
                 e_l = st.text_area("組長名單 (逗號分隔)", value=",".join(all_leaders))
                 e_s = st.text_area("一般人員 (逗號分隔)", value=",".join(all_staff))
                 e_p = st.text_area("工序流程 (逗號分隔)", value=",".join(process_list))
-                if st.form_submit_button("💾 儲存名單"):
+                if st.form_submit_button("💾 儲存基本名單"):
                     new_cfg = settings.copy()
                     new_cfg.update({
                         "order_list": [x.strip() for x in e_o.split(",") if x.strip()],
@@ -248,15 +250,15 @@ else:
         st.markdown("---")
         st.markdown("### 👥 組長與人員對應綁定 (快速輸入)")
         
-        # --- 修改點：將原本單選改為一大格輸入 ---
+        # 將現有的 map 轉為文字顯示在大區塊
         map_text_list = []
         for leader, staff_list in leader_map.items():
             map_text_list.append(f"{leader}:{','.join(staff_list)}")
         current_map_str = "\n".join(map_text_list)
 
         with st.form("leader_binding_quick_form"):
-            st.info("💡 輸入格式：組長姓名:組員1,組員2 (每一行代表一位組長)")
-            new_map_str = st.text_area("所有組長綁定清單", value=current_map_str, height=250)
+            st.info("💡 輸入格式範例：\n劉志偉:胡瑄芸,蕭詩瓊\n陳德文:徐梓翔,牟育玄\n(每一行代表一位組長)")
+            new_map_str = st.text_area("所有組長綁定清單區 (可直接貼上)", value=current_map_str, height=250)
             
             if st.form_submit_button("🔗 儲存所有綁定關係"):
                 new_map = {}
@@ -276,4 +278,4 @@ else:
                     st.success("✅ 所有組長的人員綁定已更新！")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"儲存失敗，格式可能有誤。")
+                    st.error(f"儲存失敗，請確認格式是否正確。")
