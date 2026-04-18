@@ -20,7 +20,8 @@ def get_settings():
         "all_leaders": ["管理員", "組長A", "組長B"],
         "all_staff": ["徐梓翔", "陳德文", "人員C"], 
         "processes": ["骨架作業", "前置作業", "配電作業", "模組作業", "水平調整", "通電作業", "IPQC表單查檢", "S.T作業", "收機清潔", "包機作業", "異常", "欠料", "PACKING", "前置作業(門板組立)"],
-        "order_list": ["26M0041-01", "26M0041-02", "26M0051-01", "12345"]
+        "order_list": ["26M0041-01", "26M0041-02", "26M0051-01", "12345"],
+        "leader_map": {} # 新增：存放組長與組員的對應關係
     }
     try:
         r = requests.get(f"{SETTING_URL}.json", timeout=10)
@@ -30,6 +31,7 @@ def get_settings():
                 for key in ["all_leaders", "all_staff", "processes", "order_list"]:
                     if key not in data or not data[key]:
                         data[key] = default_settings[key]
+                if "leader_map" not in data: data["leader_map"] = {}
                 return data
         return default_settings
     except:
@@ -62,6 +64,7 @@ all_leaders = settings.get("all_leaders", [])
 all_staff = settings.get("all_staff", [])
 process_list = settings.get("processes", [])
 order_list = settings.get("order_list", [])
+leader_map = settings.get("leader_map", {})
 
 if "user" not in st.session_state:
     st.title("⚓ 超慧科技公佈欄 - 登入")
@@ -77,7 +80,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 📊 製造部公佈欄 ---
+    # --- 📊 製造部公佈欄 (維持不變) ---
     if menu == "📊 製造部公佈欄":
         st.markdown('<h1 style="text-align:center; color:#1e40af; font-weight:900;">📋 超慧科技製造部派工進度</h1>', unsafe_allow_html=True)
         with st.container():
@@ -138,7 +141,7 @@ else:
         except Exception as e: 
             st.warning(f"⚠️ 公佈欄讀取暫時中斷：{e}")
 
-    # --- 📜 完工紀錄查詢 (嚴格保持版本) ---
+    # --- 📜 完工紀錄查詢 (嚴格保持版本-不動) ---
     elif menu == "📜 完工紀錄查詢":
         st.markdown('<h2 style="color:#1e40af;">📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
         try:
@@ -194,18 +197,26 @@ else:
         except Exception as e: 
             st.warning(f"⚠️ 歷史紀錄讀取暫時中斷：{e}")
 
-    # --- 📝 任務派發 ---
+    # --- 📝 任務派發 (新增選單連動邏輯) ---
     elif menu == "📝 任務派發":
         st.markdown('<h2 style="color:#1e40af;">📝 任務派發 / 內容修正</h2>', unsafe_allow_html=True)
         with st.form("dispatch_form"):
             c1, c2, c3, c4 = st.columns(4)
             t_o = c1.selectbox("1. 製令編號", order_list)
             t_p = c2.selectbox("2. 製造工序", process_list)
-            t_l = c3.selectbox("3. 指派組長", all_leaders)
+            t_l = c3.selectbox("3. 指派組長", all_leaders) # 先選組長
             t_d = c4.date_input("4. 通電日期")
             st.write("---")
+            
+            # --- 修改位置：人員選單連動 ---
+            # 根據選定的組長 t_l，找出對應的組員，若無則顯示全部
+            my_team = leader_map.get(t_l, [])
+            display_staff = my_team if my_team else all_staff
+            
             pc = st.columns(5)
-            workers = [pc[i].selectbox(f"人員 {i+1}", ["NA"] + all_staff, key=f"w{i}") for i in range(5)]
+            workers = [pc[i].selectbox(f"人員 {i+1}", ["NA"] + display_staff, key=f"w{i}") for i in range(5)]
+            # ---------------------------
+            
             if st.form_submit_button("🚀 準備發布"):
                 payload = {"製令": str(t_o), "製造工序": t_p, "組長": t_l, "通電日期": str(t_d), "提交時間": get_now_str()}
                 for i in range(5): payload[f"人員{i+1}"] = workers[i]
@@ -218,21 +229,45 @@ else:
                     st.rerun()
                 except: st.error("發布失敗")
 
-    # --- ⚙️ 設定管理 ---
+    # --- ⚙️ 設定管理 (新增組長綁定組員介面) ---
     elif menu == "⚙️ 設定管理":
         st.markdown('<h2 style="color:#1e40af;">⚙️ 系統資料後台管理</h2>', unsafe_allow_html=True)
-        with st.form("admin_settings"):
-            e_o = st.text_area("製令編號 (逗號分隔)", value=",".join(order_list))
-            e_l = st.text_area("組長名單 (逗號分隔)", value=",".join(all_leaders))
-            e_s = st.text_area("一般人員 (逗號分隔)", value=",".join(all_staff))
-            e_p = st.text_area("工序流程 (逗號分隔)", value=",".join(process_list))
-            if st.form_submit_button("💾 儲存更新"):
-                new_cfg = {
-                    "order_list": [x.strip() for x in e_o.split(",") if x.strip()],
-                    "all_leaders": [x.strip() for x in e_l.split(",") if x.strip()],
-                    "all_staff": [x.strip() for x in e_s.split(",") if x.strip()],
-                    "processes": [x.strip() for x in e_p.split(",") if x.strip()]
-                }
+        
+        # 區塊 A：基本名單設定
+        with st.expander("📌 基本名單設定", expanded=True):
+            with st.form("admin_settings"):
+                e_o = st.text_area("製令編號 (逗號分隔)", value=",".join(order_list))
+                e_l = st.text_area("組長名單 (逗號分隔)", value=",".join(all_leaders))
+                e_s = st.text_area("一般人員 (逗號分隔)", value=",".join(all_staff))
+                e_p = st.text_area("工序流程 (逗號分隔)", value=",".join(process_list))
+                if st.form_submit_button("💾 儲存名單"):
+                    new_cfg = settings.copy()
+                    new_cfg.update({
+                        "order_list": [x.strip() for x in e_o.split(",") if x.strip()],
+                        "all_leaders": [x.strip() for x in e_l.split(",") if x.strip()],
+                        "all_staff": [x.strip() for x in e_s.split(",") if x.strip()],
+                        "processes": [x.strip() for x in e_p.split(",") if x.strip()]
+                    })
+                    requests.put(f"{SETTING_URL}.json", data=json.dumps(new_cfg))
+                    st.success("基本名單已更新")
+                    st.rerun()
+
+        # 區塊 B：修改位置 - 組長與人員對應綁定
+        st.markdown("---")
+        st.markdown("### 👥 組長與人員對應綁定")
+        with st.form("leader_binding_form"):
+            selected_leader = st.selectbox("1. 選擇組長", all_leaders)
+            # 取得該組長現有的組員名單串接成字串
+            current_team = ",".join(leader_map.get(selected_leader, []))
+            team_input = st.text_input(f"2. 輸入 {selected_leader} 的專屬組員 (請用逗號分隔)", value=current_team)
+            
+            if st.form_submit_button("🔗 儲存綁定關係"):
+                new_map = leader_map.copy()
+                new_map[selected_leader] = [x.strip() for x in team_input.split(",") if x.strip()]
+                
+                # 存回資料庫
+                new_cfg = settings.copy()
+                new_cfg["leader_map"] = new_map
                 requests.put(f"{SETTING_URL}.json", data=json.dumps(new_cfg))
-                st.success("設定已更新")
+                st.success(f"✅ {selected_leader} 的人員綁定已更新！")
                 st.rerun()
