@@ -48,6 +48,29 @@ st.markdown("""
     .badge-main { background: #1e40af; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
     .badge-sub { background: #e2e8f0; color: #475569; padding: 2px 6px; border-radius: 4px; font-size: 11px; border: 1px solid #cbd5e1; }
     .search-panel { background: white; padding: 15px; border-radius: 10px; border: 1px solid #cbd5e1; margin-bottom: 20px; }
+    
+    /* 網狀格線樣式 */
+    .grid-table { 
+        border: 1px solid #cbd5e1; 
+        border-radius: 5px; 
+        overflow: hidden; 
+        margin-top: 10px;
+    }
+    .grid-header { 
+        background-color: #1e40af; 
+        color: white; 
+        font-weight: bold; 
+        padding: 10px;
+        border-bottom: 1px solid #cbd5e1;
+    }
+    .grid-cell { 
+        border: 1px solid #cbd5e1; 
+        padding: 8px; 
+        min-height: 45px;
+        display: flex;
+        align-items: center;
+        background-color: white;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -128,7 +151,7 @@ else:
             else: st.info("💡 目前無派工紀錄")
         except: st.error("❌ 連線異常，請檢查網路或資料庫設定")
 
-    # --- 📜 完工紀錄查詢 ---
+    # --- 📜 完工紀錄查詢 (修正重點區塊) ---
     elif menu == "📜 完工紀錄查詢":
         st.markdown('<h2 style="color:#1e40af;">📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
         try:
@@ -136,36 +159,60 @@ else:
             f_data = r.json()
             if f_data:
                 f_df = pd.DataFrame([dict(v, id=k) for k, v in f_data.items()]).fillna("NA")
-                sc1, sc2 = st.columns(2)
-                f_order = sc1.selectbox("🔍 搜尋製令", ["全部"] + sorted(f_df["製令"].unique().tolist()))
-                f_staff = sc2.selectbox("👤 搜尋人員", ["全部"] + sorted(all_staff))
                 
-                if f_order != "全部": f_df = f_df[f_df["製令"] == f_order]
-                if f_staff != "全部": f_df = f_df[f_df[["人員1", "人員2", "人員3", "人員4", "人員5"]].apply(lambda x: f_staff in x.values, axis=1)]
+                # 搜尋控制區
+                st.markdown('<div class="search-panel">', unsafe_allow_html=True)
+                sc1, sc2 = st.columns(2)
+                # 1. 修正：製令改為手動輸入搜尋
+                f_order_input = sc1.text_input("🔍 手動輸入製令搜尋", placeholder="輸入製令關鍵字...")
+                f_staff = sc2.selectbox("👤 搜尋人員", ["全部"] + sorted(all_staff))
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+                # 篩選邏輯
+                if f_order_input: 
+                    f_df = f_df[f_df["製令"].astype(str).str.contains(f_order_input, case=False)]
+                if f_staff != "全部": 
+                    f_df = f_df[f_df[["人員1", "人員2", "人員3", "人員4", "人員5"]].apply(lambda x: f_staff in x.values, axis=1)]
 
-                cols = st.columns([1.5, 1, 1, 1, 1, 1, 1, 1, 0.5])
+                # 顯示表格標題 (帶網格感)
+                grid_cols = [1.5, 1, 1, 0.8, 0.8, 0.8, 0.8, 0.8, 0.6]
                 names = ["完工時間", "製令", "工序", "人員1", "人員2", "人員3", "人員4", "人員5", "刪除"]
-                for i, n in enumerate(names): cols[i].write(f"**{n}**")
+                
+                # 標題列
+                t_cols = st.columns(grid_cols)
+                for i, n in enumerate(names):
+                    t_cols[i].markdown(f'<div style="background:#1e40af; color:white; padding:8px; font-weight:bold; text-align:center; border:1px solid #cbd5e1;">{n}</div>', unsafe_allow_html=True)
 
+                # 資料列 (加上網狀邊框)
                 for _, row in f_df.sort_values("完工時間", ascending=False).iterrows():
-                    rc = st.columns([1.5, 1, 1, 1, 1, 1, 1, 1, 0.5])
-                    for i, field in enumerate(["完工時間", "製令", "製造工序", "人員1", "人員2", "人員3", "人員4", "人員5"]):
-                        rc[i].write(row.get(field, "NA"))
-                    if rc[8].button("🗑️", key=f"del_{row['id']}"):
-                        st.session_state.delete_id = row['id']
-                        st.rerun()
+                    rc = st.columns(grid_cols)
+                    fields = ["完工時間", "製令", "製造工序", "人員1", "人員2", "人員3", "人員4", "人員5"]
+                    
+                    for i, field in enumerate(fields):
+                        val = row.get(field, "NA")
+                        rc[i].markdown(f'<div style="border:1px solid #cbd5e1; padding:8px; height:100%; text-align:center; background:white;">{val}</div>', unsafe_allow_html=True)
+                    
+                    # 刪除按鈕欄位也加上邊框
+                    with rc[8]:
+                        st.markdown('<div style="border:1px solid #cbd5e1; padding:3px; text-align:center; background:white;">', unsafe_allow_html=True)
+                        if st.button("🗑️", key=f"del_{row['id']}"):
+                            st.session_state.delete_id = row['id']
+                            st.rerun()
+                        st.markdown('</div>', unsafe_allow_html=True)
 
                 if "delete_id" in st.session_state:
+                    st.divider()
                     st.warning("⚠️ 確定刪除此紀錄？")
                     pwd = st.text_input("🔑 請輸入刪除密碼 (1111)", type="password")
-                    if st.button("確認執行刪除"):
+                    c1, c2 = st.columns(2)
+                    if c1.button("確認執行刪除"):
                         if pwd == "1111":
                             requests.delete(f"{FINISH_URL}/{st.session_state.delete_id}.json")
                             del st.session_state.delete_id
                             st.success("刪除成功")
                             st.rerun()
                         else: st.error("密碼錯誤！")
-                    if st.button("取消"):
+                    if c2.button("取消"):
                         del st.session_state.delete_id
                         st.rerun()
             else: st.info("目前無紀錄")
