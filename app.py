@@ -8,7 +8,7 @@ import math
 # --- 1. 核心資料與設定 (修正隱形字元與路徑) ---
 DB_BASE_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
 DB_URL = f"{DB_BASE_URL}/work_logs"
-FINISH_URL = f"{DB_BASE_URL}/completed_logs" # 已剔除結尾特殊空元
+FINISH_URL = f"{DB_BASE_URL}/completed_logs" 
 SETTING_URL = f"{DB_BASE_URL}/settings"
 
 def get_now_str():
@@ -125,13 +125,16 @@ else:
                                     st.markdown(f'<div class="table-row-container"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
                                 with row_cols[1]:
                                     st.markdown('<div class="btn-container">', unsafe_allow_html=True)
+                                    # --- 修正點：完工按鈕邏輯 ---
                                     if st.button("✅", key=f"fin_{row['id']}"):
                                         clean_data = {k: (v if not (isinstance(v, float) and math.isnan(v)) else "NA") for k, v in row.to_dict().items()}
                                         clean_data["完工時間"] = get_now_str()
                                         clean_data["完工人員"] = st.session_state.user
+                                        
+                                        # 先存入完工庫，成功後刪除派工庫
                                         if requests.post(f"{FINISH_URL}.json", data=json.dumps(clean_data)).status_code == 200:
                                             requests.delete(f"{DB_URL}/{row['id']}.json")
-                                            st.rerun()
+                                            st.rerun() # 立即刷新，該工序就會消失
                                     st.markdown('</div>', unsafe_allow_html=True)
                             else:
                                 with row_cols[0]: 
@@ -142,45 +145,31 @@ else:
         except: 
             st.warning("💡 系統提示：目前無可顯示之派工資料。")
 
-    # --- 📜 完工紀錄查詢 (優化即時搜尋邏輯) ---
+    # --- 📜 完工紀錄查詢 ---
     elif menu == "📜 完工紀錄查詢":
         st.markdown('<h2 style="color:#1e40af;">📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
-        
-        # 先抓資料，再做過濾
         try:
             r = requests.get(f"{FINISH_URL}.json", timeout=10)
             f_data = r.json()
-            
             if f_data and isinstance(f_data, dict):
                 all_finish_logs = [dict(v, id=k) for k, v in f_data.items() if v]
                 f_df = pd.DataFrame(all_finish_logs).fillna("NA")
-
-                # 搜尋面板
                 st.markdown('<div class="search-panel">', unsafe_allow_html=True)
                 sc1, sc2 = st.columns(2)
-                # 重要：這裡的 text_input 在輸入時會導致 app 重新跑一次，進而過濾資料
                 f_order_input = sc1.text_input("🔍 搜尋製令 (輸入關鍵字即時過濾)", key="search_box")
                 f_staff_s = sc2.selectbox("👤 搜尋人員", ["全部"] + sorted(all_staff))
                 st.markdown('</div>', unsafe_allow_html=True)
 
-                # --- 執行過濾邏輯 ---
                 filtered_df = f_df.copy()
-                
-                # 1. 處理製令模糊搜尋 (轉成字串後過濾)
                 if f_order_input:
                     filtered_df = filtered_df[filtered_df["製令"].astype(str).str.contains(f_order_input, case=False, na=False)]
-                
-                # 2. 處理人員選擇
                 if f_staff_s != "全部":
                     staff_cols = ["人員1", "人員2", "人員3", "人員4", "人員5"]
                     mask = filtered_df[staff_cols].apply(lambda row: f_staff_s in row.values, axis=1)
                     filtered_df = filtered_df[mask]
 
-                # 排序
                 if not filtered_df.empty:
                     filtered_df = filtered_df.sort_values("完工時間", ascending=False)
-                    
-                    # 顯示表格
                     col_widths = [1.5, 1.2, 1.2, 0.8, 0.8, 0.8, 0.8, 0.8, 0.6]
                     h_cols = st.columns(col_widths)
                     headers = ["完工時間", "製令", "製造工序", "人員1", "人員2", "人員3", "人員4", "人員5", "管理"]
@@ -197,7 +186,6 @@ else:
                         r_cols[5].write(row.get("人員3", "NA"))
                         r_cols[6].write(row.get("人員4", "NA"))
                         r_cols[7].write(row.get("人員5", "NA"))
-                        
                         with r_cols[8]:
                             with st.popover("🗑️"):
                                 st.write("確認刪除紀錄？")
@@ -208,60 +196,45 @@ else:
                                         st.success("已刪除紀錄")
                                         st.rerun()
                                     else: st.error("密碼錯誤")
-                else:
-                    st.warning("⚠️ 查無符合條件的資料")
-            else: 
-                st.info("💡 目前歷史紀錄為空")
-        except Exception as e: 
-            st.error(f"資料讀取失敗，請確認 Firebase 設定。錯誤：{e}")
+                else: st.warning("⚠️ 查無符合條件的資料")
+            else: st.info("💡 目前歷史紀錄為空")
+        except Exception as e: st.error(f"資料讀取失敗：{e}")
 
-    # --- 📝 任務派發 (保持原樣，僅修正路徑連線) ---
+    # --- 📝 任務派發 ---
     elif menu == "📝 任務派發":
         st.markdown('<h2 style="color:#1e40af;">📝 任務派發 / 內容修正</h2>', unsafe_allow_html=True)
-        
         c1, c2, c3, c4 = st.columns(4)
         t_o = c1.selectbox("1. 製令編號", order_list)
         t_p = c2.selectbox("2. 製造工序", process_list)
         t_l = c3.selectbox("3. 指派組長", all_leaders)
         t_d = c4.date_input("4. 通電日期")
-        
         st.write("---")
-        
         my_team = leader_map.get(t_l, [])
         display_staff = my_team if my_team else all_staff
         st.caption(f"💡 目前 {t_l} 的組員名單：{', '.join(display_staff) if display_staff else '未綁定(顯示全部)'}")
-        
         pc = st.columns(5)
         workers = []
         for i in range(5):
             w = pc[i].selectbox(f"人員 {i+1}", ["NA"] + display_staff, key=f"w{i}")
             workers.append(w)
-            
         if st.button("🚀 準備發布", type="primary", use_container_width=True):
             payload = {"製令": str(t_o), "製造工序": t_p, "組長": t_l, "通電日期": str(t_d), "提交時間": get_now_str()}
             for i in range(5): payload[f"人員{i+1}"] = workers[i]
-            
             try:
                 r = requests.get(f"{DB_URL}.json")
                 r_check = r.json()
                 target_key = None
                 if r_check and isinstance(r_check, dict):
                     target_key = next((k for k, v in r_check.items() if v and v.get("製令")==str(t_o) and v.get("製造工序")==t_p), None)
-                
-                if target_key:
-                    requests.put(f"{DB_URL}/{target_key}.json", data=json.dumps(payload))
-                else:
-                    requests.post(f"{DB_URL}.json", data=json.dumps(payload))
-                
+                if target_key: requests.put(f"{DB_URL}/{target_key}.json", data=json.dumps(payload))
+                else: requests.post(f"{DB_URL}.json", data=json.dumps(payload))
                 st.success(f"✅ 製令 {t_o} 發布完成！")
                 st.rerun()
-            except Exception as e:
-                st.error(f"發布失敗：{str(e)}")
+            except Exception as e: st.error(f"發布失敗：{str(e)}")
 
     # --- ⚙️ 設定管理 ---
     elif menu == "⚙️ 設定管理":
         st.markdown('<h2 style="color:#1e40af;">⚙️ 系統資料後台管理</h2>', unsafe_allow_html=True)
-        
         with st.expander("📌 基本名單設定", expanded=False):
             with st.form("admin_settings"):
                 e_o = st.text_area("製令編號 (逗號分隔)", value=",".join(order_list))
@@ -282,16 +255,11 @@ else:
 
         st.markdown("---")
         st.markdown("### 👥 組長與人員對應綁定 (快速輸入)")
-        
-        map_text_list = []
-        for leader, staff_list in leader_map.items():
-            map_text_list.append(f"{leader}:{','.join(staff_list)}")
+        map_text_list = [f"{leader}:{','.join(staff_list)}" for leader, staff_list in leader_map.items()]
         current_map_str = "\n".join(map_text_list)
-
         with st.form("leader_binding_quick_form"):
             st.info("💡 輸入格式範例：\n劉志偉:徐梓翔,牟育玄,林建安\n陳德文:徐梓翔,胡瑄芸")
             new_map_str = st.text_area("所有組長綁定清單區 (可直接貼上)", value=current_map_str, height=250)
-            
             if st.form_submit_button("🔗 儲存所有綁定關係"):
                 new_map = {}
                 try:
@@ -301,13 +269,10 @@ else:
                             leader_part, staff_part = line.split(":", 1)
                             l_name = leader_part.strip()
                             s_list = [x.strip() for x in staff_part.split(",") if x.strip()]
-                            if l_name:
-                                new_map[l_name] = s_list
-                    
+                            if l_name: new_map[l_name] = s_list
                     new_cfg = settings.copy()
                     new_cfg["leader_map"] = new_map
                     requests.put(f"{SETTING_URL}.json", data=json.dumps(new_cfg))
                     st.success("✅ 所有組長的人員綁定已更新！")
                     st.rerun()
-                except Exception as e:
-                    st.error(f"儲存失敗，請確認格式是否正確。")
+                except Exception: st.error("儲存失敗，請確認格式是否正確。")
