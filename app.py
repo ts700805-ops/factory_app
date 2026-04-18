@@ -7,6 +7,7 @@ import json
 # --- 1. 核心資料與設定 ---
 DB_BASE_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
 DB_URL = f"{DB_BASE_URL}/work_logs"
+FINISH_URL = f"{DB_BASE_URL}/finish_logs"
 SETTING_URL = f"{DB_BASE_URL}/settings"
 
 def get_now_str():
@@ -69,12 +70,12 @@ st.markdown("""
     .table-row {
         display: flex;
         border-bottom: 1px solid #dee2e6;
-        min-height: 40px;
+        min-height: 48px;
         align-items: center;
     }
     .table-row:last-child { border-bottom: none; }
     .cell-proc {
-        width: 120px;
+        width: 110px;
         background-color: #f1f5f9;
         color: #1e40af;
         font-weight: 800;
@@ -91,9 +92,9 @@ st.markdown("""
         gap: 6px;
         align-items: center;
     }
-    .badge-leader { background: #f59e0b; color: white; padding: 2px 8px; border-radius: 4px; font-size: 13px; font-weight: 900; }
-    .badge-main { background: #1e40af; color: white; padding: 2px 8px; border-radius: 4px; font-size: 13px; font-weight: 900; }
-    .badge-sub { background: #e2e8f0; color: #475569; padding: 2px 6px; border-radius: 4px; font-size: 12px; font-weight: 600; border: 1px solid #cbd5e1; }
+    .badge-leader { background: #f59e0b; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 900; }
+    .badge-main { background: #1e40af; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 900; }
+    .badge-sub { background: #e2e8f0; color: #475569; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; border: 1px solid #cbd5e1; }
     .search-panel { background: white; padding: 15px; border-radius: 10px; border: 1px solid #cbd5e1; margin-bottom: 20px; }
     </style>
 """, unsafe_allow_html=True)
@@ -107,19 +108,19 @@ order_list = settings["order_list"]
 
 if "user" not in st.session_state:
     st.title("⚓ 超慧科技公佈欄 - 登入")
-    u = st.selectbox("👤 請選擇您的姓名", all_leaders + all_staff)
+    u = st.selectbox("👤 請選擇您的姓名", sorted(all_leaders + all_staff))
     if st.button("確認進入"):
         st.session_state.user = u
         st.rerun()
 else:
     st.sidebar.markdown(f"👤 **目前使用者：{st.session_state.user}**")
-    menu = st.sidebar.radio("功能導航", ["📊 超慧科技公佈欄", "📝 任務派發", "⚙️ 設定管理"])
+    menu = st.sidebar.radio("功能導航", ["📊 超慧科技公佈欄", "📜 完工紀錄查詢", "📝 任務派發", "⚙️ 設定管理"])
     
     if st.sidebar.button("登出系統"):
         st.session_state.clear()
         st.rerun()
 
-    # --- 📊 超慧科技公佈欄 (修改後的標題) ---
+    # --- 📊 超慧科技公佈欄 ---
     if menu == "📊 超慧科技公佈欄":
         st.markdown('<h1 style="text-align:center; color:#1e40af; font-weight:900;">📋 超慧科技~阿文要派工了啦~</h1>', unsafe_allow_html=True)
         
@@ -160,6 +161,8 @@ else:
                         
                         for proc in process_list:
                             match = o_df[o_df["製造工序"] == proc]
+                            row_cols = st.columns([0.85, 0.15]) # 分開顯示人員與完工按鈕
+                            
                             if not match.empty:
                                 row = match.iloc[0]
                                 leader = row.get("組長", "-")
@@ -170,18 +173,46 @@ else:
                                 if w1 != "NA":
                                     staff_html += f'<div class="badge-main">{w1}</div>'
                                 staff_html += "".join([f'<div class="badge-sub">{s}</div>' for s in others])
+                                
+                                with row_cols[0]:
+                                    st.markdown(f'<div class="table-row"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
+                                with row_cols[1]:
+                                    # 完工按鈕
+                                    if st.button("✅", key=f"fin_{row['id']}", help=f"點擊【{proc}】完工"):
+                                        finish_data = row.to_dict()
+                                        finish_data["完工時間"] = get_now_str()
+                                        finish_data["完工人員"] = st.session_state.user
+                                        # 1. 寫入完工庫 2. 刪除派工庫
+                                        requests.post(f"{FINISH_URL}.json", data=json.dumps(finish_data))
+                                        requests.delete(f"{DB_BASE_URL}/work_logs/{row['id']}.json")
+                                        st.rerun()
                             else:
-                                staff_html = '<div style="color:#cbd5e1; font-size:11px;">未派工</div>'
-                            
-                            st.markdown(f'<div class="table-row"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
+                                with row_cols[0]:
+                                    st.markdown(f'<div class="table-row"><div class="cell-proc" style="color:#cbd5e1;">{proc}</div><div class="cell-staff" style="color:#cbd5e1; font-size:11px;">未派工</div></div>', unsafe_allow_html=True)
                         st.markdown('</div>', unsafe_allow_html=True)
         except:
             st.info("目前尚無派工紀錄")
 
-    # --- 📝 任務派發 (含覆蓋確認按鈕) ---
+    # --- 📜 完工紀錄查詢 ---
+    elif menu == "📜 完工紀錄查詢":
+        st.markdown('<h2 style="color:#1e40af;">📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
+        try:
+            r = requests.get(f"{FINISH_URL}.json", timeout=5)
+            f_data = r.json()
+            if f_data:
+                f_list = [v for k, v in f_data.items()]
+                f_df = pd.DataFrame(f_list)
+                # 整理欄位順序與顯示
+                show_cols = ["完工時間", "製令", "製造工序", "組長", "人員1", "完工人員"]
+                st.dataframe(f_df[show_cols].sort_values("完工時間", ascending=False), use_container_width=True)
+            else:
+                st.info("目前尚無完工紀錄")
+        except:
+            st.error("無法取得完工紀錄")
+
+    # --- 📝 任務派發 ---
     elif menu == "📝 任務派發":
         st.markdown('<h2 style="color:#1e40af;">📝 任務派發 / 內容修正</h2>', unsafe_allow_html=True)
-        
         if "pending_payload" not in st.session_state:
             st.session_state.pending_payload = None
             st.session_state.pending_key = None
@@ -197,7 +228,6 @@ else:
             st.write("🔧 分派組員 (人員 1 為主要標籤)")
             pc = st.columns(5)
             workers = [pc[i].selectbox(f"人員 {i+1}", ["NA"] + all_staff, key=f"ws_{i}") for i in range(5)]
-            
             submit_clicked = st.form_submit_button("🚀 準備發布")
             
             if submit_clicked:
@@ -229,21 +259,16 @@ else:
                     st.error("連線失敗")
 
         if st.session_state.pending_payload:
-            st.warning(f"⚠️ 偵測到重複資料：製令【{st.session_state.pending_payload['製令']}】的【{st.session_state.pending_payload['製造工序']}】已有紀錄。")
+            st.warning(f"⚠️ 偵測到重複資料：是否覆蓋製令【{st.session_state.pending_payload['製令']}】的【{st.session_state.pending_payload['製造工序']}】紀錄？")
             c1, c2, _ = st.columns([1, 1, 2])
-            
-            if c1.button("✅ 確認覆蓋舊資料", type="primary"):
-                requests.put(f"{DB_BASE_URL}/work_logs/{st.session_state.pending_key}.json", 
-                             data=json.dumps(st.session_state.pending_payload))
+            if c1.button("✅ 確認覆蓋", type="primary"):
+                requests.put(f"{DB_BASE_URL}/work_logs/{st.session_state.pending_key}.json", data=json.dumps(st.session_state.pending_payload))
                 st.session_state.pending_payload = None
                 st.session_state.pending_key = None
-                st.success("🔄 資料已更新！")
                 st.rerun()
-                
-            if c2.button("❌ 不寫入（取消）"):
+            if c2.button("❌ 不寫入"):
                 st.session_state.pending_payload = None
                 st.session_state.pending_key = None
-                st.info("已取消操作。")
                 st.rerun()
 
     # --- ⚙️ 設定管理 ---
@@ -254,7 +279,6 @@ else:
             edit_l = st.text_area("組長名單設定", value=",".join(all_leaders))
             edit_s = st.text_area("一般人員名單設定", value=",".join(all_staff))
             edit_p = st.text_area("工序流程設定", value=",".join(process_list))
-            
             if st.form_submit_button("💾 儲存並更新"):
                 updated_cfg = {
                     "order_list": [x.strip() for x in edit_o.split(",") if x.strip()],
