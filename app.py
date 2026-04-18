@@ -41,36 +41,46 @@ st.markdown("""
     .order-card { background: white; border-radius: 8px; border: 2px solid #1e40af; margin-bottom: 20px; overflow: hidden; }
     .order-title { background: #1e40af; color: white; padding: 10px; font-weight: 900; display: flex; justify-content: space-between; }
     .power-date { background: #fbbf24; color: #1e40af; padding: 2px 8px; border-radius: 4px; font-size: 13px; }
-    .table-row { display: flex; border-bottom: 1px solid #dee2e6; min-height: 48px; align-items: center; }
-    .cell-proc { width: 110px; background: #f1f5f9; color: #1e40af; font-weight: 800; padding: 8px; border-right: 1px solid #dee2e6; }
-    .cell-staff { flex-grow: 1; padding: 5px 10px; display: flex; flex-wrap: wrap; gap: 6px; }
-    .badge-leader { background: #f59e0b; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
-    .badge-main { background: #1e40af; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
-    .badge-sub { background: #e2e8f0; color: #475569; padding: 2px 6px; border-radius: 4px; font-size: 11px; border: 1px solid #cbd5e1; }
-    .search-panel { background: white; padding: 15px; border-radius: 10px; border: 1px solid #cbd5e1; margin-bottom: 20px; }
     
-    /* 網狀格線樣式 */
-    .grid-table { 
-        border: 1px solid #cbd5e1; 
-        border-radius: 5px; 
-        overflow: hidden; 
-        margin-top: 10px;
+    /* 修正重點：固定表格列的對齊與高度 */
+    .table-row { 
+        display: flex; 
+        border-bottom: 1px solid #dee2e6; 
+        height: 52px; /* 固定每列高度，防止內容撐開 */
+        align-items: center; 
+        overflow: hidden;
     }
-    .grid-header { 
-        background-color: #1e40af; 
-        color: white; 
-        font-weight: bold; 
-        padding: 10px;
-        border-bottom: 1px solid #cbd5e1;
-    }
-    .grid-cell { 
-        border: 1px solid #cbd5e1; 
+    .cell-proc { 
+        width: 110px; 
+        min-width: 110px; /* 強制固定寬度 */
+        background: #f1f5f9; 
+        color: #1e40af; 
+        font-weight: 800; 
         padding: 8px; 
-        min-height: 45px;
+        border-right: 1px solid #dee2e6;
+        height: 100%;
         display: flex;
         align-items: center;
-        background-color: white;
+        font-size: 13px;
     }
+    .cell-staff { 
+        flex-grow: 1; 
+        padding: 5px 10px; 
+        display: flex; 
+        flex-wrap: nowrap; /* 不換行，確保整列高度一致 */
+        gap: 6px; 
+        overflow-x: auto; /* 若人太多可橫向滑動但不影響高度 */
+        align-items: center;
+    }
+    
+    .badge-leader { background: #f59e0b; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; white-space: nowrap; }
+    .badge-main { background: #1e40af; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; white-space: nowrap; }
+    .badge-sub { background: #e2e8f0; color: #475569; padding: 2px 6px; border-radius: 4px; font-size: 11px; border: 1px solid #cbd5e1; white-space: nowrap; }
+    .search-panel { background: white; padding: 15px; border-radius: 10px; border: 1px solid #cbd5e1; margin-bottom: 20px; }
+    
+    /* 完工紀錄表格樣式 */
+    .grid-header { background-color: #1e40af; color: white; font-weight: bold; padding: 8px; text-align: center; border: 1px solid #cbd5e1; }
+    .grid-cell { border: 1px solid #cbd5e1; padding: 8px; text-align: center; background: white; height: 100%; display: flex; align-items: center; justify-content: center; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -127,7 +137,7 @@ else:
                         st.markdown(f'<div class="order-card"><div class="order-title"><span>📦 製令：{o_id}</span><span class="power-date">⚡ 通電：{p_date}</span></div>', unsafe_allow_html=True)
                         for proc in process_list:
                             match = o_df[o_df["製造工序"] == proc]
-                            row_cols = st.columns([0.85, 0.15])
+                            row_cols = st.columns([0.88, 0.12]) # 微調按鈕比例
                             if not match.empty:
                                 row = match.iloc[0]
                                 staff_html = f'<div class="badge-leader">L: {row.get("組長","")}</div>'
@@ -137,6 +147,8 @@ else:
                                 
                                 with row_cols[0]: st.markdown(f'<div class="table-row"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
                                 with row_cols[1]:
+                                    # 讓按鈕垂直置中於固定高度的列中
+                                    st.write("") 
                                     if st.button("✅", key=f"fin_{row['id']}"):
                                         clean_data = {k: (v if not (isinstance(v, float) and math.isnan(v)) else "NA") for k, v in row.to_dict().items()}
                                         clean_data["完工時間"] = get_now_str()
@@ -151,7 +163,7 @@ else:
             else: st.info("💡 目前無派工紀錄")
         except: st.error("❌ 連線異常，請檢查網路或資料庫設定")
 
-    # --- 📜 完工紀錄查詢 (修正重點區塊) ---
+    # --- 📜 完工紀錄查詢 ---
     elif menu == "📜 完工紀錄查詢":
         st.markdown('<h2 style="color:#1e40af;">📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
         try:
@@ -159,42 +171,30 @@ else:
             f_data = r.json()
             if f_data:
                 f_df = pd.DataFrame([dict(v, id=k) for k, v in f_data.items()]).fillna("NA")
-                
-                # 搜尋控制區
                 st.markdown('<div class="search-panel">', unsafe_allow_html=True)
                 sc1, sc2 = st.columns(2)
-                # 1. 修正：製令改為手動輸入搜尋
                 f_order_input = sc1.text_input("🔍 手動輸入製令搜尋", placeholder="輸入製令關鍵字...")
                 f_staff = sc2.selectbox("👤 搜尋人員", ["全部"] + sorted(all_staff))
                 st.markdown('</div>', unsafe_allow_html=True)
                 
-                # 篩選邏輯
                 if f_order_input: 
                     f_df = f_df[f_df["製令"].astype(str).str.contains(f_order_input, case=False)]
                 if f_staff != "全部": 
                     f_df = f_df[f_df[["人員1", "人員2", "人員3", "人員4", "人員5"]].apply(lambda x: f_staff in x.values, axis=1)]
 
-                # 顯示表格標題 (帶網格感)
                 grid_cols = [1.5, 1, 1, 0.8, 0.8, 0.8, 0.8, 0.8, 0.6]
                 names = ["完工時間", "製令", "工序", "人員1", "人員2", "人員3", "人員4", "人員5", "刪除"]
-                
-                # 標題列
                 t_cols = st.columns(grid_cols)
                 for i, n in enumerate(names):
-                    t_cols[i].markdown(f'<div style="background:#1e40af; color:white; padding:8px; font-weight:bold; text-align:center; border:1px solid #cbd5e1;">{n}</div>', unsafe_allow_html=True)
+                    t_cols[i].markdown(f'<div class="grid-header">{n}</div>', unsafe_allow_html=True)
 
-                # 資料列 (加上網狀邊框)
                 for _, row in f_df.sort_values("完工時間", ascending=False).iterrows():
                     rc = st.columns(grid_cols)
                     fields = ["完工時間", "製令", "製造工序", "人員1", "人員2", "人員3", "人員4", "人員5"]
-                    
                     for i, field in enumerate(fields):
-                        val = row.get(field, "NA")
-                        rc[i].markdown(f'<div style="border:1px solid #cbd5e1; padding:8px; height:100%; text-align:center; background:white;">{val}</div>', unsafe_allow_html=True)
-                    
-                    # 刪除按鈕欄位也加上邊框
+                        rc[i].markdown(f'<div class="grid-cell">{row.get(field, "NA")}</div>', unsafe_allow_html=True)
                     with rc[8]:
-                        st.markdown('<div style="border:1px solid #cbd5e1; padding:3px; text-align:center; background:white;">', unsafe_allow_html=True)
+                        st.markdown('<div class="grid-cell" style="padding:3px;">', unsafe_allow_html=True)
                         if st.button("🗑️", key=f"del_{row['id']}"):
                             st.session_state.delete_id = row['id']
                             st.rerun()
@@ -204,17 +204,13 @@ else:
                     st.divider()
                     st.warning("⚠️ 確定刪除此紀錄？")
                     pwd = st.text_input("🔑 請輸入刪除密碼 (1111)", type="password")
-                    c1, c2 = st.columns(2)
-                    if c1.button("確認執行刪除"):
+                    if st.button("確認執行刪除"):
                         if pwd == "1111":
                             requests.delete(f"{FINISH_URL}/{st.session_state.delete_id}.json")
                             del st.session_state.delete_id
                             st.success("刪除成功")
                             st.rerun()
                         else: st.error("密碼錯誤！")
-                    if c2.button("取消"):
-                        del st.session_state.delete_id
-                        st.rerun()
             else: st.info("目前無紀錄")
         except: st.error("讀取失敗")
 
