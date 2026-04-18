@@ -23,54 +23,36 @@ def get_settings():
         "order_list": ["26M0041-01", "26M0041-02", "26M0051-01", "12345"]
     }
     try:
-        r = requests.get(f"{SETTING_URL}.json", timeout=5)
+        r = requests.get(f"{SETTING_URL}.json", timeout=10)
         if r.status_code == 200:
             data = r.json()
             if data and isinstance(data, dict):
+                for key in ["all_leaders", "all_staff", "processes", "order_list"]:
+                    if key not in data or not data[key]:
+                        data[key] = default_settings[key]
                 return data
         return default_settings
     except:
         return default_settings
 
 # --- 2. 介面樣式 ---
-st.set_page_config(page_title="超慧科技公佈欄", layout="wide")
+st.set_page_config(page_title="大量科技公佈欄", layout="wide")
 
 st.markdown("""
     <style>
     .stApp { background-color: #f8fafc; }
-    .order-card { background: white; border-radius: 8px; border: 2px solid #1e40af; margin-bottom: 20px; overflow: hidden; }
-    .order-title { background: #1e40af; color: white; padding: 10px; font-weight: 900; display: flex; justify-content: space-between; }
-    .power-date { background: #fbbf24; color: #1e40af; padding: 2px 8px; border-radius: 4px; font-size: 13px; }
-    .table-row { display: flex; border-bottom: 1px solid #dee2e6; min-height: 48px; align-items: center; }
-    .cell-proc { width: 110px; background: #f1f5f9; color: #1e40af; font-weight: 800; padding: 8px; border-right: 1px solid #dee2e6; }
-    .cell-staff { flex-grow: 1; padding: 5px 10px; display: flex; flex-wrap: wrap; gap: 6px; }
-    .badge-leader { background: #f59e0b; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
-    .badge-main { background: #1e40af; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
-    .badge-sub { background: #e2e8f0; color: #475569; padding: 2px 6px; border-radius: 4px; font-size: 11px; border: 1px solid #cbd5e1; }
+    .order-card { background: white; border-radius: 8px; border: 2px solid #1e40af; margin-bottom: 25px; overflow: hidden; }
+    .order-title { background: #1e40af; color: white; padding: 10px 15px; font-weight: 900; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1e40af; }
+    .power-date { background: #fbbf24; color: #1e40af; padding: 2px 10px; border-radius: 4px; font-size: 13px; font-weight: bold; }
+    .table-row-container { border-bottom: 1px solid #dee2e6; display: flex; align-items: stretch; }
+    .cell-proc { width: 100px; min-width: 100px; background: #f1f5f9; color: #1e40af; font-weight: 800; padding: 10px; display: flex; align-items: center; border-right: 1px solid #dee2e6; font-size: 14px; }
+    .cell-staff { flex-grow: 1; padding: 10px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; background: white; }
+    .btn-container { width: 50px; display: flex; align-items: center; justify-content: center; background: white; border-left: 1px solid #dee2e6; padding: 0 5px; }
+    .badge-leader { background: #f59e0b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+    .badge-main { background: #1e40af; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+    .badge-sub { background: #e2e8f0; color: #475569; padding: 2px 5px; border-radius: 4px; font-size: 10px; border: 1px solid #cbd5e1; }
     .search-panel { background: white; padding: 15px; border-radius: 10px; border: 1px solid #cbd5e1; margin-bottom: 20px; }
-    
-    /* 網狀格線樣式 */
-    .grid-table { 
-        border: 1px solid #cbd5e1; 
-        border-radius: 5px; 
-        overflow: hidden; 
-        margin-top: 10px;
-    }
-    .grid-header { 
-        background-color: #1e40af; 
-        color: white; 
-        font-weight: bold; 
-        padding: 10px;
-        border-bottom: 1px solid #cbd5e1;
-    }
-    .grid-cell { 
-        border: 1px solid #cbd5e1; 
-        padding: 8px; 
-        min-height: 45px;
-        display: flex;
-        align-items: center;
-        background-color: white;
-    }
+    .history-header { background: #f1f5f9; font-weight: bold; border-bottom: 2px solid #cbd5e1; padding: 10px 5px; text-align: left; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -82,7 +64,7 @@ process_list = settings.get("processes", [])
 order_list = settings.get("order_list", [])
 
 if "user" not in st.session_state:
-    st.title("⚓ 超慧科技公佈欄 - 登入")
+    st.title("⚓ 大量科技公佈欄 - 登入")
     u = st.selectbox("👤 請選擇您的姓名", sorted(list(set(all_leaders + all_staff))))
     if st.button("確認進入"):
         st.session_state.user = u
@@ -97,7 +79,7 @@ else:
 
     # --- 📊 製造部公佈欄 ---
     if menu == "📊 製造部公佈欄":
-        st.markdown('<h1 style="text-align:center; color:#1e40af; font-weight:900;">📋 超慧科技製造部派工進度</h1>', unsafe_allow_html=True)
+        st.markdown('<h1 style="text-align:center; color:#1e40af; font-weight:900;">📋 大量科技製造部派工進度</h1>', unsafe_allow_html=True)
         with st.container():
             st.markdown('<div class="search-panel">', unsafe_allow_html=True)
             c1, c2 = st.columns(2)
@@ -111,7 +93,6 @@ else:
             if db_data:
                 all_logs = [dict(v, id=k) for k, v in db_data.items() if v and isinstance(v, dict)]
                 df = pd.DataFrame(all_logs).fillna("NA")
-                
                 unique_orders = df["製令"].unique()
                 filtered_orders = [o for o in unique_orders if (s_order == "全部" or str(o) == str(s_order))]
                 
@@ -127,96 +108,90 @@ else:
                         st.markdown(f'<div class="order-card"><div class="order-title"><span>📦 製令：{o_id}</span><span class="power-date">⚡ 通電：{p_date}</span></div>', unsafe_allow_html=True)
                         for proc in process_list:
                             match = o_df[o_df["製造工序"] == proc]
-                            row_cols = st.columns([0.85, 0.15])
+                            row_cols = st.columns([0.85, 0.15]) 
                             if not match.empty:
                                 row = match.iloc[0]
                                 staff_html = f'<div class="badge-leader">L: {row.get("組長","")}</div>'
-                                if row.get("人員1") != "NA": staff_html += f'<div class="badge-main">{row.get("人員1")}</div>'
+                                if row.get("人員1") not in ["NA", ""]: staff_html += f'<div class="badge-main">{row.get("人員1")}</div>'
                                 for i in range(2, 6):
-                                    if row.get(f"人員{i}") not in ["NA", ""]: staff_html += f'<div class="badge-sub">{row.get(f"人員{i}")}</div>'
+                                    p_val = row.get(f"人員{i}")
+                                    if p_val not in ["NA", ""]: staff_html += f'<div class="badge-sub">{p_val}</div>'
                                 
-                                with row_cols[0]: st.markdown(f'<div class="table-row"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
+                                with row_cols[0]: 
+                                    st.markdown(f'<div class="table-row-container"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
                                 with row_cols[1]:
+                                    st.markdown('<div class="btn-container">', unsafe_allow_html=True)
                                     if st.button("✅", key=f"fin_{row['id']}"):
                                         clean_data = {k: (v if not (isinstance(v, float) and math.isnan(v)) else "NA") for k, v in row.to_dict().items()}
                                         clean_data["完工時間"] = get_now_str()
                                         clean_data["完工人員"] = st.session_state.user
                                         if requests.post(f"{FINISH_URL}.json", data=json.dumps(clean_data)).status_code == 200:
                                             requests.delete(f"{DB_URL}/{row['id']}.json")
-                                            st.balloons()
                                             st.rerun()
+                                    st.markdown('</div>', unsafe_allow_html=True)
                             else:
-                                with row_cols[0]: st.markdown(f'<div class="table-row"><div class="cell-proc" style="color:#cbd5e1;">{proc}</div><div class="cell-staff" style="color:#cbd5e1; font-size:11px;">未派工</div></div>', unsafe_allow_html=True)
+                                with row_cols[0]: 
+                                    st.markdown(f'<div class="table-row-container"><div class="cell-proc" style="color:#cbd5e1;">{proc}</div><div class="cell-staff" style="color:#cbd5e1; font-size:12px;">未派工</div></div>', unsafe_allow_html=True)
                         st.markdown('</div>', unsafe_allow_html=True)
             else: st.info("💡 目前無派工紀錄")
-        except: st.error("❌ 連線異常，請檢查網路或資料庫設定")
+        except: st.error("❌ 連線異常")
 
-    # --- 📜 完工紀錄查詢 (修正重點區塊) ---
+    # --- 📜 完工紀錄查詢 (修正刪除報錯版本) ---
     elif menu == "📜 完工紀錄查詢":
         st.markdown('<h2 style="color:#1e40af;">📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
         try:
             r = requests.get(f"{FINISH_URL}.json", timeout=10)
             f_data = r.json()
             if f_data:
-                f_df = pd.DataFrame([dict(v, id=k) for k, v in f_data.items()]).fillna("NA")
-                
-                # 搜尋控制區
+                all_finish_logs = [dict(v, id=k) for k, v in f_data.items() if v]
+                f_df = pd.DataFrame(all_finish_logs).fillna("NA")
+
                 st.markdown('<div class="search-panel">', unsafe_allow_html=True)
                 sc1, sc2 = st.columns(2)
-                # 1. 修正：製令改為手動輸入搜尋
-                f_order_input = sc1.text_input("🔍 手動輸入製令搜尋", placeholder="輸入製令關鍵字...")
-                f_staff = sc2.selectbox("👤 搜尋人員", ["全部"] + sorted(all_staff))
+                f_order_input = sc1.text_input("🔍 搜尋製令", placeholder="輸入製令關鍵字...")
+                f_staff_s = sc2.selectbox("👤 搜尋人員", ["全部"] + sorted(all_staff))
                 st.markdown('</div>', unsafe_allow_html=True)
                 
-                # 篩選邏輯
-                if f_order_input: 
-                    f_df = f_df[f_df["製令"].astype(str).str.contains(f_order_input, case=False)]
-                if f_staff != "全部": 
-                    f_df = f_df[f_df[["人員1", "人員2", "人員3", "人員4", "人員5"]].apply(lambda x: f_staff in x.values, axis=1)]
+                if f_order_input: f_df = f_df[f_df["製令"].astype(str).str.contains(f_order_input, case=False)]
+                if f_staff_s != "全部": f_df = f_df[f_df[["人員1", "人員2", "人員3", "人員4", "人員5"]].apply(lambda x: f_staff_s in x.values, axis=1)]
 
-                # 顯示表格標題 (帶網格感)
-                grid_cols = [1.5, 1, 1, 0.8, 0.8, 0.8, 0.8, 0.8, 0.6]
-                names = ["完工時間", "製令", "工序", "人員1", "人員2", "人員3", "人員4", "人員5", "刪除"]
+                f_df = f_df.sort_values("完工時間", ascending=False)
+                col_widths = [1.5, 1.2, 1.2, 0.8, 0.8, 0.8, 0.8, 0.8, 0.6]
                 
-                # 標題列
-                t_cols = st.columns(grid_cols)
-                for i, n in enumerate(names):
-                    t_cols[i].markdown(f'<div style="background:#1e40af; color:white; padding:8px; font-weight:bold; text-align:center; border:1px solid #cbd5e1;">{n}</div>', unsafe_allow_html=True)
+                # 繪製表頭
+                h_cols = st.columns(col_widths)
+                headers = ["完工時間", "製令", "製造工序", "人員1", "人員2", "人員3", "人員4", "人員5", "管理"]
+                for h_col, h_text in zip(h_cols, headers):
+                    h_col.markdown(f'<div class="history-header">{h_text}</div>', unsafe_allow_html=True)
 
-                # 資料列 (加上網狀邊框)
-                for _, row in f_df.sort_values("完工時間", ascending=False).iterrows():
-                    rc = st.columns(grid_cols)
-                    fields = ["完工時間", "製令", "製造工序", "人員1", "人員2", "人員3", "人員4", "人員5"]
+                # 繪製內容
+                for _, row in f_df.iterrows():
+                    r_cols = st.columns(col_widths)
+                    r_cols[0].write(row.get("完工時間", "NA"))
+                    r_cols[1].write(row.get("製令", "NA"))
+                    r_cols[2].write(row.get("製造工序", "NA"))
+                    r_cols[3].write(row.get("人員1", "NA"))
+                    r_cols[4].write(row.get("人員2", "NA"))
+                    r_cols[5].write(row.get("人員3", "NA"))
+                    r_cols[6].write(row.get("人員4", "NA"))
+                    r_cols[7].write(row.get("人員5", "NA"))
                     
-                    for i, field in enumerate(fields):
-                        val = row.get(field, "NA")
-                        rc[i].markdown(f'<div style="border:1px solid #cbd5e1; padding:8px; height:100%; text-align:center; background:white;">{val}</div>', unsafe_allow_html=True)
-                    
-                    # 刪除按鈕欄位也加上邊框
-                    with rc[8]:
-                        st.markdown('<div style="border:1px solid #cbd5e1; padding:3px; text-align:center; background:white;">', unsafe_allow_html=True)
-                        if st.button("🗑️", key=f"del_{row['id']}"):
-                            st.session_state.delete_id = row['id']
-                            st.rerun()
-                        st.markdown('</div>', unsafe_allow_html=True)
-
-                if "delete_id" in st.session_state:
-                    st.divider()
-                    st.warning("⚠️ 確定刪除此紀錄？")
-                    pwd = st.text_input("🔑 請輸入刪除密碼 (1111)", type="password")
-                    c1, c2 = st.columns(2)
-                    if c1.button("確認執行刪除"):
-                        if pwd == "1111":
-                            requests.delete(f"{FINISH_URL}/{st.session_state.delete_id}.json")
-                            del st.session_state.delete_id
-                            st.success("刪除成功")
-                            st.rerun()
-                        else: st.error("密碼錯誤！")
-                    if c2.button("取消"):
-                        del st.session_state.delete_id
-                        st.rerun()
+                    with r_cols[8]:
+                        # 修正：刪除邏輯改為直接執行並 rerun，避免 ID 殘留導致讀取失敗
+                        with st.popover("🗑️"):
+                            st.write("確認刪除？")
+                            pwd = st.text_input("密碼", type="password", key=f"pwd_{row['id']}")
+                            if st.button("執行", key=f"btn_{row['id']}"):
+                                if pwd == "1111":
+                                    del_res = requests.delete(f"{FINISH_URL}/{row['id']}.json")
+                                    if del_res.status_code == 200:
+                                        st.rerun() # 立即重整，防止程式試圖渲染已不存在的資料
+                                    else:
+                                        st.error("刪除失敗")
+                                else:
+                                    st.error("密碼錯誤")
             else: st.info("目前無紀錄")
-        except: st.error("讀取失敗")
+        except: st.error("資料讀取異常")
 
     # --- 📝 任務派發 ---
     elif menu == "📝 任務派發":
@@ -238,9 +213,9 @@ else:
                     target_key = next((k for k, v in exist_r.items() if v.get("製令")==str(t_o) and v.get("製造工序")==t_p), None) if exist_r else None
                     if target_key: requests.put(f"{DB_URL}/{target_key}.json", data=json.dumps(payload))
                     else: requests.post(f"{DB_URL}.json", data=json.dumps(payload))
-                    st.balloons()
                     st.success(f"✅ 製令 {t_o} 發布完成！")
-                except: st.error("發布失敗，請檢查連線")
+                    st.rerun()
+                except: st.error("發布失敗")
 
     # --- ⚙️ 設定管理 ---
     elif menu == "⚙️ 設定管理":
@@ -258,6 +233,5 @@ else:
                     "processes": [x.strip() for x in e_p.split(",") if x.strip()]
                 }
                 requests.put(f"{SETTING_URL}.json", data=json.dumps(new_cfg))
-                st.balloons()
                 st.success("設定已更新")
                 st.rerun()
