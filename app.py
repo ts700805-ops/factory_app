@@ -51,8 +51,7 @@ st.markdown("""
     .search-panel { background: white; padding: 15px; border-radius: 10px; border: 1px solid #cbd5e1; margin-bottom: 20px; }
     
     /* 歷史紀錄表頭樣式 */
-    .history-header { background: #f1f5f9; font-weight: bold; border-bottom: 2px solid #cbd5e1; padding: 10px 5px; }
-    .history-row { border-bottom: 1px solid #e2e8f0; padding: 8px 5px; align-items: center; display: flex; }
+    .history-header { background: #f1f5f9; font-weight: bold; border-bottom: 2px solid #cbd5e1; padding: 10px 5px; text-align: left; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -77,7 +76,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 📊 製造部公佈欄 ---
+    # --- 📊 製造部公佈欄 (代碼保持不變) ---
     if menu == "📊 製造部公佈欄":
         st.markdown('<h1 style="text-align:center; color:#1e40af; font-weight:900;">📋 超慧科技製造部派工進度</h1>', unsafe_allow_html=True)
         with st.container():
@@ -136,7 +135,7 @@ else:
             else: st.info("💡 目前無派工紀錄")
         except: st.error("❌ 連線異常")
 
-    # --- 📜 完工紀錄查詢 (修正刪除按鈕與表格顯示) ---
+    # --- 📜 完工紀錄查詢 (僅優化列寬對齊) ---
     elif menu == "📜 完工紀錄查詢":
         st.markdown('<h2 style="color:#1e40af;">📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
         try:
@@ -146,28 +145,27 @@ else:
                 all_finish_logs = [dict(v, id=k) for k, v in f_data.items()]
                 f_df = pd.DataFrame(all_finish_logs).fillna("NA")
 
-                # 搜尋面板
                 st.markdown('<div class="search-panel">', unsafe_allow_html=True)
                 sc1, sc2 = st.columns(2)
                 f_order_input = sc1.text_input("🔍 搜尋製令", placeholder="輸入製令關鍵字...")
                 f_staff_s = sc2.selectbox("👤 搜尋人員", ["全部"] + sorted(all_staff))
                 st.markdown('</div>', unsafe_allow_html=True)
                 
-                # 篩選邏輯
                 if f_order_input: f_df = f_df[f_df["製令"].astype(str).str.contains(f_order_input, case=False)]
                 if f_staff_s != "全部": f_df = f_df[f_df[["人員1", "人員2", "人員3", "人員4", "人員5"]].apply(lambda x: f_staff_s in x.values, axis=1)]
 
                 f_df = f_df.sort_values("完工時間", ascending=False)
 
-                # --- 核心修正：手寫表格表頭 ---
-                h_cols = st.columns([1.5, 1.2, 1, 0.8, 0.8, 0.8, 0.8, 0.8, 0.5])
-                headers = ["完工時間", "製令", "工序", "人員1", "人員2", "人員3", "人員4", "人員5", "刪除"]
+                # 使用等寬比例確保表頭與內容對齊
+                col_widths = [1.5, 1.2, 1.2, 0.8, 0.8, 0.8, 0.8, 0.8, 0.6]
+                
+                h_cols = st.columns(col_widths)
+                headers = ["完工時間", "製令", "製造工序", "人員1", "人員2", "人員3", "人員4", "人員5", "管理"]
                 for h_col, h_text in zip(h_cols, headers):
                     h_col.markdown(f'<div class="history-header">{h_text}</div>', unsafe_allow_html=True)
 
-                # --- 核心修正：手寫表格內容與行尾刪除鈕 ---
                 for _, row in f_df.iterrows():
-                    r_cols = st.columns([1.5, 1.2, 1, 0.8, 0.8, 0.8, 0.8, 0.8, 0.5])
+                    r_cols = st.columns(col_widths)
                     r_cols[0].write(row.get("完工時間", "NA"))
                     r_cols[1].write(row.get("製令", "NA"))
                     r_cols[2].write(row.get("製造工序", "NA"))
@@ -177,21 +175,21 @@ else:
                     r_cols[6].write(row.get("人員4", "NA"))
                     r_cols[7].write(row.get("人員5", "NA"))
                     
-                    # 刪除按鈕：點擊彈出密碼確認框
                     with r_cols[8]:
                         with st.popover("🗑️"):
-                            st.write("確認刪除？")
-                            pwd = st.text_input("輸入密碼", type="password", key=f"del_pwd_{row['id']}")
+                            st.write("確認刪除此筆完工紀錄？")
+                            pwd = st.text_input("輸入刪除密碼", type="password", key=f"del_pwd_{row['id']}")
                             if st.button("確認執行", key=f"del_btn_{row['id']}"):
                                 if pwd == "1111":
                                     requests.delete(f"{FINISH_URL}/{row['id']}.json")
-                                    st.success("已刪除紀錄")
+                                    st.success("已刪除")
                                     st.rerun()
                                 else:
                                     st.error("密碼錯誤")
             else: st.info("目前無紀錄")
         except: st.error("讀取資料失敗")
 
+    # --- 📝 任務派發 (代碼保持不變) ---
     elif menu == "📝 任務派發":
         st.markdown('<h2 style="color:#1e40af;">📝 任務派發 / 內容修正</h2>', unsafe_allow_html=True)
         with st.form("dispatch_form"):
@@ -214,6 +212,7 @@ else:
                     st.success(f"✅ 製令 {t_o} 發布完成！")
                 except: st.error("發布失敗")
 
+    # --- ⚙️ 設定管理 (代碼保持不變) ---
     elif menu == "⚙️ 設定管理":
         st.markdown('<h2 style="color:#1e40af;">⚙️ 系統資料後台管理</h2>', unsafe_allow_html=True)
         with st.form("admin_settings"):
