@@ -8,7 +8,7 @@ import math
 # --- 1. 核心資料與設定 ---
 DB_BASE_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
 DB_URL = f"{DB_BASE_URL}/work_logs"
-FINISH_URL = f"{DB_BASE_URL}/completed_logs" 
+FINISH_URL = f"{DB_BASE_URL}/completed_logs"
 SETTING_URL = f"{DB_BASE_URL}/settings"
 
 def get_now_str():
@@ -22,18 +22,20 @@ def get_settings():
         "processes": ["骨架作業", "前置作業", "配電作業", "模組作業", "水平調整", "通電作業", "IPQC表單查檢", "S.T作業", "收機清潔", "包機作業", "異常", "欠料", "PACKING", "前置作業(門板組立)"],
         "order_list": ["26M0041-01", "26M0041-02", "26M0051-01", "12345"],
         "leader_map": {},
-        "process_map": {} # 新增：組長與工序綁定
+        "process_map": {}
     }
     try:
         r = requests.get(f"{SETTING_URL}.json", timeout=10)
         if r.status_code == 200:
             data = r.json()
             if data and isinstance(data, dict):
+                # 確保基本欄位完整
                 for key in ["all_leaders", "all_staff", "processes", "order_list"]:
                     if key not in data or not data[key]:
                         data[key] = default_settings[key]
-                if "leader_map" not in data: data["leader_map"] = {}
-                if "process_map" not in data: data["process_map"] = {} # 確保欄位存在
+                # 強制檢查 map 類型，防止格式錯誤
+                if "leader_map" not in data or not isinstance(data["leader_map"], dict): data["leader_map"] = {}
+                if "process_map" not in data or not isinstance(data["process_map"], dict): data["process_map"] = {}
                 return data
         return default_settings
     except:
@@ -103,14 +105,15 @@ else:
                 filtered_orders = [o for o in unique_orders if (s_order == "全部" or str(o) == str(s_order))]
                 
                 cols = st.columns(3)
-                for idx, o_id in enumerate(filtered_orders):
+                display_count = 0
+                for o_id in filtered_orders:
                     o_df = df[df["製令"] == o_id]
                     if s_staff != "全部":
                         check_cols = ["組長", "人員1", "人員2", "人員3", "人員4", "人員5"]
                         if not o_df[[c for c in check_cols if c in o_df.columns]].apply(lambda x: s_staff in x.values, axis=1).any(): continue
 
                     p_date = str(o_df.iloc[0].get("通電日期", "未設定"))
-                    with cols[idx % 3]:
+                    with cols[display_count % 3]:
                         st.markdown(f'<div class="order-card"><div class="order-title"><span>📦 製令：{o_id}</span><span class="power-date">⚡ 通電：{p_date}</span></div>', unsafe_allow_html=True)
                         for proc in process_list:
                             match = o_df[o_df["製造工序"] == proc]
@@ -127,7 +130,6 @@ else:
                                 with row_cols[0]: 
                                     st.markdown(f'<div class="table-row-container"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
                                 with row_cols[1]:
-                                    st.markdown('<div class="btn-container">', unsafe_allow_html=True)
                                     if st.button("✅", key=f"fin_{row['id']}"):
                                         clean_data = {k: (v if not (isinstance(v, float) and math.isnan(v)) else "NA") for k, v in row.to_dict().items()}
                                         clean_data["完工時間"] = get_now_str()
@@ -135,8 +137,8 @@ else:
                                         if requests.post(f"{FINISH_URL}.json", data=json.dumps(clean_data)).status_code == 200:
                                             requests.delete(f"{DB_URL}/{row['id']}.json")
                                             st.rerun()
-                                    st.markdown('</div>', unsafe_allow_html=True)
                         st.markdown('</div>', unsafe_allow_html=True)
+                    display_count += 1
             else: 
                 st.info("💡 目前資料庫為空，尚無派工紀錄")
         except: 
@@ -153,7 +155,7 @@ else:
                 f_df = pd.DataFrame(all_finish_logs).fillna("NA")
                 st.markdown('<div class="search-panel">', unsafe_allow_html=True)
                 sc1, sc2 = st.columns(2)
-                f_order_input = sc1.text_input("🔍 搜尋製令 (輸入關鍵字即時過濾)", key="search_box")
+                f_order_input = sc1.text_input("🔍 搜尋製令 (關鍵字過濾)", key="search_box")
                 f_staff_s = sc2.selectbox("👤 搜尋人員", ["全部"] + sorted(all_staff))
                 st.markdown('</div>', unsafe_allow_html=True)
 
@@ -186,33 +188,30 @@ else:
                         with r_cols[8]:
                             with st.popover("🗑️"):
                                 st.write("確認刪除紀錄？")
-                                pwd = st.text_input("輸入管理密碼", type="password", key=f"pwd_{row['id']}")
-                                if st.button("確認執行", key=f"btn_{row['id']}"):
+                                pwd = st.text_input("管理密碼", type="password", key=f"pwd_{row['id']}")
+                                if st.button("執行刪除", key=f"btn_{row['id']}"):
                                     if pwd == "1111":
                                         requests.delete(f"{FINISH_URL}/{row['id']}.json")
-                                        st.success("已刪除紀錄")
+                                        st.success("已刪除")
                                         st.rerun()
-                                    else: st.error("密碼錯誤")
-                else: st.warning("⚠️ 查無符合條件的資料")
+                                    else: st.error("錯誤")
+                else: st.warning("⚠️ 查無資料")
             else: st.info("💡 目前歷史紀錄為空")
-        except Exception as e: st.error(f"資料讀取失敗：{e}")
+        except Exception as e: st.error(f"讀取失敗：{e}")
 
     # --- 📝 任務派發 ---
     elif menu == "📝 任務派發":
         st.markdown('<h2 style="color:#1e40af;">📝 任務派發 / 內容修正</h2>', unsafe_allow_html=True)
         c1, c2, c3, c4 = st.columns(4)
         t_o = c1.selectbox("1. 製令編號", order_list)
-        t_l = c3.selectbox("3. 指派組長", all_leaders) # 調換順序，先選組長
+        t_l = c3.selectbox("3. 指派組長", all_leaders)
 
-        # --- 邏輯修正：工序連動組長 ---
         my_processes = process_map.get(t_l, [])
         display_processes = my_processes if my_processes else process_list
         t_p = c2.selectbox("2. 製造工序", display_processes)
-        
         t_d = c4.date_input("4. 通電日期")
         st.write("---")
         
-        # 人員連動組長
         my_team = leader_map.get(t_l, [])
         display_staff = my_team if my_team else all_staff
         st.caption(f"💡 目前 {t_l} 的組員名單：{', '.join(display_staff) if display_staff else '未綁定'} | 負責工序：{', '.join(my_processes) if my_processes else '全部'}")
@@ -241,65 +240,73 @@ else:
     # --- ⚙️ 設定管理 ---
     elif menu == "⚙️ 設定管理":
         st.markdown('<h2 style="color:#1e40af;">⚙️ 系統資料後台管理</h2>', unsafe_allow_html=True)
+        
         with st.expander("📌 基本名單設定", expanded=False):
             with st.form("admin_settings"):
-                e_o = st.text_area("製令編號 (逗號分隔)", value=",".join(order_list))
-                e_l = st.text_area("組長名單 (逗號分隔)", value=",".join(all_leaders))
-                e_s = st.text_area("一般人員 (逗號分隔)", value=",".join(all_staff))
-                e_p = st.text_area("工序流程 (逗號分隔)", value=",".join(process_list))
+                e_o = st.text_area("製令編號 (逗號隔開)", value=",".join(order_list))
+                e_l = st.text_area("組長名單 (逗號隔開)", value=",".join(all_leaders))
+                e_s = st.text_area("一般人員 (逗號隔開)", value=",".join(all_staff))
+                e_p = st.text_area("工序流程 (逗號隔開)", value=",".join(process_list))
                 if st.form_submit_button("💾 儲存基本名單"):
                     new_cfg = settings.copy()
+                    # 增加全形逗號相容處理
                     new_cfg.update({
-                        "order_list": [x.strip() for x in e_o.split(",") if x.strip()],
-                        "all_leaders": [x.strip() for x in e_l.split(",") if x.strip()],
-                        "all_staff": [x.strip() for x in e_s.split(",") if x.strip()],
-                        "processes": [x.strip() for x in e_p.split(",") if x.strip()]
+                        "order_list": [x.strip() for x in e_o.replace("，", ",").split(",") if x.strip()],
+                        "all_leaders": [x.strip() for x in e_l.replace("，", ",").split(",") if x.strip()],
+                        "all_staff": [x.strip() for x in e_s.replace("，", ",").split(",") if x.strip()],
+                        "processes": [x.strip() for x in e_p.replace("，", ",").split(",") if x.strip()]
                     })
                     requests.put(f"{SETTING_URL}.json", data=json.dumps(new_cfg))
-                    st.success("基本名單已更新")
+                    st.success("基本名單更新成功")
                     st.rerun()
 
         st.markdown("---")
         
-        # 新增：組長與工序對應綁定介面
-        st.markdown("### 🛠️ 組長與工序對應綁定 (快速輸入)")
+        # 組長工序綁定
+        st.markdown("### 🛠️ 組長與工序對應綁定")
         p_map_text_list = [f"{leader}:{','.join(procs)}" for leader, procs in process_map.items()]
         current_p_map_str = "\n".join(p_map_text_list)
         with st.form("process_binding_form"):
-            st.info("💡 輸入格式範例：\n陳德文:骨架作業,前置作業\n劉志偉:配電作業,模組作業")
-            new_p_map_str = st.text_area("組長負責工序清單區", value=current_p_map_str, height=150)
-            if st.form_submit_button("🔗 儲存工序綁定關係"):
+            st.info("💡 格式：組長姓名:工序1,工序2 (支援全形符號)")
+            new_p_map_str = st.text_area("工序綁定清單區", value=current_p_map_str, height=150)
+            if st.form_submit_button("🔗 儲存工序綁定"):
                 new_p_map = {}
                 try:
-                    lines = [l for l in new_p_map_str.split("\n") if l.strip()]
+                    lines = [l.strip() for l in new_p_map_str.split("\n") if l.strip()]
                     for line in lines:
+                        # 相容全形冒號
+                        line = line.replace("：", ":")
                         if ":" in line:
                             l_part, p_part = line.split(":", 1)
-                            new_p_map[l_part.strip()] = [x.strip() for x in p_part.split(",") if x.strip()]
+                            # 相容全形逗號
+                            new_p_map[l_part.strip()] = [x.strip() for x in p_part.replace("，", ",").split(",") if x.strip()]
                     new_cfg = settings.copy()
                     new_cfg["process_map"] = new_p_map
                     requests.put(f"{SETTING_URL}.json", data=json.dumps(new_cfg))
-                    st.success("✅ 組長工序連動設定已更新！")
+                    st.success("✅ 工序連動已更新！")
                     st.rerun()
                 except: st.error("格式錯誤")
 
         st.markdown("---")
-        st.markdown("### 👥 組長與人員對應綁定 (快速輸入)")
+        
+        # 組長人員綁定
+        st.markdown("### 👥 組長與人員對應綁定")
         map_text_list = [f"{leader}:{','.join(staff_list)}" for leader, staff_list in leader_map.items()]
         current_map_str = "\n".join(map_text_list)
         with st.form("leader_binding_quick_form"):
-            new_map_str = st.text_area("所有組長綁員名單區", value=current_map_str, height=200)
-            if st.form_submit_button("🔗 儲存人員綁定關係"):
+            new_map_str = st.text_area("組員綁定清單區", value=current_map_str, height=200)
+            if st.form_submit_button("🔗 儲存人員綁定"):
                 new_map = {}
                 try:
-                    lines = [l for l in new_map_str.split("\n") if l.strip()]
+                    lines = [l.strip() for l in new_map_str.split("\n") if l.strip()]
                     for line in lines:
+                        line = line.replace("：", ":")
                         if ":" in line:
                             leader_part, staff_part = line.split(":", 1)
-                            new_map[leader_part.strip()] = [x.strip() for x in staff_part.split(",") if x.strip()]
+                            new_map[leader_part.strip()] = [x.strip() for x in staff_part.replace("，", ",").split(",") if x.strip()]
                     new_cfg = settings.copy()
                     new_cfg["leader_map"] = new_map
                     requests.put(f"{SETTING_URL}.json", data=json.dumps(new_cfg))
-                    st.success("✅ 組長人員綁定已更新！")
+                    st.success("✅ 人員綁定已更新！")
                     st.rerun()
-                except Exception: st.error("格式錯誤")
+                except: st.error("格式錯誤")
