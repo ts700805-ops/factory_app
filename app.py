@@ -76,7 +76,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 📊 製造部公佈欄 (代碼保持不變) ---
+    # --- 📊 製造部公佈欄 (維持原樣) ---
     if menu == "📊 製造部公佈欄":
         st.markdown('<h1 style="text-align:center; color:#1e40af; font-weight:900;">📋 超慧科技製造部派工進度</h1>', unsafe_allow_html=True)
         with st.container():
@@ -135,14 +135,15 @@ else:
             else: st.info("💡 目前無派工紀錄")
         except: st.error("❌ 連線異常")
 
-    # --- 📜 完工紀錄查詢 (僅優化列寬對齊) ---
+    # --- 📜 完工紀錄查詢 (精確修正刪除功能與對齊) ---
     elif menu == "📜 完工紀錄查詢":
         st.markdown('<h2 style="color:#1e40af;">📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
         try:
             r = requests.get(f"{FINISH_URL}.json", timeout=10)
             f_data = r.json()
             if f_data:
-                all_finish_logs = [dict(v, id=k) for k, v in f_data.items()]
+                # 確保 ID 正確綁定
+                all_finish_logs = [dict(v, id=k) for k, v in f_data.items() if v]
                 f_df = pd.DataFrame(all_finish_logs).fillna("NA")
 
                 st.markdown('<div class="search-panel">', unsafe_allow_html=True)
@@ -156,14 +157,16 @@ else:
 
                 f_df = f_df.sort_values("完工時間", ascending=False)
 
-                # 使用等寬比例確保表頭與內容對齊
+                # 列寬權重設定
                 col_widths = [1.5, 1.2, 1.2, 0.8, 0.8, 0.8, 0.8, 0.8, 0.6]
                 
+                # 繪製表頭
                 h_cols = st.columns(col_widths)
                 headers = ["完工時間", "製令", "製造工序", "人員1", "人員2", "人員3", "人員4", "人員5", "管理"]
                 for h_col, h_text in zip(h_cols, headers):
                     h_col.markdown(f'<div class="history-header">{h_text}</div>', unsafe_allow_html=True)
 
+                # 繪製內容列
                 for _, row in f_df.iterrows():
                     r_cols = st.columns(col_widths)
                     r_cols[0].write(row.get("完工時間", "NA"))
@@ -176,20 +179,24 @@ else:
                     r_cols[7].write(row.get("人員5", "NA"))
                     
                     with r_cols[8]:
+                        # 核心修正：正確帶入資料 ID
                         with st.popover("🗑️"):
-                            st.write("確認刪除此筆完工紀錄？")
-                            pwd = st.text_input("輸入刪除密碼", type="password", key=f"del_pwd_{row['id']}")
-                            if st.button("確認執行", key=f"del_btn_{row['id']}"):
+                            st.write("確認刪除紀錄？")
+                            pwd = st.text_input("輸入密碼", type="password", key=f"pwd_{row['id']}")
+                            if st.button("執行", key=f"btn_{row['id']}"):
                                 if pwd == "1111":
-                                    requests.delete(f"{FINISH_URL}/{row['id']}.json")
-                                    st.success("已刪除")
-                                    st.rerun()
+                                    del_url = f"{FINISH_URL}/{row['id']}.json"
+                                    if requests.delete(del_url).status_code == 200:
+                                        st.success("成功")
+                                        st.rerun()
+                                    else:
+                                        st.error("刪除失敗")
                                 else:
-                                    st.error("密碼錯誤")
+                                    st.error("錯誤")
             else: st.info("目前無紀錄")
-        except: st.error("讀取資料失敗")
+        except: st.error("資料讀取異常")
 
-    # --- 📝 任務派發 (代碼保持不變) ---
+    # --- 📝 任務派發 (維持原樣) ---
     elif menu == "📝 任務派發":
         st.markdown('<h2 style="color:#1e40af;">📝 任務派發 / 內容修正</h2>', unsafe_allow_html=True)
         with st.form("dispatch_form"):
@@ -212,7 +219,7 @@ else:
                     st.success(f"✅ 製令 {t_o} 發布完成！")
                 except: st.error("發布失敗")
 
-    # --- ⚙️ 設定管理 (代碼保持不變) ---
+    # --- ⚙️ 設定管理 (維持原樣) ---
     elif menu == "⚙️ 設定管理":
         st.markdown('<h2 style="color:#1e40af;">⚙️ 系統資料後台管理</h2>', unsafe_allow_html=True)
         with st.form("admin_settings"):
