@@ -91,28 +91,23 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 📊 製造部派工專區 (修改後的主頁) ---
+    # --- 📊 製造部派工專區 (修改編輯按鈕部分) ---
     if menu == "📊 製造部派工專區":
         st.markdown('<h2 style="text-align:center; color:#1e40af; font-weight:900;">📋 超慧科技製造部派工進度</h2>', unsafe_allow_html=True)
         
-        # 決定當前登入者要顯示哪些工序
         current_user = st.session_state.user
-        my_procs = process_map.get(current_user, process_list) # 若沒綁定則顯示全部
+        my_procs = process_map.get(current_user, process_list) 
         if not my_procs: my_procs = process_list
 
         try:
-            # 讀取 Firebase 資料
             r = requests.get(f"{DB_URL}.json", timeout=10)
             db_data = r.json()
             all_df = pd.DataFrame([dict(v, id=k) for k, v in db_data.items()]) if db_data else pd.DataFrame()
 
-            # 設定介面：一行顯示兩個
             display_cols = st.columns(2)
             
-            # 以後台設定的「製令清單」為準，不論有沒有派工都要顯示
             for idx, o_id in enumerate(order_list):
                 with display_cols[idx % 2]:
-                    # 取得該製令的通電日期
                     o_match = all_df[all_df["製令"] == str(o_id)] if not all_df.empty else pd.DataFrame()
                     p_date = str(o_match.iloc[0].get("通電日期", "未設定")) if not o_match.empty else "未設定"
                     
@@ -124,12 +119,11 @@ else:
                             </div>
                     """, unsafe_allow_html=True)
 
-                    # 顯示該組長對應的工序內容
                     for proc in my_procs:
-                        # 檢查資料庫是否已有此工序的派工紀錄
                         proc_match = o_match[o_match["製造工序"] == proc] if not o_match.empty else pd.DataFrame()
                         
-                        r_c1, r_c2 = st.columns([0.8, 0.2])
+                        # 調整欄位：文字(70%), 編輯(15%), 完工(15%)
+                        r_c1, r_c2, r_c3 = st.columns([0.7, 0.15, 0.15])
                         
                         with r_c1:
                             if not proc_match.empty:
@@ -142,11 +136,45 @@ else:
                                         staff_html += f'<div class="{badge_class}">{p_val}</div>'
                                 st.markdown(f'<div class="table-row-container"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
                             else:
-                                # 沒有派工資料時，也要顯示該工序但標註「尚未派工」
                                 st.markdown(f'<div class="table-row-container"><div class="cell-proc">{proc}</div><div class="no-data">尚未派工</div></div>', unsafe_allow_html=True)
                         
                         with r_c2:
-                            # 只有有派工資料的工序才能按完工
+                            # --- 📝 編輯按鈕 ---
+                            if not proc_match.empty:
+                                row = proc_match.iloc[0]
+                                with st.popover("✏️"):
+                                    st.write(f"修改人員 ({o_id} - {proc})")
+                                    # 日期修改
+                                    try:
+                                        curr_d = pd.to_datetime(row.get("通電日期", "today")).date()
+                                    except:
+                                        curr_d = datetime.date.today()
+                                    new_d = st.date_input("修改通電日期", value=curr_d, key=f"edit_d_{row['id']}")
+                                    
+                                    # 抓取該任務組長對應的人員清單
+                                    t_leader = row.get("組長", "")
+                                    staff_opts = ["NA"] + (leader_map.get(t_leader, all_staff))
+                                    
+                                    new_w = []
+                                    for i in range(1, 6):
+                                        curr_p = row.get(f"人員{i}", "NA")
+                                        d_idx = staff_opts.index(curr_p) if curr_p in staff_opts else 0
+                                        w_sel = st.selectbox(f"人員{i}", staff_opts, index=d_idx, key=f"ed_w{i}_{row['id']}")
+                                        new_w.append(w_sel)
+                                    
+                                    if st.button("💾 儲存修改", key=f"save_{row['id']}", use_container_width=True):
+                                        edit_payload = row.to_dict()
+                                        edit_payload.update({
+                                            "通電日期": str(new_d),
+                                            "人員1": new_w[0], "人員2": new_w[1], "人員3": new_w[2], "人員4": new_w[3], "人員5": new_w[4],
+                                            "最後修改": get_now_str()
+                                        })
+                                        if requests.put(f"{DB_URL}/{row['id']}.json", data=json.dumps(edit_payload)).status_code == 200:
+                                            st.success("更新完成")
+                                            time.sleep(0.5)
+                                            st.rerun()
+
+                        with r_c3:
                             if not proc_match.empty:
                                 if st.button("✅", key=f"fin_{o_id}_{proc}"):
                                     row = proc_match.iloc[0]
@@ -161,7 +189,7 @@ else:
         except:
             st.warning("⚠️ 無法讀取派工資料。")
 
-    # --- 📜 完工紀錄查詢 (以下維持原樣) ---
+    # --- 📜 完工紀錄查詢 (維持原樣) ---
     elif menu == "📜 完工紀錄查詢":
         st.markdown('<h2 style="color:#1e40af;">📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
         try:
