@@ -3,7 +3,6 @@ import pandas as pd
 import datetime
 import requests
 import json
-import math
 import time
 
 # --- 1. 核心資料與設定 (Firebase URL) ---
@@ -18,12 +17,16 @@ def get_now_str():
 
 def get_settings():
     default_settings = {
-        "all_leaders": ["管理員", "組長A", "組長B"],
+        "all_leaders": ["陳德文", "劉志偉", "吳政昌", "蘇萬紘"],
         "all_staff": ["徐梓翔", "陳德文", "胡瑄芸", "蕭詩瓊"], 
-        "processes": ["骨架作業", "前置作業", "配電作業", "模組作業", "水平調整", "通電作業", "IPQC表單查檢", "S.T作業", "收機清潔", "包機作業", "異常", "欠料", "PACKING", "前置作業(門板組立)"],
-        "order_list": ["26M0041-01", "26M0041-02", "26M0051-01", "12345"],
+        "processes": ["骨架作業", "前置作業", "配電作業", "模組作業", "水平調整", "通電作業", "IPQC表單查檢", "S.T作業", "收機清潔", "包機作業", "PACKING", "前置作業(門板組立)"],
+        "order_list": ["26M0041-01", "26M0041-02", "12345"],
         "leader_map": {},
-        "process_map": {}
+        "process_map": {
+            "陳德文": ["骨架作業", "前置作業", "配電作業", "模組作業", "水平調整", "通電作業", "IPQC表單查檢"],
+            "吳政昌": ["S.T作業"],
+            "劉志偉": ["收機清潔", "包機作業", "PACKING", "前置作業(門板組立)"]
+        }
     }
     try:
         r = requests.get(f"{SETTING_URL}.json", timeout=10)
@@ -43,7 +46,6 @@ def get_settings():
 # --- 2. 介面設定 ---
 st.set_page_config(page_title="超慧科技管理系統", layout="wide")
 
-# CSS 針對手機觀看進行強化
 st.markdown("""
     <style>
     .stApp { background-color: #f8fafc; }
@@ -58,18 +60,15 @@ st.markdown("""
     .order-title { background: #1e40af; color: white; padding: 10px 15px; font-weight: 900; display: flex; justify-content: space-between; align-items: center; }
     .power-date { background: #fbbf24; color: #1e40af; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
     .table-row-container { border-bottom: 1px solid #dee2e6; display: flex; align-items: center; min-height: 50px; }
-    .cell-proc { width: 90px; min-width: 90px; color: #1e40af; font-weight: 800; padding-left: 10px; font-size: 14px; }
+    .cell-proc { width: 140px; min-width: 140px; color: #1e40af; font-weight: 800; padding-left: 10px; font-size: 14px; }
     .cell-staff { flex-grow: 1; display: flex; flex-wrap: wrap; gap: 4px; padding: 5px; }
-    .badge-main { background: #1e40af; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
-    .badge-sub { background: #e2e8f0; color: #475569; padding: 2px 5px; border-radius: 4px; font-size: 10px; border: 1px solid #cbd5e1; }
+    .badge-staff { background: #1e40af; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
     .no-data { color: #94a3b8; font-size: 12px; font-style: italic; padding-left: 5px; }
-    
-    /* 讓按鈕在小空間內更緊湊 */
     div[data-testid="column"] { display: flex; align-items: center; justify-content: center; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. 核心邏輯讀取 ---
+# --- 3. 讀取設定與登入 ---
 settings = get_settings()
 all_leaders = settings.get("all_leaders", [])
 all_staff = settings.get("all_staff", [])
@@ -78,13 +77,14 @@ order_list = settings.get("order_list", [])
 leader_map = settings.get("leader_map", {})
 process_map = settings.get("process_map", {})
 
-# 登入邏輯
 if "user" not in st.session_state:
-    st.title("⚓ 超慧科技管理系統 - 登入")
-    u = st.selectbox("👤 請選擇您的姓名", sorted(list(set(all_leaders + all_staff))))
-    if st.button("確認進入"):
-        st.session_state.user = u
-        st.rerun()
+    st.markdown('<h1 style="text-align:center; color:#1e3a8a;">⚓ 超慧科技管理系統</h1>', unsafe_allow_html=True)
+    with st.columns([1,2,1])[1]:
+        with st.container(border=True):
+            u = st.selectbox("👤 請選擇組長登入", sorted(all_leaders))
+            if st.button("確認進入", use_container_width=True, type="primary"):
+                st.session_state.user = u
+                st.rerun()
 else:
     st.sidebar.markdown(f"👤 **目前使用者：{st.session_state.user}**")
     menu = st.sidebar.radio("功能導航", ["📊 製造部派工專區", "📜 完工紀錄查詢", "📝 任務派發", "⚙️ 設定管理"])
@@ -99,15 +99,12 @@ else:
         
         current_user = st.session_state.user
         my_procs = process_map.get(current_user, process_list) 
-        if not my_procs: my_procs = process_list
 
         try:
-            r = requests.get(f"{DB_URL}.json", timeout=10)
-            db_data = r.json()
-            all_df = pd.DataFrame([dict(v, id=k) for k, v in db_data.items()]) if db_data else pd.DataFrame()
+            r = requests.get(f"{DB_URL}.json", timeout=10).json() or {}
+            all_df = pd.DataFrame([dict(v, id=k) for k, v in r.items()]) if r else pd.DataFrame()
 
             display_cols = st.columns(2)
-            
             for idx, o_id in enumerate(order_list):
                 with display_cols[idx % 2]:
                     o_match = all_df[all_df["製令"] == str(o_id)] if not all_df.empty else pd.DataFrame()
@@ -124,18 +121,11 @@ else:
                     for proc in my_procs:
                         proc_match = o_match[o_match["製造工序"] == proc] if not o_match.empty else pd.DataFrame()
                         
-                        # 佈局分配：工序與人員(70%), 編輯(15%), 完成(15%)
                         row_c1, row_c2, row_c3 = st.columns([0.7, 0.15, 0.15])
-                        
                         with row_c1:
                             if not proc_match.empty:
                                 row = proc_match.iloc[0]
-                                staff_html = ""
-                                for i in range(1, 6):
-                                    p_val = row.get(f"人員{i}")
-                                    if p_val and p_val != "NA":
-                                        badge_class = "badge-main" if i == 1 else "badge-sub"
-                                        staff_html += f'<div class="{badge_class}">{p_val}</div>'
+                                staff_html = "".join([f'<div class="badge-staff">{row.get(f"人員{i}")}</div>' for i in range(1, 6) if row.get(f"人員{i}") and row.get(f"人員{i}") != "NA"])
                                 st.markdown(f'<div class="table-row-container"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
                             else:
                                 st.markdown(f'<div class="table-row-container"><div class="cell-proc">{proc}</div><div class="no-data">尚未派工</div></div>', unsafe_allow_html=True)
@@ -144,95 +134,81 @@ else:
                             if not proc_match.empty:
                                 row = proc_match.iloc[0]
                                 with st.popover("✏️"):
-                                    st.write(f"修改工序：{proc}")
+                                    st.write(f"修改：{o_id}-{proc}")
                                     try: curr_d = pd.to_datetime(row.get("通電日期", "today")).date()
                                     except: curr_d = datetime.date.today()
-                                    new_d = st.date_input("修改通電日期", value=curr_d, key=f"ed_date_{row['id']}")
+                                    new_d = st.date_input("日期", value=curr_d, key=f"d_{row['id']}")
                                     
-                                    t_leader = row.get("組長", "")
-                                    staff_opts = ["NA"] + (leader_map.get(t_leader, all_staff))
-                                    new_staff = []
-                                    for i in range(1, 6):
-                                        curr_p = row.get(f"人員{i}", "NA")
-                                        d_idx = staff_opts.index(curr_p) if curr_p in staff_opts else 0
-                                        s_sel = st.selectbox(f"人員{i}", staff_opts, index=d_idx, key=f"ed_s{i}_{row['id']}")
-                                        new_staff.append(s_sel)
+                                    t_leader = row.get("組長", current_user)
+                                    staff_opts = ["NA"] + leader_map.get(t_leader, all_staff)
+                                    new_staff = [st.selectbox(f"人員{i}", staff_opts, index=staff_opts.index(row.get(f"人員{i}", "NA")) if row.get(f"人員{i}") in staff_opts else 0, key=f"s{i}_{row['id']}") for i in range(1, 6)]
                                     
-                                    if st.button("💾 儲存更新", key=f"save_{row['id']}", use_container_width=True):
-                                        edit_payload = row.to_dict()
-                                        edit_payload.update({
-                                            "通電日期": str(new_d),
-                                            "人員1": new_staff[0], "人員2": new_staff[1], "人員3": new_staff[2], 
-                                            "人員4": new_staff[3], "人員5": new_staff[4],
-                                            "最後修改": get_now_str()
-                                        })
-                                        requests.put(f"{DB_URL}/{row['id']}.json", data=json.dumps(edit_payload))
-                                        st.success("更新成功")
-                                        time.sleep(0.5)
+                                    if st.button("儲存", key=f"sv_{row['id']}", use_container_width=True):
+                                        edit_p = row.to_dict()
+                                        edit_p.update({"通電日期": str(new_d), "最後修改": get_now_str(), **{f"人員{i+1}": new_staff[i] for i in range(5)}})
+                                        requests.put(f"{DB_URL}/{row['id']}.json", data=json.dumps(edit_p))
                                         st.rerun()
 
                         with row_c3:
                             if not proc_match.empty:
-                                if st.button("✅", key=f"check_{o_id}_{proc}"):
-                                    row = proc_match.iloc[0]
-                                    clean_data = row.to_dict()
-                                    clean_data["完工時間"] = get_now_str()
-                                    clean_data["完工人員"] = current_user
-                                    if requests.post(f"{FINISH_URL}.json", data=json.dumps(clean_data)).status_code == 200:
-                                        requests.delete(f"{DB_URL}/{row['id']}.json")
-                                        st.rerun()
-                    
+                                if st.button("✅", key=f"ok_{o_id}_{proc}"):
+                                    row = proc_match.iloc[0].to_dict()
+                                    row["完工時間"], row["完工人員"] = get_now_str(), current_user
+                                    requests.post(f"{FINISH_URL}.json", data=json.dumps(row))
+                                    requests.delete(f"{DB_URL}/{row['id']}.json")
+                                    st.rerun()
                     st.markdown('</div>', unsafe_allow_html=True)
-        except:
-            st.warning("⚠️ 無法讀取派工資料。")
+        except Exception as e: st.error(f"連線錯誤: {e}")
 
+    # --- 📜 完工紀錄查詢 ---
     elif menu == "📜 完工紀錄查詢":
         st.markdown('<h2 style="color:#1e40af;">📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
         try:
-            r = requests.get(f"{FINISH_URL}.json", timeout=10)
-            f_data = r.json()
-            if f_data:
-                all_finish_logs = [dict(v, id=k) for k, v in f_data.items() if v]
-                f_df = pd.DataFrame(all_finish_logs).fillna("NA")
-                sc1, sc2 = st.columns(2)
-                f_order_input = sc1.text_input("🔍 搜尋製令", key="search_box")
-                f_staff_s = sc2.selectbox("👤 搜尋人員", ["全部"] + sorted(all_staff))
-
-                filtered_df = f_df.copy()
-                if f_order_input: filtered_df = filtered_df[filtered_df["製令"].astype(str).str.contains(f_order_input)]
-                if f_staff_s != "全部":
-                    mask = filtered_df[["人員1", "人員2", "人員3", "人員4", "人員5"]].apply(lambda x: f_staff_s in x.values, axis=1)
-                    filtered_df = filtered_df[mask]
-
-                if not filtered_df.empty:
-                    st.dataframe(filtered_df.sort_values("完工時間", ascending=False), use_container_width=True)
-                else: st.info("查無資料")
+            r = requests.get(f"{FINISH_URL}.json", timeout=10).json()
+            if r:
+                f_df = pd.DataFrame([dict(v, id=k) for k, v in r.items() if v]).fillna("NA")
+                q1, q2 = st.columns(2)
+                sk = q1.text_input("🔍 搜尋製令")
+                sp = q2.selectbox("👤 搜尋人員", ["全部"] + sorted(all_staff))
+                if sk: f_df = f_df[f_df["製令"].astype(str).str.contains(sk)]
+                if sp != "全部": f_df = f_df[f_df[["人員1", "人員2", "人員3", "人員4", "人員5"]].apply(lambda x: sp in x.values, axis=1)]
+                st.dataframe(f_df.sort_values("完工時間", ascending=False), use_container_width=True)
+            else: st.info("無紀錄")
         except: st.error("讀取失敗")
 
+    # --- 📝 任務派發 ---
     elif menu == "📝 任務派發":
-        st.markdown('<h2 style="color:#1e40af;">📝 任務派發</h2>', unsafe_allow_html=True)
-        c1, c2, c3, c4 = st.columns(4)
-        t_o = c1.selectbox("1. 製令編號", order_list)
-        t_l = c3.selectbox("3. 指派組長", all_leaders)
-        my_processes = process_map.get(t_l, process_list)
-        t_p = c2.selectbox("2. 製造工序", my_processes)
-        t_d = c4.date_input("4. 通電日期")
-        
-        display_staff = leader_map.get(t_l, all_staff)
-        pc = st.columns(5)
-        workers = []
-        for i in range(5):
-            w = pc[i].selectbox(f"人員 {i+1}", ["NA"] + display_staff, key=f"new_w{i}")
-            workers.append(w)
+        st.markdown('<h2 style="color:#1e40af;">📝 任務指派</h2>', unsafe_allow_html=True)
+        with st.container(border=True):
+            c1, c2, c3, c4 = st.columns(4)
+            t_o = c1.selectbox("1. 製令", order_list)
+            t_l = c3.selectbox("3. 組長", all_leaders, index=all_leaders.index(st.session_state.user) if st.session_state.user in all_leaders else 0)
+            t_p = c2.selectbox("2. 工序", process_map.get(t_l, process_list))
+            t_d = c4.date_input("4. 通電日期")
             
-        if st.button("🚀 發布任務", type="primary", use_container_width=True):
-            payload = {"製令": str(t_o), "製造工序": t_p, "組長": t_l, "通電日期": str(t_d), "提交時間": get_now_str()}
-            for i in range(5): payload[f"人員{i+1}"] = workers[i]
-            requests.post(f"{DB_URL}.json", data=json.dumps(payload))
-            st.success("發布成功")
-            time.sleep(1)
-            st.rerun()
+            display_staff = leader_map.get(t_l, all_staff)
+            wk = [col.selectbox(f"人員 {i+1}", ["NA"] + display_staff, key=f"nw_{i}") for i, col in enumerate(st.columns(5))]
+            
+            if st.button("🚀 發布任務", type="primary", use_container_width=True):
+                payload = {"製令": str(t_o), "製造工序": t_p, "組長": t_l, "通電日期": str(t_d), "提交時間": get_now_str(), **{f"人員{i+1}": wk[i] for i in range(5)}}
+                requests.post(f"{DB_URL}.json", data=json.dumps(payload))
+                st.success("成功"); time.sleep(0.5); st.rerun()
 
+    # --- ⚙️ 設定管理 ---
     elif menu == "⚙️ 設定管理":
-        st.markdown('<h2 style="color:#1e40af;">⚙️ 系統設定</h2>', unsafe_allow_html=True)
-        st.info("此區塊保留原本的設定邏輯，可自行新增名單與綁定關係。")
+        st.markdown('<h2 style="color:#1e40af;">⚙️ 系統設定管理</h2>', unsafe_allow_html=True)
+        with st.form("sys_config"):
+            so = st.text_area("製令清單 (逗號隔開)", ",".join(order_list))
+            sl = st.text_area("組長名單 (逗號隔開)", ",".join(all_leaders))
+            ss = st.text_area("所有人員 (逗號隔開)", ",".join(all_staff))
+            sp = st.text_area("工序清單 (逗號隔開)", ",".join(process_list))
+            sm_p = st.text_area("組長:工序綁定 (每行一個 組長:工序1,工序2)", "\n".join([f"{k}:{','.join(v)}" for k, v in process_map.items()]))
+            sm_l = st.text_area("組長:組員綁定 (每行一個 組長:組員1,組員2)", "\n".join([f"{k}:{','.join(v)}" for k, v in leader_map.items()]))
+            
+            if st.form_submit_button("💾 儲存所有設定"):
+                def parse(s, nl=False):
+                    if nl: return {x.split(":")[0].strip(): [y.strip() for y in x.split(":")[1].split(",")] for x in s.split("\n") if ":" in x}
+                    return [x.strip() for x in s.replace("，", ",").split(",") if x.strip()]
+                new_conf = {"order_list": parse(so), "all_leaders": parse(sl), "all_staff": parse(ss), "processes": parse(sp), "process_map": parse(sm_p, True), "leader_map": parse(sm_l, True)}
+                requests.put(f"{SETTING_URL}.json", data=json.dumps(new_conf))
+                st.success("設定更新成功！"); time.sleep(0.5); st.rerun()
