@@ -269,9 +269,14 @@ else:
         except Exception as e:
             st.error(f"連線資料庫錯誤: {e}")
 
-    # --- 📝 任務派發 ---
+   # --- 📝 任務派發 ---
     elif st.session_state.menu_selection == "📝 任務派發":
         st.title("📝 任務指派與編輯")
+        
+        # 取得目前登入組長綁定的成員，若沒綁定則顯示全部人員
+        current_leader = st.session_state.user
+        my_bound_staff = staff_map.get(current_leader, all_staff)
+        staff_options = ["NA"] + sorted(list(set(my_bound_staff)))
         
         target_o = order_list[0] if order_list else ""
         target_p = process_list[0] if process_list else ""
@@ -287,13 +292,16 @@ else:
             t_p = v2.selectbox("2. 選擇工序", process_list, index=process_list.index(target_p) if target_p in process_list else 0)
             
             v3, v4 = st.columns(2)
-            t_l = v3.selectbox("3. 負責組長", all_leaders, index=all_leaders.index(st.session_state.user) if st.session_state.user in all_leaders else 0)
+            # 鎖定負責組長為目前登入者
+            t_l = v3.selectbox("3. 負責組長", all_leaders, index=all_leaders.index(current_leader) if current_leader in all_leaders else 0)
             t_d = v4.date_input("4. 預計通電日期")
             
+            st.markdown(f"### 👥 {current_leader} 的組員名單")
             wk = []
             cols = st.columns(5)
             for i in range(5):
-                wk.append(cols[i].selectbox(f"人員 {i+1}", ["NA"] + all_staff, key=f"form_staff_{i}"))
+                # 這裡的選項改用 staff_options (組長綁定的成員)
+                wk.append(cols[i].selectbox(f"人員 {i+1}", staff_options, key=f"form_staff_{i}"))
             
             if st.form_submit_button("🚀 確認發布任務", use_container_width=True):
                 payload = {
@@ -301,16 +309,24 @@ else:
                     "最後更新": get_now_str(),
                     "人員1": wk[0], "人員2": wk[1], "人員3": wk[2], "人員4": wk[3], "人員5": wk[4]
                 }
-                r_c = requests.get(f"{DB_URL}.json").json() or {}
-                ek = next((k for k, v in r_c.items() if v.get("製令")==str(t_o) and v.get("製造工序")==t_p), None)
-                if ek: requests.put(f"{DB_URL}/{ek}.json", data=json.dumps(payload))
-                else: requests.post(f"{DB_URL}.json", data=json.dumps(payload))
                 
-                st.session_state.edit_target = None
-                st.success("任務指派成功！")
-                time.sleep(0.5)
-                st.session_state.menu_selection = "📊 製造部派工專區"
-                st.rerun()
+                # 檢查資料庫是否已存在相同製令與工序的任務
+                try:
+                    r_c = requests.get(f"{DB_URL}.json").json() or {}
+                    ek = next((k for k, v in r_c.items() if v.get("製令")==str(t_o) and v.get("製造工序")==t_p), None)
+                    
+                    if ek:
+                        requests.put(f"{DB_URL}/{ek}.json", data=json.dumps(payload))
+                    else:
+                        requests.post(f"{DB_URL}.json", data=json.dumps(payload))
+                    
+                    st.session_state.edit_target = None
+                    st.success("任務指派成功！")
+                    time.sleep(0.5)
+                    st.session_state.menu_selection = "📊 製造部派工專區"
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"發布失敗: {e}")
     # --- ⚙️ 設定管理 ---
     elif st.session_state.menu_selection == "⚙️ 設定管理":
         st.title("⚙️ 系統設定")
