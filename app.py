@@ -102,8 +102,9 @@ else:
         st.session_state.clear()
         st.rerun()
 
- # --- 📊 製造部派工專區 ---
+# --- 📊 製造部派工專區 ---
     if st.session_state.menu_selection == "📊 製造部派工專區":
+        import uuid  # 導入唯一識別碼工具
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📋 製造部派工進度</h1>', unsafe_allow_html=True)
         
         my_procs = process_map.get(st.session_state.user, process_list)
@@ -118,7 +119,8 @@ else:
             df_work = pd.DataFrame([dict(v, id=k) for k, v in r_work.items()]).fillna("NA") if r_work else pd.DataFrame()
             df_finish = pd.DataFrame([dict(v, id=k) for k, v in r_finish.items()]).fillna("NA") if r_finish else pd.DataFrame()
 
-            display_orders = [o for o in order_list if (s_order == "全部" or str(o) == str(s_order))]
+            # 使用 set 去重，防止 order_list 本身有重複導致 key 衝突
+            display_orders = sorted(list(set([o for o in order_list if (s_order == "全部" or str(o) == str(s_order))])))
             
             cols = st.columns(2)
             for idx, o_id in enumerate(display_orders):
@@ -128,11 +130,10 @@ else:
                 with cols[idx % 2]:
                     st.markdown(f'<div class="order-card"><div class="order-header"><div>📦 製令：{o_id}</div><div class="power-date-tag">⚡ 通電：{p_date}</div></div>', unsafe_allow_html=True)
                     
-                    # 遍歷工序
                     for p_idx, proc in enumerate(my_procs):
-                        # --- 核心修正：使用絕對唯一的 Key 組合 ---
-                        # 包含：製令ID + 工序名稱 + 該工序在清單中的位置索引
-                        unique_id = f"{o_id}_{proc}_{p_idx}"
+                        # --- 終極解決方案：使用隨機生成的唯一 Key ---
+                        random_key = str(uuid.uuid4())[:8]
+                        unique_id = f"{o_id}_{proc}_{p_idx}_{random_key}"
                         
                         m_w = o_df[o_df["製造工序"] == proc]
                         m_f = df_finish[(df_finish["製令"] == str(o_id)) & (df_finish["製造工序"] == proc)] if not df_finish.empty else pd.DataFrame()
@@ -150,15 +151,14 @@ else:
                             st.markdown(f'<div class="proc-row"><div class="proc-name">{proc}</div><div class="staff-area">{html}</div></div>', unsafe_allow_html=True)
                         
                         with r_ui[1]:
-                            # 加上 prefix 確保與其他功能按鈕不衝突
-                            if st.button("✏️", key=f"edit_btn_{unique_id}"):
+                            if st.button("✏️", key=f"ed_btn_{unique_id}"):
                                 st.session_state.edit_target = {"order": str(o_id), "proc": proc}
                                 st.session_state.menu_selection = "📝 任務派發"
                                 st.rerun()
                                 
                         with r_ui[2]:
                             if not m_w.empty:
-                                if st.button("確認完工", key=f"finish_btn_{unique_id}"):
+                                if st.button("確認完工", key=f"ok_btn_{unique_id}"):
                                     dat = m_w.iloc[0].to_dict()
                                     dat["完工時間"] = get_now_str()
                                     dat["完工人員"] = st.session_state.user
