@@ -57,10 +57,9 @@ st.markdown("""
         background: #facc15; color: #1e3a8a; padding: 4px 12px; 
         border-radius: 6px; font-size: 14px; font-weight: bold; 
     }
-    /* 加強格線設計 */
     .proc-row { 
         display: flex; align-items: center; 
-        border-bottom: 1.5px solid #cbd5e1; /* 加深顏色與寬度 */
+        border-bottom: 1.5px solid #cbd5e1; 
         padding: 10px 15px;
     }
     .proc-row:last-child { border-bottom: none; }
@@ -73,7 +72,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. 核心邏輯 ---
+# --- 3. 核心邏輯讀取 ---
 settings = get_settings()
 all_leaders = settings.get("all_leaders", [])
 all_staff = settings.get("all_staff", [])
@@ -95,8 +94,7 @@ if "user" not in st.session_state:
         st.rerun()
 else:
     st.sidebar.markdown(f"👤 **目前使用者：{st.session_state.user}**")
-    nav = st.sidebar.radio("功能導航", ["📊 製造部派工專區", "📜 完工紀錄查詢", "📝 任務派發", "⚙️ 設定管理"], 
-                           index=["📊 製造部派工專區", "📜 完工紀錄查詢", "📝 任務派發", "⚙️ 設定管理"].index(st.session_state.menu_selection))
+    nav = st.sidebar.radio("功能導航", ["📊 製造部派工專區", "📜 完工紀錄查詢", "📝 任務派發", "⚙️ 設定管理"])
     
     if nav != st.session_state.menu_selection:
         st.session_state.menu_selection = nav
@@ -110,6 +108,15 @@ else:
     if st.session_state.menu_selection == "📊 製造部派工專區":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📋 製造部派工進度專區</h1>', unsafe_allow_html=True)
         
+        # 決定目前使用者要看到的工序清單
+        current_user = st.session_state.user
+        if current_user in process_map:
+            # 只顯示該組長綁定的工序
+            my_display_procs = process_map[current_user]
+        else:
+            # 如果是管理員或不在清單中，顯示全部
+            my_display_procs = process_list
+
         c1, c2 = st.columns(2)
         s_order = c1.selectbox("🔍 篩選製令", ["全部"] + sorted(order_list))
         s_staff = c2.selectbox("👤 篩選人員", ["全部"] + sorted(list(set(all_leaders + all_staff))))
@@ -124,6 +131,8 @@ else:
             cols = st.columns(2)
             for idx, o_id in enumerate(display_orders):
                 o_df = df_work[df_work["製令"] == str(o_id)]
+                
+                # 執行人員篩選邏輯
                 if s_staff != "全部" and not o_df.empty:
                     check_cols = ["組長", "人員1", "人員2", "人員3", "人員4", "人員5"]
                     if not o_df[[c for c in check_cols if c in o_df.columns]].apply(lambda x: s_staff in x.values, axis=1).any():
@@ -134,7 +143,8 @@ else:
 
                 with cols[idx % 2]:
                     st.markdown(f'<div class="order-card"><div class="order-header"><div>📦 製令：{o_id}</div><div class="power-date-tag">⚡ 通電：{p_date}</div></div>', unsafe_allow_html=True)
-                    for proc in process_list:
+                    # 僅迴圈顯示該使用者綁定的工序
+                    for proc in my_display_procs:
                         m_w = o_df[o_df["製造工序"] == proc]
                         m_f = df_finish[(df_finish["製令"] == str(o_id)) & (df_finish["製造工序"] == proc)] if not df_finish.empty else pd.DataFrame()
 
@@ -165,7 +175,7 @@ else:
                                     requests.delete(f"{DB_URL}/{dat['id']}.json")
                                     st.rerun()
                     st.markdown('</div>', unsafe_allow_html=True)
-        except Exception as e: st.error(f"錯誤: {e}")
+        except Exception as e: st.error(f"讀取資料失敗: {e}")
 
     # --- 📜 完工紀錄查詢 ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
@@ -182,11 +192,9 @@ else:
                 if sk: f_df = f_df[f_df["製令"].astype(str).str.contains(sk)]
                 if sp != "全部": f_df = f_df[f_df[["人員1", "人員2", "人員3", "人員4", "人員5"]].apply(lambda x: sp in x.values, axis=1)]
                 
-                # 隱藏指定欄位：id, 提交時間, 最後修改時間, 通電日期
                 drop_cols = ["id", "提交時間", "最後修改時間", "通電日期"]
                 f_df_display = f_df.drop(columns=[c for c in drop_cols if c in f_df.columns])
                 
-                # 製令置前
                 cols = f_df_display.columns.tolist()
                 if "製令" in cols:
                     cols.insert(0, cols.pop(cols.index("製令")))
@@ -202,7 +210,7 @@ else:
                         requests.delete(f"{FINISH_URL}/{del_id}.json")
                         st.success("紀錄已刪除"); time.sleep(0.5); st.rerun()
             else: st.info("目前無完工紀錄")
-        except: st.error("讀取失敗")
+        except: st.error("讀取完工紀錄失敗")
 
     # --- 📝 任務派發 ---
     elif st.session_state.menu_selection == "📝 任務派發":
