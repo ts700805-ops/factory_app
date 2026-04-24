@@ -242,24 +242,24 @@ else:
             sp = st.text_area("工序清單 (逗號隔開)", ",".join(process_list))
             sm = st.text_area("組長:工序綁定 (格式 組長:工序1,工序2 每行一筆)", "\n".join([f"{k}:{','.join(v)}" for k, v in process_map.items()]))
             
-            # --- 保持您的格式，僅新增人員綁定顯示 ---
-            st_m = st.text_area("組長:人員綁定 (格式 組長:人員1,人員2 每行一筆)", "\n".join([f"{k}:{','.join(v)}" for k, v in staff_map.items()]))
+            # --- 核心修正：新增人員綁定欄位，確保 staff_map 有地方定義 ---
+            staff_input = st.text_area("組長:人員綁定 (格式 組長:人員1,人員2 每行一筆)", "\n".join([f"{k}:{','.join(v)}" for k, v in staff_map.items()]))
             
             if st.form_submit_button("💾 儲存設定"):
                 def split_s(s): return [x.strip() for x in s.split(",") if x.strip()]
                 
-                # 原有的工序綁定處理
+                # 原有的工序綁定邏輯
                 new_map = {}
                 for line in sm.split("\n"):
                     if ":" in line:
-                        k, v = line.split(":")
+                        k, v = line.split(":", 1)
                         new_map[k.strip()] = split_s(v)
                 
-                # 新增的人員綁定處理 (同樣邏輯)
+                # --- 核心修正：處理人員綁定邏輯 ---
                 new_staff_map = {}
-                for line in st_m.split("\n"):
+                for line in staff_input.split("\n"):
                     if ":" in line:
-                        k, v = line.split(":")
+                        k, v = line.split(":", 1)
                         new_staff_map[k.strip()] = split_s(v)
                 
                 final_conf = {
@@ -268,7 +268,7 @@ else:
                     "all_staff": split_s(ss),
                     "processes": split_s(sp), 
                     "process_map": new_map,
-                    "staff_map": new_staff_map  # 補上這行，解決 NameError 報錯
+                    "staff_map": new_staff_map  # 存入資料庫，解決 NameError
                 }
                 
                 requests.put(f"{SETTING_URL}.json", data=json.dumps(final_conf))
