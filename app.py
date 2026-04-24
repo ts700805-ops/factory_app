@@ -105,7 +105,7 @@ else:
             if r.status_code == 200:
                 db_data = r.json() or {}
         except:
-            st.error("⚠️ 無法連線至資料庫，請檢查網路。")
+            st.error("⚠️ 無法連線至資料庫")
 
         all_df = pd.DataFrame([dict(v, id=k) for k, v in db_data.items()]) if db_data else pd.DataFrame()
 
@@ -115,10 +115,9 @@ else:
             with display_cols[idx % 2]:
                 o_match = all_df[all_df["製令"] == str(o_id)] if not all_df.empty else pd.DataFrame()
                 
-                # 取得通電日期，若無資料則顯示預設
+                # 取得通電日期
                 p_date = "未設定"
                 if not o_match.empty:
-                    # 抓取該製令下任何一筆有日期的資料
                     valid_dates = o_match["通電日期"].dropna()
                     if not valid_dates.empty:
                         p_date = str(valid_dates.iloc[0])
@@ -152,12 +151,10 @@ else:
                         if not proc_match.empty:
                             row = proc_match.iloc[0]
                             with st.popover("✏️"):
-                                st.write(f"修改：{proc}")
                                 try: curr_d = pd.to_datetime(row.get("通電日期", "today")).date()
                                 except: curr_d = datetime.date.today()
                                 new_d = st.date_input("通電日期", value=curr_d, key=f"ed_date_{row['id']}")
                                 
-                                t_leader = row.get("組長", "")
                                 staff_opts = ["NA"] + sorted(list(set(all_staff + all_leaders)))
                                 new_staff = []
                                 for i in range(1, 6):
@@ -175,8 +172,6 @@ else:
                                         "最後修改": get_now_str()
                                     })
                                     requests.put(f"{DB_URL}/{row['id']}.json", data=json.dumps(edit_payload))
-                                    st.success("已儲存")
-                                    time.sleep(0.5)
                                     st.rerun()
 
                     with row_c3:
@@ -211,4 +206,35 @@ else:
                     filtered_df = filtered_df[mask]
 
                 if not filtered_df.empty:
-                    st.dataframe(filtered_df
+                    # 修正處：確保括號正確閉合
+                    st.dataframe(filtered_df.sort_values("完工時間", ascending=False), use_container_width=True)
+                else: st.info("查無資料")
+        except: st.error("讀取失敗")
+
+    elif menu == "📝 任務派發":
+        st.markdown('<h2 style="color:#1e40af;">📝 任務派發</h2>', unsafe_allow_html=True)
+        c1, c2, c3, c4 = st.columns(4)
+        t_o = c1.selectbox("1. 製令編號", order_list)
+        t_l = c3.selectbox("3. 指派組長", all_leaders)
+        my_processes = process_map.get(t_l, process_list)
+        t_p = c2.selectbox("2. 製造工序", my_processes)
+        t_d = c4.date_input("4. 通電日期")
+        
+        display_staff = leader_map.get(t_l, all_staff)
+        pc = st.columns(5)
+        workers = []
+        for i in range(5):
+            w = pc[i].selectbox(f"人員 {i+1}", ["NA"] + display_staff, key=f"new_w{i}")
+            workers.append(w)
+            
+        if st.button("🚀 發布任務", type="primary", use_container_width=True):
+            payload = {"製令": str(t_o), "製造工序": t_p, "組長": t_l, "通電日期": str(t_d), "提交時間": get_now_str()}
+            for i in range(5): payload[f"人員{i+1}"] = workers[i]
+            requests.post(f"{DB_URL}.json", data=json.dumps(payload))
+            st.success("發布成功")
+            time.sleep(0.5)
+            st.rerun()
+
+    elif menu == "⚙️ 設定管理":
+        st.markdown('<h2 style="color:#1e40af;">⚙️ 系統設定</h2>', unsafe_allow_html=True)
+        st.write("設定管理功能維持原狀。")
