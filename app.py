@@ -56,7 +56,7 @@ st.markdown("""
     .badge-main { background: #1e40af; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
     .badge-sub { background: #e2e8f0; color: #475569; padding: 2px 5px; border-radius: 4px; font-size: 10px; border: 1px solid #cbd5e1; }
     .search-panel { background: white; padding: 15px; border-radius: 10px; border: 1px solid #cbd5e1; margin-bottom: 20px; }
-    .history-header { background: #f1f5f9; font-weight: bold; border-bottom: 2px solid #cbd5e1; padding: 10px 5px; text-align: left; }
+    .completed-text { color: #16a34a; font-weight: bold; font-size: 14px; display: flex; align-items: center; justify-content: center; height: 100%; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -77,6 +77,11 @@ if "user" not in st.session_state:
         st.rerun()
 else:
     st.sidebar.markdown(f"👤 **目前使用者：{st.session_state.user}**")
+    
+    # 用於編輯跳轉的 state 初始化
+    if "edit_target" not in st.session_state:
+        st.session_state.edit_target = None
+
     menu = st.sidebar.radio("功能導航", ["📊 製造部派工專區", "📜 完工紀錄查詢", "📝 任務派發", "⚙️ 設定管理"])
     
     if st.sidebar.button("登出系統"):
@@ -94,8 +99,19 @@ else:
             st.markdown('</div>', unsafe_allow_html=True)
 
         try:
-            r = requests.get(f"{DB_URL}.json", timeout=10)
-            db_data = r.json()
+            # 讀取未完工資料
+            r_db = requests.get(f"{DB_URL}.json", timeout=10)
+            db_data = r_db.json()
+            # 讀取已完工資料（用於判斷狀態）
+            r_fin = requests.get(f"{FINISH_URL}.json", timeout=10)
+            fin_data = r_fin.json()
+            
+            # 整合所有紀錄以便判斷哪些工序「已完成」
+            finished_keys = []
+            if fin_data and isinstance(fin_data, dict):
+                # 建立一個 (製令, 工序) 的清單來判斷狀態
+                finished_keys = [(v['製令'], v['製造工序']) for k, v in fin_data.items() if '製令' in v and '製造工序' in v]
+
             if db_data and isinstance(db_data, dict):
                 all_logs = [dict(v, id=k) for k, v in db_data.items() if v and isinstance(v, dict)]
                 df = pd.DataFrame(all_logs).fillna("NA")
@@ -117,7 +133,10 @@ else:
                             match = o_df[o_df["製造工序"] == proc]
                             if not match.empty:
                                 row = match.iloc[0]
-                                row_cols = st.columns([0.85, 0.15]) 
+                                # 判斷是否已完工
+                                is_done = (str(o_id), proc) in finished_keys
+                                
+                                row_cols = st.columns([0.7, 0.15, 0.15]) 
                                 staff_html = f'<div class="badge-leader">L: {row.get("組長","")}</div>'
                                 for i in range(1, 6):
                                     p_val = row.get(f"人員{i}")
@@ -127,18 +146,28 @@ else:
                                 
                                 with row_cols[0]: 
                                     st.markdown(f'<div class="table-row-container"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
-                                with row_cols[1]:
-                                    if st.button("✅", key=f"fin_{row['id']}"):
-                                        clean_data = {k: (v if not (isinstance(v, float) and math.isnan(v)) else "NA") for k, v in row.to_dict().items()}
-                                        clean_data["完工時間"] = get_now_str()
-                                        clean_data["完工人員"] = st.session_state.user
-                                        if requests.post(f"{FINISH_URL}.json", data=json.dumps(clean_data)).status_code == 200:
-                                            requests.delete(f"{DB_URL}/{row['id']}.json")
-                                            st.rerun()
+                                
+                                if is_done:
+                                    with row_cols[1:]:
+                                        st.markdown('<div class="completed-text">✅ 已完成</div>', unsafe_allow_html=True)
+                                else:
+                                    with row_cols[1]: # 編輯按鈕
+                                        if st.button("📝", key=f"edit_{row['id']}"):
+                                            st.session_state.edit_target = row.to_dict()
+                                            st.info("已載入編輯資料，請前往「任務派發」頁面。")
+                                            # 您也可以在此處加上 st.rerun() 切換 menu，但為避免複雜維持現狀
+                                    with row_cols[2]: # 完工按鈕
+                                        if st.button("✅", key=f"fin_{row['id']}"):
+                                            clean_data = {k: (v if not (isinstance(v, float) and math.isnan(v)) else "NA") for k, v in row.to_dict().items()}
+                                            clean_data["完工時間"] = get_now_str()
+                                            clean_data["完工人員"] = st.session_state.user
+                                            if requests.post(f"{FINISH_URL}.json", data=json.dumps(clean_data)).status_code == 200:
+                                                requests.delete(f"{DB_URL}/{row['id']}.json")
+                                                st.rerun()
                         st.markdown('</div>', unsafe_allow_html=True)
                     display_count += 1
             else: st.info("💡 目前資料庫為空，尚無派工紀錄")
-        except: st.warning("💡 系統提示：目前無可顯示之派工資料。")
+        except Exception as e: st.warning(f"💡 系統提示：目前無可顯示之派工資料。")
 
     # --- 📜 完工紀錄查詢 ---
     elif menu == "📜 完工紀錄查詢":
@@ -165,7 +194,6 @@ else:
 
                 if not filtered_df.empty:
                     filtered_df = filtered_df.sort_values("完工時間", ascending=False)
-                    # 修正 st.dataframe 括號問題
                     st.dataframe(filtered_df, use_container_width=True)
                 else: st.warning("⚠️ 查無資料")
             else: st.info("💡 目前歷史紀錄為空")
@@ -174,14 +202,33 @@ else:
     # --- 📝 任務派發 ---
     elif menu == "📝 任務派發":
         st.markdown('<h2 style="color:#1e40af;">📝 任務派發 / 內容修正</h2>', unsafe_allow_html=True)
+        
+        # 檢查是否有來自「派工專區」的編輯請求
+        edit_data = st.session_state.edit_target if st.session_state.edit_target else {}
+        
         c1, c2, c3, c4 = st.columns(4)
-        t_o = c1.selectbox("1. 製令編號", order_list)
-        t_l = c3.selectbox("3. 指派組長", all_leaders)
+        
+        # 如果是編輯模式，則預設選中該製令
+        init_order = edit_data.get("製令", order_list[0] if order_list else "")
+        t_o = c1.selectbox("1. 製令編號", order_list, index=order_list.index(init_order) if init_order in order_list else 0)
+        
+        init_leader = edit_data.get("組長", all_leaders[0] if all_leaders else "")
+        t_l = c3.selectbox("3. 指派組長", all_leaders, index=all_leaders.index(init_leader) if init_leader in all_leaders else 0)
 
         my_processes = process_map.get(t_l, [])
         display_processes = my_processes if my_processes else process_list
-        t_p = c2.selectbox("2. 製造工序", display_processes)
-        t_d = c4.date_input("4. 通電日期")
+        
+        init_proc = edit_data.get("製造工序", display_processes[0] if display_processes else "")
+        t_p = c2.selectbox("2. 製造工序", display_processes, index=display_processes.index(init_proc) if init_proc in display_processes else 0)
+        
+        # 通電日期處理
+        init_date_str = edit_data.get("通電日期")
+        try:
+            init_date = datetime.datetime.strptime(init_date_str, "%Y-%m-%d").date() if init_date_str and init_date_str != "未設定" else datetime.date.today()
+        except:
+            init_date = datetime.date.today()
+        t_d = c4.date_input("4. 通電日期", value=init_date)
+        
         st.write("---")
         
         my_team = leader_map.get(t_l, [])
@@ -191,10 +238,13 @@ else:
         pc = st.columns(5)
         workers = []
         for i in range(5):
-            w = pc[i].selectbox(f"人員 {i+1}", ["NA"] + display_staff, key=f"w{i}")
+            init_w = edit_data.get(f"人員{i+1}", "NA")
+            w = pc[i].selectbox(f"人員 {i+1}", ["NA"] + display_staff, key=f"w{i}", index=(["NA"] + display_staff).index(init_w) if init_w in (["NA"] + display_staff) else 0)
             workers.append(w)
             
-        if st.button("🚀 準備發布", type="primary", use_container_width=True):
+        btn_label = "💾 更新內容" if st.session_state.edit_target else "🚀 準備發布"
+        
+        if st.button(btn_label, type="primary", use_container_width=True):
             payload = {"製令": str(t_o), "製造工序": t_p, "組長": t_l, "通電日期": str(t_d), "提交時間": get_now_str()}
             for i in range(5): payload[f"人員{i+1}"] = workers[i]
             try:
@@ -208,16 +258,21 @@ else:
                 else: requests.post(f"{DB_URL}.json", data=json.dumps(payload))
                 
                 st.balloons()
-                st.success(f"✅ 製令 {t_o} 發布完成！")
+                st.success(f"✅ 製令 {t_o} 操作完成！")
+                st.session_state.edit_target = None # 清除編輯狀態
                 time.sleep(1.5)
                 st.rerun()
             except Exception as e: st.error(f"發布失敗：{str(e)}")
+            
+        if st.session_state.edit_target:
+            if st.button("❌ 取消編輯"):
+                st.session_state.edit_target = None
+                st.rerun()
 
     # --- ⚙️ 設定管理 ---
     elif menu == "⚙️ 設定管理":
         st.markdown('<h2 style="color:#1e40af;">⚙️ 系統資料後台管理</h2>', unsafe_allow_html=True)
         
-        # 1. 基本名單設定
         with st.expander("📌 基本名單設定", expanded=True):
             with st.form("admin_settings"):
                 e_o = st.text_area("製令編號 (逗號隔開)", value=",".join(order_list))
@@ -239,7 +294,6 @@ else:
 
         st.markdown("---")
         
-        # 2. 組長與工序對應綁定
         st.markdown("### 🛠️ 組長與工序對應綁定")
         p_map_text_list = [f"{leader}:{','.join(procs)}" for leader, procs in process_map.items()]
         current_p_map_str = "\n".join(p_map_text_list)
@@ -266,7 +320,6 @@ else:
 
         st.markdown("---")
         
-        # 3. 組長與人員對應綁定
         st.markdown("### 👥 組長與人員對應綁定")
         map_text_list = [f"{leader}:{','.join(staff_list)}" for leader, staff_list in leader_map.items()]
         current_map_str = "\n".join(map_text_list)
