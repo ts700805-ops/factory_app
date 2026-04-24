@@ -286,28 +286,79 @@ else:
                 st.session_state.menu_selection = "📊 製造部派工專區"
                 st.rerun()
 
-    # --- ⚙️ 設定管理 ---
-    elif st.session_state.menu_selection == "⚙️ 設定管理":
-        st.title("⚙️ 系統設定")
-        with st.form("config_form"):
-            so = st.text_area("製令清單 (逗號隔開)", ",".join(order_list))
-            sl = st.text_area("組長清單 (逗號隔開)", ",".join(all_leaders))
-            ss = st.text_area("人員清單 (逗號隔開)", ",".join(all_staff))
-            sp = st.text_area("工序清單 (逗號隔開)", ",".join(process_list))
-            sm = st.text_area("組長:工序綁定 (格式 組長:工序1,工序2 每行一筆)", "\n".join([f"{k}:{','.join(v)}" for k, v in process_map.items()]))
-            
-            if st.form_submit_button("💾 儲存設定"):
-                def split_s(s): return [x.strip() for x in s.split(",") if x.strip()]
+ # --- ⚙️ 設定管理 ---
+    elif menu == "⚙️ 設定管理":
+        st.markdown('<h2 style="color:#1e40af;">⚙️ 系統資料後台管理</h2>', unsafe_allow_html=True)
+        
+        with st.expander("📌 基本名單設定", expanded=False):
+            with st.form("admin_settings"):
+                e_o = st.text_area("製令編號 (逗號隔開)", value=",".join(order_list))
+                e_l = st.text_area("組長名單 (逗號隔開)", value=",".join(all_leaders))
+                e_s = st.text_area("一般人員 (逗號隔開)", value=",".join(all_staff))
+                e_p = st.text_area("工序流程 (逗號隔開)", value=",".join(process_list))
+                if st.form_submit_button("💾 儲存基本名單"):
+                    new_cfg = settings.copy()
+                    new_cfg.update({
+                        "order_list": [x.strip() for x in e_o.replace("，", ",").split(",") if x.strip()],
+                        "all_leaders": [x.strip() for x in e_l.replace("，", ",").split(",") if x.strip()],
+                        "all_staff": [x.strip() for x in e_s.replace("，", ",").split(",") if x.strip()],
+                        "processes": [x.strip() for x in e_p.replace("，", ",").split(",") if x.strip()]
+                    })
+                    requests.put(f"{SETTING_URL}.json", data=json.dumps(new_cfg))
+                    st.success("基本名單更新成功")
+                    st.rerun()
+
+        st.markdown("---")
+        
+        # 組長工序綁定
+        st.markdown("### 🛠️ 組長與工序對應綁定")
+        p_map_text_list = [f"{leader}:{','.join(procs)}" for leader, procs in process_map.items()]
+        current_p_map_str = "\n".join(p_map_text_list)
+        with st.form("process_binding_form"):
+            st.info("💡 格式：組長姓名:工序1,工序2 (支援全形符號)")
+            new_p_map_str = st.text_area("工序綁定清單區", value=current_p_map_str, height=150)
+            if st.form_submit_button("🔗 儲存工序綁定"):
+                new_p_map = {}
+                try:
+                    lines = [l.strip() for l in new_p_map_str.split("\n") if l.strip()]
+                    for line in lines:
+                        line = line.replace("：", ":")
+                        if ":" in line:
+                            l_part, p_part = line.split(":", 1)
+                            new_p_map[l_part.strip()] = [x.strip() for x in p_part.replace("，", ",").split(",") if x.strip()]
+                    new_cfg = settings.copy()
+                    new_cfg["process_map"] = new_p_map
+                    requests.put(f"{SETTING_URL}.json", data=json.dumps(new_cfg))
+                    st.success("✅ 工序連動已更新！")
+                    time.sleep(1)
+                    st.rerun()
+                except:
+                    # 原本的紅色格式錯誤區塊已依指令移除
+                    pass
+
+        st.markdown("---")
+        
+        # 組長人員綁定
+        st.markdown("### 👥 組長與人員對應綁定")
+        map_text_list = [f"{leader}:{','.join(staff_list)}" for leader, staff_list in leader_map.items()]
+        current_map_str = "\n".join(map_text_list)
+        with st.form("leader_binding_quick_form"):
+            new_map_str = st.text_area("組員綁定清單區", value=current_map_str, height=200)
+            if st.form_submit_button("🔗 儲存人員綁定"):
                 new_map = {}
-                for line in sm.split("\n"):
-                    if ":" in line:
-                        k, v = line.split(":")
-                        new_map[k.strip()] = split_s(v)
-                
-                final_conf = {
-                    "order_list": split_s(so), "all_leaders": split_s(sl), "all_staff": split_s(ss),
-                    "processes": split_s(sp), "process_map": new_map
-                }
-                requests.put(f"{SETTING_URL}.json", data=json.dumps(final_conf))
-                st.success("設定已更新")
-                st.rerun()
+                try:
+                    lines = [l.strip() for l in new_map_str.split("\n") if l.strip()]
+                    for line in lines:
+                        line = line.replace("：", ":")
+                        if ":" in line:
+                            leader_part, staff_part = line.split(":", 1)
+                            new_map[leader_part.strip()] = [x.strip() for x in staff_part.replace("，", ",").split(",") if x.strip()]
+                    new_cfg = settings.copy()
+                    new_cfg["leader_map"] = new_map
+                    requests.put(f"{SETTING_URL}.json", data=json.dumps(new_cfg))
+                    st.success("✅ 人員綁定已更新！")
+                    time.sleep(1)
+                    st.rerun()
+                except:
+                    # 原本的紅色格式錯誤區塊已依指令移除
+                    pass
