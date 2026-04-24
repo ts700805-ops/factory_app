@@ -203,48 +203,52 @@ else:
         try:
             r = requests.get(f"{FINISH_URL}.json").json()
             if r:
-                # 1. 建立初始 DataFrame
+                # 1. 建立 DataFrame 並處理欄位
                 f_df = pd.DataFrame([dict(v, db_id=k) for k, v in r.items() if v]).fillna("NA")
                 
-                # 2. 定義要顯示的順序與欄位 (製令擺第一，排除掉您不想要的欄位)
-                # 假設您的欄位名稱為：製令, 製造工序, 通電日期, 人員1...人員5, 完工時間, 完工人員
-                all_cols = f_df.columns.tolist()
-                
-                # 排除清單
-                exclude_cols = ["db_id", "id", "最後更新", "組長", "提交時間"]
-                display_cols = [c for c in all_cols if c not in exclude_cols]
-                
-                # 將 "製令" 移到最前面
-                if "製令" in display_cols:
-                    display_cols.insert(0, display_cols.pop(display_cols.index("製令")))
-                
-                # 3. 顯示過濾後的資料表
-                st.dataframe(f_df[display_cols].sort_values("完工時間", ascending=False), use_container_width=True)
-                
+                # 排序：按完工時間倒序
+                f_df = f_df.sort_values("完工時間", ascending=False)
+
+                # 2. 定義要顯示的欄位與順序 (排除 ID/提交時間/最後更新/組長)
+                # 核心要求：製令在最前面，刪除「最後更新」等欄位
+                target_cols = ["製令", "製造工序", "通電日期", "人員1", "人員2", "人員3", "人員4", "人員5", "完工人員", "完工時間"]
+                # 過濾掉資料中可能不存在的欄位，避免報錯
+                display_cols = [c for c in target_cols if c in f_df.columns]
+
+                # 3. 自定義表頭 (使用 columns 模擬表格)
                 st.markdown("---")
-                st.subheader("🗑️ 紀錄管理")
-                
-                # 4. 刪除功能：讓使用者選擇製令與工序來刪除
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    # 建立選單顯示文字，方便辨識要刪哪一筆
-                    delete_options = {f"{row['製令']} - {row['製造工序']} (完工於: {row['完工時間']})": row['db_id'] 
-                                     for _, row in f_df.iterrows()}
-                    target_label = st.selectbox("請選擇要刪除的紀錄", list(delete_options.keys()))
-                
-                with col2:
-                    st.write(" ") # 調整對齊
-                    st.write(" ")
-                    if st.button("🔥 執行刪除", use_container_width=True, type="secondary"):
-                        target_id = delete_options[target_label]
-                        del_r = requests.delete(f"{FINISH_URL}/{target_id}.json")
-                        if del_r.status_code == 200:
-                            st.success("紀錄已刪除")
-                            time.sleep(0.5)
-                            st.rerun()
-                        else:
-                            st.error("刪除失敗")
-                            
+                h_cols = st.columns([1.5, 1.5, 1.2, 1, 1, 1, 1, 1, 1.2, 1.8, 0.8])
+                header_names = ["製令", "工序", "通電日", "人1", "人2", "人3", "人4", "人5", "完工人員", "完工時間", "管理"]
+                for i, name in enumerate(header_names):
+                    h_cols[i].markdown(f"**{name}**")
+                st.markdown("---")
+
+                # 4. 逐列顯示資料與刪除按鈕
+                for _, row in f_df.iterrows():
+                    r_cols = st.columns([1.5, 1.5, 1.2, 1, 1, 1, 1, 1, 1.2, 1.8, 0.8])
+                    
+                    # 顯示資料
+                    r_cols[0].write(row.get("製令", "NA"))
+                    r_cols[1].write(row.get("製造工序", "NA"))
+                    r_cols[2].write(row.get("通電日期", "NA"))
+                    r_cols[3].write(row.get("人員1", ""))
+                    r_cols[4].write(row.get("人員2", ""))
+                    r_cols[5].write(row.get("人員3", ""))
+                    r_cols[6].write(row.get("人員4", ""))
+                    r_cols[7].write(row.get("人員5", ""))
+                    r_cols[8].write(row.get("完工人員", "NA"))
+                    r_cols[9].write(row.get("完工時間", "NA"))
+                    
+                    # 5. 右側刪除按鈕
+                    if r_cols[10].button("🗑️", key=f"del_{row['db_id']}", help="點擊刪除此筆紀錄"):
+                        with st.spinner("正在刪除..."):
+                            res = requests.delete(f"{FINISH_URL}/{row['db_id']}.json")
+                            if res.status_code == 200:
+                                st.toast(f"✅ 已刪除：{row.get('製令')} - {row.get('製造工序')}")
+                                time.sleep(0.5)
+                                st.rerun()
+                            else:
+                                st.error("刪除失敗，請檢查網路。")
             else:
                 st.info("目前無完工紀錄")
         except Exception as e:
