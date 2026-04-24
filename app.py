@@ -3,7 +3,6 @@ import pandas as pd
 import datetime
 import requests
 import json
-import math
 import time
 
 # --- 1. 核心資料與設定 ---
@@ -33,8 +32,8 @@ def get_settings():
                 for key in ["all_leaders", "all_staff", "processes", "order_list"]:
                     if key not in data or not data[key]:
                         data[key] = default_settings[key]
-                if "leader_map" not in data or not isinstance(data["leader_map"], dict): data["leader_map"] = {}
-                if "process_map" not in data or not isinstance(data["process_map"], dict): data["process_map"] = {}
+                if "leader_map" not in data: data["leader_map"] = {}
+                if "process_map" not in data: data["process_map"] = {}
                 return data
         return default_settings
     except:
@@ -80,7 +79,9 @@ order_list = settings.get("order_list", [])
 leader_map = settings.get("leader_map", {})
 process_map = settings.get("process_map", {})
 
-# 編輯跳轉暫存
+# Session States
+if "menu_selection" not in st.session_state:
+    st.session_state.menu_selection = "📊 製造部派工專區"
 if "edit_target" not in st.session_state:
     st.session_state.edit_target = None
 
@@ -91,15 +92,21 @@ if "user" not in st.session_state:
         st.session_state.user = u
         st.rerun()
 else:
+    # 側邊欄導航
     st.sidebar.markdown(f"👤 **目前使用者：{st.session_state.user}**")
-    menu = st.sidebar.radio("功能導航", ["📊 製造部派工專區", "📜 完工紀錄查詢", "📝 任務派發", "⚙️ 設定管理"])
+    nav = st.sidebar.radio("功能導航", ["📊 製造部派工專區", "📜 完工紀錄查詢", "📝 任務派發", "⚙️ 設定管理"], 
+                           index=["📊 製造部派工專區", "📜 完工紀錄查詢", "📝 任務派發", "⚙️ 設定管理"].index(st.session_state.menu_selection))
     
+    if nav != st.session_state.menu_selection:
+        st.session_state.menu_selection = nav
+        st.rerun()
+
     if st.sidebar.button("登出系統"):
         st.session_state.clear()
         st.rerun()
 
     # --- 📊 製造部派工專區 ---
-    if menu == "📊 製造部派工專區":
+    if st.session_state.menu_selection == "📊 製造部派工專區":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📋 製造部派工進度專區</h1>', unsafe_allow_html=True)
         
         c1, c2 = st.columns(2)
@@ -107,20 +114,16 @@ else:
         s_staff = c2.selectbox("👤 篩選人員", ["全部"] + sorted(list(set(all_leaders + all_staff))))
 
         try:
-            r_work = requests.get(f"{DB_URL}.json", timeout=10).json() or {}
-            r_finish = requests.get(f"{FINISH_URL}.json", timeout=10).json() or {}
-            
+            r_work = requests.get(f"{DB_URL}.json").json() or {}
+            r_finish = requests.get(f"{FINISH_URL}.json").json() or {}
             df_work = pd.DataFrame([dict(v, id=k) for k, v in r_work.items()]).fillna("NA") if r_work else pd.DataFrame()
             df_finish = pd.DataFrame([dict(v, id=k) for k, v in r_finish.items()]).fillna("NA") if r_finish else pd.DataFrame()
 
-            # 顯示所有製令清單
             display_orders = [o for o in order_list if (s_order == "全部" or str(o) == str(s_order))]
             
             cols = st.columns(2)
             for idx, o_id in enumerate(display_orders):
                 o_df = df_work[df_work["製令"] == str(o_id)]
-                
-                # 如果有篩選人員，判斷該製令是否有該員
                 if s_staff != "全部" and not o_df.empty:
                     check_cols = ["組長", "人員1", "人員2", "人員3", "人員4", "人員5"]
                     if not o_df[[c for c in check_cols if c in o_df.columns]].apply(lambda x: s_staff in x.values, axis=1).any():
@@ -128,170 +131,110 @@ else:
 
                 p_date = "未設定"
                 if not o_df.empty: p_date = str(o_df.iloc[0].get("通電日期", "未設定"))
-                elif not df_finish.empty:
-                    f_o_df = df_finish[df_finish["製令"] == str(o_id)]
-                    if not f_o_df.empty: p_date = str(f_o_df.iloc[0].get("通電日期", "未設定"))
 
                 with cols[idx % 2]:
-                    st.markdown(f"""
-                        <div class="order-card">
-                            <div class="order-header">
-                                <div class="header-left">📦 製令：{o_id}</div>
-                                <div class="power-date-tag">⚡ 通電：{p_date}</div>
-                            </div>
-                    """, unsafe_allow_html=True)
-                    
+                    st.markdown(f'<div class="order-card"><div class="order-header"><div>📦 製令：{o_id}</div><div class="power-date-tag">⚡ 通電：{p_date}</div></div>', unsafe_allow_html=True)
                     for proc in process_list:
                         m_w = o_df[o_df["製造工序"] == proc]
                         m_f = df_finish[(df_finish["製令"] == str(o_id)) & (df_finish["製造工序"] == proc)] if not df_finish.empty else pd.DataFrame()
 
-                        row_ui = st.columns([0.7, 0.15, 0.15])
-                        
-                        with row_ui[0]:
-                            staff_html = ""
+                        r_ui = st.columns([0.65, 0.15, 0.2])
+                        with r_ui[0]:
                             if not m_w.empty:
                                 row = m_w.iloc[0]
-                                staff_html += f'<div class="badge-leader">L: {row.get("組長","")}</div>'
+                                html = f'<div class="badge-leader">L: {row.get("組長","")}</div>'
                                 for i in range(1, 6):
                                     p = row.get(f"人員{i}")
-                                    if p and p != "NA":
-                                        staff_html += f'<div class="{"badge-main" if i==1 else "badge-sub"}">{p}</div>'
-                            elif not m_f.empty:
-                                staff_html = '<span class="status-done">✅ 已完工</span>'
-                            else:
-                                staff_html = '<span class="status-empty">尚未派工</span>'
-                            
-                            st.markdown(f'<div class="proc-row"><div class="proc-name">{proc}</div><div class="staff-area">{staff_html}</div></div>', unsafe_allow_html=True)
+                                    if p and p != "NA": html += f'<div class="{"badge-main" if i==1 else "badge-sub"}">{p}</div>'
+                            elif not m_f.empty: html = '<span class="status-done">✅ 已完工</span>'
+                            else: html = '<span class="status-empty">尚未派工</span>'
+                            st.markdown(f'<div class="proc-row"><div class="proc-name">{proc}</div><div class="staff-area">{html}</div></div>', unsafe_allow_html=True)
                         
-                        with row_ui[1]: # 編輯功能
-                            if st.button("✏️", key=f"edit_{o_id}_{proc}"):
+                        with r_ui[1]:
+                            if st.button("✏️", key=f"ed_{o_id}_{proc}"):
                                 st.session_state.edit_target = {"order": str(o_id), "proc": proc}
-                                # 自動導向任務派發頁面
-                                st.switch_page(st.Page(menu)) # 由於Streamlit Page限制，直接重導向通常配合Session狀態
-
-                        with row_ui[2]: # 完工功能
+                                st.session_state.menu_selection = "📝 任務派發"
+                                st.rerun()
+                        with r_ui[2]:
                             if not m_w.empty:
-                                if st.button("✅", key=f"fin_{o_id}_{proc}"):
-                                    row_data = m_w.iloc[0].to_dict()
-                                    row_data["完工時間"] = get_now_str()
-                                    row_data["完工人員"] = st.session_state.user
-                                    requests.post(f"{FINISH_URL}.json", data=json.dumps(row_data))
-                                    requests.delete(f"{DB_URL}/{row_data['id']}.json")
+                                if st.button("確認完工", key=f"ok_{o_id}_{proc}"):
+                                    dat = m_w.iloc[0].to_dict()
+                                    dat["完工時間"] = get_now_str()
+                                    dat["完工人員"] = st.session_state.user
+                                    requests.post(f"{FINISH_URL}.json", data=json.dumps(dat))
+                                    requests.delete(f"{DB_URL}/{dat['id']}.json")
                                     st.rerun()
                     st.markdown('</div>', unsafe_allow_html=True)
-        except Exception as e:
-            st.error(f"系統錯誤：{e}")
+        except Exception as e: st.error(f"錯誤: {e}")
 
     # --- 📜 完工紀錄查詢 ---
-    elif menu == "📜 完工紀錄查詢":
-        st.markdown('<h2 style="color:#1e40af;">📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
+    elif st.session_state.menu_selection == "📜 完工紀錄查詢":
+        st.markdown('<h2>📜 歷史完工紀錄</h2>', unsafe_allow_html=True)
         try:
-            r = requests.get(f"{FINISH_URL}.json", timeout=10)
-            f_data = r.json()
-            if f_data:
-                all_finish_logs = [dict(v, id=k) for k, v in f_data.items() if v]
-                f_df = pd.DataFrame(all_finish_logs).fillna("NA")
-                sc1, sc2 = st.columns(2)
-                f_order_input = sc1.text_input("🔍 搜尋製令 (關鍵字)")
-                f_staff_s = sc2.selectbox("👤 搜尋人員", ["全部"] + sorted(all_staff))
-                
-                filtered_df = f_df.copy()
-                if f_order_input:
-                    filtered_df = filtered_df[filtered_df["製令"].astype(str).str.contains(f_order_input)]
-                if f_staff_s != "全部":
-                    mask = filtered_df[["人員1", "人員2", "人員3", "人員4", "人員5"]].apply(lambda x: f_staff_s in x.values, axis=1)
-                    filtered_df = filtered_df[mask]
-                st.dataframe(filtered_df.sort_values("完工時間", ascending=False), use_container_width=True)
-            else:
-                st.info("尚無完工紀錄")
-        except:
-            st.error("讀取失敗")
+            r = requests.get(f"{FINISH_URL}.json").json()
+            if r:
+                f_df = pd.DataFrame([dict(v, id=k) for k, v in r.items() if v]).fillna("NA")
+                q1, q2 = st.columns(2)
+                sk = q1.text_input("🔍 搜尋製令")
+                sp = q2.selectbox("👤 搜尋人員", ["全部"] + sorted(all_staff))
+                if sk: f_df = f_df[f_df["製令"].astype(str).str.contains(sk)]
+                if sp != "全部": f_df = f_df[f_df[["人員1", "人員2", "人員3", "人員4", "人員5"]].apply(lambda x: sp in x.values, axis=1)]
+                st.dataframe(f_df.sort_values("完工時間", ascending=False), use_container_width=True)
+            else: st.info("無紀錄")
+        except: st.error("讀取失敗")
 
     # --- 📝 任務派發 ---
-    elif menu == "📝 任務派發":
-        st.markdown('<h2 style="color:#1e40af;">📝 任務指派與修正</h2>', unsafe_allow_html=True)
-        
-        # 處理編輯跳轉過來的預填
-        default_o = order_list[0]
-        default_p = process_list[0]
+    elif st.session_state.menu_selection == "📝 任務派發":
+        st.markdown('<h2>📝 任務指派系統</h2>', unsafe_allow_html=True)
+        def_o = order_list[0]
+        def_p = process_list[0]
         if st.session_state.edit_target:
-            default_o = st.session_state.edit_target["order"]
-            default_p = st.session_state.edit_target["proc"]
-            st.success(f"已載入製令：{default_o} | 工序：{default_p} 進行編輯")
-            st.session_state.edit_target = None # 用完清除
+            def_o = st.session_state.edit_target["order"]
+            def_p = st.session_state.edit_target["proc"]
+            st.info(f"正在編輯：{def_o} - {def_p}")
 
         with st.container(border=True):
-            c1, c2, c3, c4 = st.columns(4)
-            # 確保預填的製令在清單中
-            t_o = c1.selectbox("1. 選擇製令", order_list, index=order_list.index(default_o) if default_o in order_list else 0)
-            t_l = c3.selectbox("3. 指派組長", all_leaders)
+            v1, v2, v3, v4 = st.columns(4)
+            t_o = v1.selectbox("1. 製令", order_list, index=order_list.index(def_o) if def_o in order_list else 0)
+            t_l = v3.selectbox("3. 組長", all_leaders)
             
-            my_procs = process_map.get(t_l, process_list)
-            t_p = c2.selectbox("2. 選擇工序", my_procs, index=my_procs.index(default_p) if default_p in my_procs else 0)
-            t_d = c4.date_input("4. 通電日期")
-            
+            # --- 找回組長連動功能 ---
             my_team = leader_map.get(t_l, all_staff)
-            st.caption(f"💡 {t_l} 的組員名單：{', '.join(my_team)}")
+            my_procs = process_map.get(t_l, process_list)
             
-            pc = st.columns(5)
-            workers = []
-            for i in range(5):
-                w = pc[i].selectbox(f"人員 {i+1}", ["NA"] + my_team, key=f"task_w{i}")
-                workers.append(w)
+            t_p = v2.selectbox("2. 工序", my_procs, index=my_procs.index(def_p) if def_p in my_procs else 0)
+            t_d = v4.date_input("4. 通電日期")
             
-            if st.button("🚀 確認發布任務", type="primary", use_container_width=True):
-                payload = {
-                    "製令": str(t_o), "製造工序": t_p, "組長": t_l, 
-                    "通電日期": str(t_d), "提交時間": get_now_str(),
-                    "人員1": workers[0], "人員2": workers[1], "人員3": workers[2], "人員4": workers[3], "人員5": workers[4]
-                }
-                r_check = requests.get(f"{DB_URL}.json").json() or {}
-                existing_key = next((k for k, v in r_check.items() if v.get("製令")==str(t_o) and v.get("製造工序")==t_p), None)
-                
-                if existing_key: requests.put(f"{DB_URL}/{existing_key}.json", data=json.dumps(payload))
+            st.write(f"👥 當前組員：{', '.join(my_team)}")
+            wk = []
+            for i, col in enumerate(st.columns(5)):
+                wk.append(col.selectbox(f"人員 {i+1}", ["NA"] + my_team, key=f"w_{i}"))
+            
+            if st.button("🚀 發布任務", type="primary", use_container_width=True):
+                payload = {"製令": str(t_o), "製造工序": t_p, "組長": t_l, "通電日期": str(t_d), "提交時間": get_now_str(),
+                           "人員1": wk[0], "人員2": wk[1], "人員3": wk[2], "人員4": wk[3], "人員5": wk[4]}
+                r_c = requests.get(f"{DB_URL}.json").json() or {}
+                ek = next((k for k, v in r_c.items() if v.get("製令")==str(t_o) and v.get("製造工序")==t_p), None)
+                if ek: requests.put(f"{DB_URL}/{ek}.json", data=json.dumps(payload))
                 else: requests.post(f"{DB_URL}.json", data=json.dumps(payload))
-                
-                st.balloons()
-                st.success("任務處理完成！")
-                time.sleep(1)
-                st.rerun()
+                st.session_state.edit_target = None
+                st.success("成功！"); time.sleep(0.5); st.rerun()
 
     # --- ⚙️ 設定管理 ---
-    elif menu == "⚙️ 設定管理":
-        st.markdown('<h2 style="color:#1e40af;">⚙️ 後台設定管理</h2>', unsafe_allow_html=True)
-        with st.expander("📌 基礎名單維護"):
-            with st.form("base_config"):
-                e_o = st.text_area("製令編號 (逗號隔開)", value=",".join(order_list))
-                e_l = st.text_area("組長名單 (逗號隔開)", value=",".join(all_leaders))
-                e_s = st.text_area("一般人員 (逗號隔開)", value=",".join(all_staff))
-                e_p = st.text_area("工序流程 (逗號隔開)", value=",".join(process_list))
-                if st.form_submit_button("💾 儲存設定"):
-                    new_cfg = settings.copy()
-                    new_cfg.update({
-                        "order_list": [x.strip() for x in e_o.replace("，", ",").split(",") if x.strip()],
-                        "all_leaders": [x.strip() for x in e_l.replace("，", ",").split(",") if x.strip()],
-                        "all_staff": [x.strip() for x in e_s.replace("，", ",").split(",") if x.strip()],
-                        "processes": [x.strip() for x in e_p.replace("，", ",").split(",") if x.strip()]
-                    })
-                    requests.put(f"{SETTING_URL}.json", data=json.dumps(new_cfg))
-                    st.rerun()
-        
-        with st.expander("🔗 綁定設定"):
-            with st.form("binding_config"):
-                curr_p = "\n".join([f"{k}:{','.join(v)}" for k, v in process_map.items()])
-                curr_l = "\n".join([f"{k}:{','.join(v)}" for k, v in leader_map.items()])
-                new_p_str = st.text_area("組長:工序", value=curr_p)
-                new_l_str = st.text_area("組長:組員", value=curr_l)
-                if st.form_submit_button("🔗 儲存連結"):
-                    def str_to_map(s):
-                        res = {}
-                        for line in s.split("\n"):
-                            if ":" in line:
-                                k, v = line.split(":", 1)
-                                res[k.strip()] = [x.strip() for x in v.replace("，", ",").split(",") if x.strip()]
-                        return res
-                    new_cfg = settings.copy()
-                    new_cfg["process_map"] = str_to_map(new_p_str)
-                    new_cfg["leader_map"] = str_to_map(new_l_str)
-                    requests.put(f"{SETTING_URL}.json", data=json.dumps(new_cfg))
-                    st.rerun()
+    elif st.session_state.menu_selection == "⚙️ 設定管理":
+        st.markdown('<h2>⚙️ 系統設定</h2>', unsafe_allow_html=True)
+        with st.form("set_form"):
+            so = st.text_area("製令 (逗號隔開)", ",".join(order_list))
+            sl = st.text_area("組長 (逗號隔開)", ",".join(all_leaders))
+            ss = st.text_area("人員 (逗號隔開)", ",".join(all_staff))
+            sp = st.text_area("工序 (逗號隔開)", ",".join(process_list))
+            sm_l = st.text_area("組長:組員 (格式: 組長A:人員1,人員2)", "\n".join([f"{k}:{','.join(v)}" for k, v in leader_map.items()]))
+            sm_p = st.text_area("組長:工序 (格式: 組長A:工序1,工序2)", "\n".join([f"{k}:{','.join(v)}" for k, v in process_map.items()]))
+            if st.form_submit_button("儲存"):
+                def parse(s, nl=False):
+                    if nl: return {x.split(":")[0].strip(): [y.strip() for y in x.split(":")[1].split(",")] for x in s.split("\n") if ":" in x}
+                    return [x.strip() for x in s.replace("，", ",").split(",") if x.strip()]
+                new_s = {"order_list": parse(so), "all_leaders": parse(sl), "all_staff": parse(ss), "processes": parse(sp),
+                         "leader_map": parse(sm_l, True), "process_map": parse(sm_p, True)}
+                requests.put(f"{SETTING_URL}.json", data=json.dumps(new_s))
+                st.rerun()
