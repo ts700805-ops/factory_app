@@ -105,22 +105,21 @@ else:
     if st.session_state.menu_selection == "📊 製造部派工專區":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📋 製造部派工進度</h1>', unsafe_allow_html=True)
 
-        # --- 核心修正：加入人員過濾邏輯 ---
+        # --- 核心修正：精確過濾組長綁定的人員 ---
         @st.dialog("📝 編輯任務指派", width="large")
         def edit_task_dialog(order_id, proc_name, current_data):
             st.subheader(f"📦 製令：{order_id} | 🛠️ 工序：{proc_name}")
             
-            # 根據目前登入的組長，從 process_map 過濾出他負責的人員名單
-            # 如果沒有特別綁定，就顯示全部人員
-            # 注意：這裡假設 process_map 的結構是 {"組長": ["人員1", "人員2"]}
-            # 如果您的 process_map 是綁定工序，則維持 all_staff，若要限制特定人員請在此調整
-            my_available_staff = all_staff # 預設全部
+            # 從 staff_map 取得目前登入組長負責的人員名單
+            # 如果 staff_map 裡找不到該組長，則回退顯示 all_staff (避免錯誤)
+            my_bound_staff = staff_map.get(st.session_state.user, all_staff)
             
             with st.form("dialog_edit_form"):
                 col_left, col_right = st.columns([1, 2])
                 
                 with col_left:
                     st.markdown("### 📅 基本資訊")
+                    # 固定顯示目前組長
                     d_leader = st.selectbox("負責組長", all_leaders, index=all_leaders.index(st.session_state.user) if st.session_state.user in all_leaders else 0)
                     
                     try:
@@ -130,22 +129,24 @@ else:
                     d_date = st.date_input("預計通電日期", value=default_date)
                 
                 with col_right:
-                    st.markdown("### 👥 人員配置")
+                    st.markdown(f"### 👥 {st.session_state.user} 負責人員名單")
                     p_cols = st.columns(3) 
                     p_cols2 = st.columns(2)
                     all_p_cols = p_cols + p_cols2
                     new_wk = []
                     
-                    # 這裡就是你要的：下拉選單只顯示負責的人員清單
                     for i in range(5):
                         p_val = current_data.get(f"人員{i+1}", "NA")
                         
-                        # 核心過濾：只顯示 my_available_staff
+                        # 這裡使用 my_bound_staff，確保下拉選單只出現該組長的人員
+                        # 如果原本已指派的人員不在目前名單內，強制設為 NA 或保留顯示
+                        options = ["NA"] + sorted(list(set(my_bound_staff)))
+                        
                         sel = all_p_cols[i].selectbox(
                             f"人員 {i+1}", 
-                            ["NA"] + my_available_staff, 
-                            index=(["NA"] + my_available_staff).index(p_val) if p_val in (["NA"] + my_available_staff) else 0, 
-                            key=f"dlg_staff_select_{i}"
+                            options, 
+                            index=options.index(p_val) if p_val in options else 0, 
+                            key=f"dlg_staff_final_{i}"
                         )
                         new_wk.append(sel)
                 
@@ -158,11 +159,15 @@ else:
                     }
                     if "db_id" in current_data:
                         requests.put(f"{DB_URL}/{current_data['db_id']}.json", data=json.dumps(new_payload))
-                        st.success("✅ 資料已成功更新！")
-                        time.sleep(0.8)
-                        st.rerun()
+                    else:
+                        # 如果是全新派工
+                        requests.post(f"{DB_URL}.json", data=json.dumps(new_payload))
+                        
+                    st.success("✅ 人員指派已更新！")
+                    time.sleep(0.8)
+                    st.rerun()
 
-        # --- 顯示清單邏輯 ---
+        # --- 顯示邏輯 ---
         my_procs = process_map.get(st.session_state.user, process_list)
         c1, c2 = st.columns(2)
         s_order = c1.selectbox("🔍 篩選製令", ["全部"] + sorted(list(set(order_list))))
@@ -185,12 +190,9 @@ else:
                     st.markdown(f'<div class="order-card"><div class="order-header"><div>📦 製令：{o_id}</div><div class="power-date-tag">⚡ 通電：{p_date}</div></div>', unsafe_allow_html=True)
                     
                     for p_idx, proc in enumerate(my_procs):
-                        # 生成唯一 Key
-                        u_key = f"v4_{str(o_id).replace('-','_')}_{p_idx}"
-                        
+                        u_key = f"v5_{str(o_id).replace('-','_')}_{p_idx}"
                         m_w = o_df[o_df["製造工序"] == proc]
-                        m_f = df_finish[(df_finish["製令"] == str(o_id)) & (df_finish["製造工序"] == proc)] if not df_finish.empty else pd.DataFrame()
-
+                        
                         r_ui = st.columns([0.65, 0.1, 0.25])
                         with r_ui[0]:
                             html = ""
@@ -201,21 +203,20 @@ else:
                                 for i in range(1, 6):
                                     p = row.get(f"人員{i}")
                                     if p and p != "NA": html += f'<div class="badge-staff">{p}</div>'
-                            elif not m_f.empty: html = '<span class="status-done">✅ 已完工</span>'
-                            else: html = '<span class="status-empty">尚未派工</span>'
+                            else:
+                                html = '<span class="status-empty">尚未派工</span>'
                             st.markdown(f'<div class="proc-row"><div class="proc-name">{proc}</div><div class="staff-area">{html}</div></div>', unsafe_allow_html=True)
                         
                         with r_ui[1]:
-                            # 如果該工序有資料（m_w 不為空），才允許編輯，並傳入資料
-                            if st.button("✏️", key=f"edit_{u_key}"):
-                                # 如果是空資料（尚未派工），建立一個初始字典
+                            if st.button("✏️", key=f"eb_{u_key}"):
+                                # 點擊時，若該工序完全沒資料，先預設基本欄位
                                 if not curr_data_dict:
-                                    curr_data_dict = {"製令": o_id, "製造工序": proc, "組長": st.session_state.user}
+                                    curr_data_dict = {"製令": o_id, "製造工序": proc, "組長": st.session_state.user, "通電日期": "未設定"}
                                 edit_task_dialog(o_id, proc, curr_data_dict)
                                 
                         with r_ui[2]:
                             if not m_w.empty:
-                                if st.button("確認完工", key=f"done_{u_key}"):
+                                if st.button("確認完工", key=f"db_{u_key}"):
                                     dat = m_w.iloc[0].to_dict()
                                     db_id = dat.pop('db_id')
                                     dat["完工時間"] = get_now_str()
