@@ -63,12 +63,13 @@ st.markdown("""
     .cell-proc { width: 140px; min-width: 140px; color: #1e40af; font-weight: 800; padding-left: 10px; font-size: 14px; }
     .cell-staff { flex-grow: 1; display: flex; flex-wrap: wrap; gap: 4px; padding: 5px; }
     .badge-staff { background: #1e40af; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+    .badge-done { background: #22c55e; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
     .no-data { color: #94a3b8; font-size: 12px; font-style: italic; padding-left: 5px; }
     div[data-testid="column"] { display: flex; align-items: center; justify-content: center; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. 讀取設定與登入 ---
+# --- 3. 核心數據讀取 ---
 settings = get_settings()
 all_leaders = settings.get("all_leaders", [])
 all_staff = settings.get("all_staff", [])
@@ -96,18 +97,24 @@ else:
     # --- 📊 製造部派工專區 ---
     if menu == "📊 製造部派工專區":
         st.markdown('<h2 style="text-align:center; color:#1e40af; font-weight:900;">📋 製造部派工進度</h2>', unsafe_allow_html=True)
-        
         current_user = st.session_state.user
         my_procs = process_map.get(current_user, process_list) 
 
         try:
-            r = requests.get(f"{DB_URL}.json", timeout=10).json() or {}
-            all_df = pd.DataFrame([dict(v, id=k) for k, v in r.items()]) if r else pd.DataFrame()
+            # 同時抓取「未完工」與「已完工」資料來比對狀態
+            db_res = requests.get(f"{DB_URL}.json", timeout=10).json() or {}
+            fn_res = requests.get(f"{FINISH_URL}.json", timeout=10).json() or {}
+            
+            all_df = pd.DataFrame([dict(v, id=k) for k, v in db_res.items()]) if db_res else pd.DataFrame()
+            done_df = pd.DataFrame([v for v in fn_res.values()]) if fn_res else pd.DataFrame()
 
             display_cols = st.columns(2)
             for idx, o_id in enumerate(order_list):
                 with display_cols[idx % 2]:
                     o_match = all_df[all_df["製令"] == str(o_id)] if not all_df.empty else pd.DataFrame()
+                    o_done = done_df[done_df["製令"] == str(o_id)] if not done_df.empty else pd.DataFrame()
+                    
+                    # 抓取通電日期 (優先從進行中抓，沒有則顯示未設定)
                     p_date = str(o_match.iloc[0].get("通電日期", "未設定")) if not o_match.empty else "未設定"
                     
                     st.markdown(f"""
@@ -120,6 +127,7 @@ else:
 
                     for proc in my_procs:
                         proc_match = o_match[o_match["製造工序"] == proc] if not o_match.empty else pd.DataFrame()
+                        is_done = not o_done[o_done["製造工序"] == proc].empty if not o_done.empty else False
                         
                         row_c1, row_c2, row_c3 = st.columns([0.7, 0.15, 0.15])
                         with row_c1:
@@ -127,6 +135,8 @@ else:
                                 row = proc_match.iloc[0]
                                 staff_html = "".join([f'<div class="badge-staff">{row.get(f"人員{i}")}</div>' for i in range(1, 6) if row.get(f"人員{i}") and row.get(f"人員{i}") != "NA"])
                                 st.markdown(f'<div class="table-row-container"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
+                            elif is_done:
+                                st.markdown(f'<div class="table-row-container"><div class="cell-proc">{proc}</div><div class="cell-staff"><div class="badge-done">✅ 已完工</div></div></div>', unsafe_allow_html=True)
                             else:
                                 st.markdown(f'<div class="table-row-container"><div class="cell-proc">{proc}</div><div class="no-data">尚未派工</div></div>', unsafe_allow_html=True)
                         
@@ -138,11 +148,8 @@ else:
                                     try: curr_d = pd.to_datetime(row.get("通電日期", "today")).date()
                                     except: curr_d = datetime.date.today()
                                     new_d = st.date_input("日期", value=curr_d, key=f"d_{row['id']}")
-                                    
-                                    t_leader = row.get("組長", current_user)
-                                    staff_opts = ["NA"] + leader_map.get(t_leader, all_staff)
+                                    staff_opts = ["NA"] + leader_map.get(row.get("組長", current_user), all_staff)
                                     new_staff = [st.selectbox(f"人員{i}", staff_opts, index=staff_opts.index(row.get(f"人員{i}", "NA")) if row.get(f"人員{i}") in staff_opts else 0, key=f"s{i}_{row['id']}") for i in range(1, 6)]
-                                    
                                     if st.button("儲存", key=f"sv_{row['id']}", use_container_width=True):
                                         edit_p = row.to_dict()
                                         edit_p.update({"通電日期": str(new_d), "最後修改": get_now_str(), **{f"人員{i+1}": new_staff[i] for i in range(5)}})
@@ -166,17 +173,16 @@ else:
         try:
             r = requests.get(f"{FINISH_URL}.json", timeout=10).json()
             if r:
-                # 轉換為 DataFrame
                 f_df = pd.DataFrame([dict(v, id=k) for k, v in r.items() if v]).fillna("NA")
                 
-                # 1. 刪除不需要的欄位
-                drop_cols = ["id", "提交時間", "最後修改時間"]
+                # 刪除指定欄位
+                drop_cols = ["提交時間", "最後修改時間", "最後修改"]
                 f_df = f_df.drop(columns=[c for c in drop_cols if c in f_df.columns])
                 
-                # 2. 重新排序欄位 (製令移至最前方)
+                # 重新排序 (製令在最前)
                 if "製令" in f_df.columns:
-                    cols = ["製令"] + [c for c in f_df.columns if c != "製令"]
-                    f_df = f_df[cols]
+                    cols = ["製令"] + [c for c in f_df.columns if c not in ["製令", "id"]]
+                    f_df = f_df[cols + ["id"]] # 把 id 藏在最後用來刪除
                 
                 q1, q2 = st.columns(2)
                 sk = q1.text_input("🔍 搜尋製令")
@@ -185,7 +191,16 @@ else:
                 if sk: f_df = f_df[f_df["製令"].astype(str).str.contains(sk)]
                 if sp != "全部": f_df = f_df[f_df[["人員1", "人員2", "人員3", "人員4", "人員5"]].apply(lambda x: sp in x.values, axis=1)]
                 
-                st.dataframe(f_df.sort_values("完工時間", ascending=False), use_container_width=True)
+                # 顯示表格 (不顯示最後一欄 id)
+                st.dataframe(f_df.drop(columns=["id"]).sort_values("完工時間", ascending=False), use_container_width=True)
+                
+                # 刪除功能區
+                with st.expander("🗑️ 刪除紀錄管理"):
+                    st.warning("注意：刪除後無法復原。")
+                    del_id = st.selectbox("選擇要刪除的製令工序 ID", f_df["id"].tolist(), format_func=lambda x: f"{f_df[f_df['id']==x]['製令'].values[0]} - {f_df[f_df['id']==x]['製造工序'].values[0]}")
+                    if st.button("確認刪除該筆完工紀錄", type="primary"):
+                        requests.delete(f"{FINISH_URL}/{del_id}.json")
+                        st.success("已刪除"); time.sleep(0.5); st.rerun()
             else: st.info("無紀錄")
         except Exception as e: st.error(f"讀取失敗: {e}")
 
@@ -198,10 +213,8 @@ else:
             t_l = c3.selectbox("3. 組長", all_leaders, index=all_leaders.index(st.session_state.user) if st.session_state.user in all_leaders else 0)
             t_p = c2.selectbox("2. 工序", process_map.get(t_l, process_list))
             t_d = c4.date_input("4. 通電日期")
-            
             display_staff = leader_map.get(t_l, all_staff)
             wk = [col.selectbox(f"人員 {i+1}", ["NA"] + display_staff, key=f"nw_{i}") for i, col in enumerate(st.columns(5))]
-            
             if st.button("🚀 發布任務", type="primary", use_container_width=True):
                 payload = {"製令": str(t_o), "製造工序": t_p, "組長": t_l, "通電日期": str(t_d), "提交時間": get_now_str(), **{f"人員{i+1}": wk[i] for i in range(5)}}
                 requests.post(f"{DB_URL}.json", data=json.dumps(payload))
@@ -211,13 +224,12 @@ else:
     elif menu == "⚙️ 設定管理":
         st.markdown('<h2 style="color:#1e40af;">⚙️ 系統設定管理</h2>', unsafe_allow_html=True)
         with st.form("sys_config"):
-            so = st.text_area("製令清單 (逗號隔開)", ",".join(order_list))
-            sl = st.text_area("組長名單 (逗號隔開)", ",".join(all_leaders))
-            ss = st.text_area("所有人員 (逗號隔開)", ",".join(all_staff))
-            sp = st.text_area("工序清單 (逗號隔開)", ",".join(process_list))
-            sm_p = st.text_area("組長:工序綁定 (每行一個 組長:工序1,工序2)", "\n".join([f"{k}:{','.join(v)}" for k, v in process_map.items()]))
-            sm_l = st.text_area("組長:組員綁定 (每行一個 組長:組員1,組員2)", "\n".join([f"{k}:{','.join(v)}" for k, v in leader_map.items()]))
-            
+            so = st.text_area("製令清單", ",".join(order_list))
+            sl = st.text_area("組長名單", ",".join(all_leaders))
+            ss = st.text_area("所有人員", ",".join(all_staff))
+            sp = st.text_area("工序清單", ",".join(process_list))
+            sm_p = st.text_area("組長:工序綁定", "\n".join([f"{k}:{','.join(v)}" for k, v in process_map.items()]))
+            sm_l = st.text_area("組長:組員綁定", "\n".join([f"{k}:{','.join(v)}" for k, v in leader_map.items()]))
             if st.form_submit_button("💾 儲存所有設定"):
                 def parse(s, nl=False):
                     if nl: return {x.split(":")[0].strip(): [y.strip() for y in x.split(":")[1].split(",")] for x in s.split("\n") if ":" in x}
