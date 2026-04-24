@@ -57,10 +57,14 @@ st.markdown("""
         background: #facc15; color: #1e3a8a; padding: 4px 12px; 
         border-radius: 6px; font-size: 14px; font-weight: bold; 
     }
+    /* 加強格線設計 */
     .proc-row { 
-        display: flex; align-items: center; border-bottom: 1px solid #f1f5f9; padding: 8px 15px;
+        display: flex; align-items: center; 
+        border-bottom: 1.5px solid #cbd5e1; /* 加深顏色與寬度 */
+        padding: 10px 15px;
     }
-    .proc-name { width: 120px; font-weight: 800; color: #1e3a8a; font-size: 15px; }
+    .proc-row:last-child { border-bottom: none; }
+    .proc-name { width: 140px; font-weight: 800; color: #1e3a8a; font-size: 15px; }
     .staff-area { flex-grow: 1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
     .badge-main { background: #1e40af; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
     .badge-sub { background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 4px; font-size: 12px; border: 1px solid #cbd5e1; }
@@ -69,7 +73,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. 核心邏輯讀取 ---
+# --- 3. 核心邏輯 ---
 settings = get_settings()
 all_leaders = settings.get("all_leaders", [])
 all_staff = settings.get("all_staff", [])
@@ -102,7 +106,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 📊 製造部派工專區 (首頁：不顯示組長) ---
+    # --- 📊 製造部派工專區 ---
     if st.session_state.menu_selection == "📊 製造部派工專區":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📋 製造部派工進度專區</h1>', unsafe_allow_html=True)
         
@@ -134,12 +138,11 @@ else:
                         m_w = o_df[o_df["製造工序"] == proc]
                         m_f = df_finish[(df_finish["製令"] == str(o_id)) & (df_finish["製造工序"] == proc)] if not df_finish.empty else pd.DataFrame()
 
-                        r_ui = st.columns([0.65, 0.15, 0.2])
+                        r_ui = st.columns([0.6, 0.15, 0.25])
                         with r_ui[0]:
                             html = ""
                             if not m_w.empty:
                                 row = m_w.iloc[0]
-                                # 僅顯示一般人員，不顯示組長
                                 for i in range(1, 6):
                                     p = row.get(f"人員{i}")
                                     if p and p != "NA": html += f'<div class="{"badge-main" if i==1 else "badge-sub"}">{p}</div>'
@@ -164,27 +167,26 @@ else:
                     st.markdown('</div>', unsafe_allow_html=True)
         except Exception as e: st.error(f"錯誤: {e}")
 
-    # --- 📜 完工紀錄查詢 (製令移前、隱藏ID與時間、新增刪除) ---
+    # --- 📜 完工紀錄查詢 ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
         st.markdown('<h2>📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
         try:
             r = requests.get(f"{FINISH_URL}.json").json()
             if r:
-                all_finish_logs = [dict(v, id=k) for k, v in r.items() if v]
-                f_df = pd.DataFrame(all_finish_logs).fillna("NA")
+                all_logs = [dict(v, id=k) for k, v in r.items() if v]
+                f_df = pd.DataFrame(all_logs).fillna("NA")
                 
-                # 篩選
                 q1, q2 = st.columns(2)
                 sk = q1.text_input("🔍 搜尋製令")
                 sp = q2.selectbox("👤 搜尋人員", ["全部"] + sorted(all_staff))
                 if sk: f_df = f_df[f_df["製令"].astype(str).str.contains(sk)]
                 if sp != "全部": f_df = f_df[f_df[["人員1", "人員2", "人員3", "人員4", "人員5"]].apply(lambda x: sp in x.values, axis=1)]
                 
-                # 欄位處理：移除不要的欄位
-                drop_cols = ["id", "提交時間", "最後修改時間"]
+                # 隱藏指定欄位：id, 提交時間, 最後修改時間, 通電日期
+                drop_cols = ["id", "提交時間", "最後修改時間", "通電日期"]
                 f_df_display = f_df.drop(columns=[c for c in drop_cols if c in f_df.columns])
                 
-                # 欄位排序：製令移到最前面
+                # 製令置前
                 cols = f_df_display.columns.tolist()
                 if "製令" in cols:
                     cols.insert(0, cols.pop(cols.index("製令")))
@@ -192,17 +194,15 @@ else:
                 
                 st.dataframe(f_df_display.sort_values("完工時間", ascending=False), use_container_width=True)
                 
-                # 刪除按鈕功能
                 st.divider()
                 with st.expander("🗑️ 刪除紀錄管理"):
-                    del_id = st.selectbox("選擇要刪除的紀錄 ID", options=[log['id'] for log in all_finish_logs], 
-                                          format_func=lambda x: f"ID: {x} | {next(l['製令'] for l in all_finish_logs if l['id']==x)} - {next(l['製造工序'] for l in all_finish_logs if l['id']==x)}")
+                    del_id = st.selectbox("選擇要刪除的紀錄 ID", options=[log['id'] for log in all_logs], 
+                                          format_func=lambda x: f"ID: {x} | {next(l['製令'] for l in all_logs if l['id']==x)} - {next(l['製造工序'] for l in all_logs if l['id']==x)}")
                     if st.button("🔴 確認刪除此筆紀錄"):
                         requests.delete(f"{FINISH_URL}/{del_id}.json")
-                        st.success("紀錄已刪除")
-                        st.rerun()
+                        st.success("紀錄已刪除"); time.sleep(0.5); st.rerun()
             else: st.info("目前無完工紀錄")
-        except Exception as e: st.error(f"讀取失敗: {e}")
+        except: st.error("讀取失敗")
 
     # --- 📝 任務派發 ---
     elif st.session_state.menu_selection == "📝 任務派發":
