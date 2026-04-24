@@ -105,22 +105,29 @@ else:
     if st.session_state.menu_selection == "📊 製造部派工專區":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📋 製造部派工進度</h1>', unsafe_allow_html=True)
 
-        # --- 核心修正：精確過濾組長綁定的人員 ---
+        # 這裡手動建立名單，確保 Dialog 內部一定讀得到
+        # 請根據您的實際需求修改這裡的組長與人員對應
+        local_staff_map = {
+            "陳德文": ["鍾明志", "黃瑞翎", "羅文發", "羅章淳", "蕭桓惟", "周棟榮", "李偉誠"],
+            "劉志偉": ["人員A", "人員B"], # 這裡請依此類推
+            "吳政昌": ["人員C"],
+            "蘇萬紘": ["人員D"]
+        }
+
         @st.dialog("📝 編輯任務指派", width="large")
         def edit_task_dialog(order_id, proc_name, current_data):
             st.subheader(f"📦 製令：{order_id} | 🛠️ 工序：{proc_name}")
             
-            # 從 staff_map 取得目前登入組長負責的人員名單
-            # 如果 staff_map 裡找不到該組長，則回退顯示 all_staff (避免錯誤)
-            my_bound_staff = staff_map.get(st.session_state.user, all_staff)
+            # 核心修正：從 local_staff_map 抓取名單，若找不到才用全部人員
+            current_leader = st.session_state.user
+            my_bound_staff = local_staff_map.get(current_leader, all_staff)
             
             with st.form("dialog_edit_form"):
                 col_left, col_right = st.columns([1, 2])
                 
                 with col_left:
                     st.markdown("### 📅 基本資訊")
-                    # 固定顯示目前組長
-                    d_leader = st.selectbox("負責組長", all_leaders, index=all_leaders.index(st.session_state.user) if st.session_state.user in all_leaders else 0)
+                    d_leader = st.selectbox("負責組長", all_leaders, index=all_leaders.index(current_leader) if current_leader in all_leaders else 0)
                     
                     try:
                         default_date = datetime.datetime.strptime(current_data.get("通電日期"), "%Y-%m-%d")
@@ -129,24 +136,22 @@ else:
                     d_date = st.date_input("預計通電日期", value=default_date)
                 
                 with col_right:
-                    st.markdown(f"### 👥 {st.session_state.user} 負責人員名單")
+                    st.markdown(f"### 👥 {current_leader} 負責人員名單")
                     p_cols = st.columns(3) 
                     p_cols2 = st.columns(2)
                     all_p_cols = p_cols + p_cols2
                     new_wk = []
                     
+                    # 生成 5 個下拉選單，選項只包含該組長的人員
+                    options = ["NA"] + sorted(list(set(my_bound_staff)))
+                    
                     for i in range(5):
                         p_val = current_data.get(f"人員{i+1}", "NA")
-                        
-                        # 這裡使用 my_bound_staff，確保下拉選單只出現該組長的人員
-                        # 如果原本已指派的人員不在目前名單內，強制設為 NA 或保留顯示
-                        options = ["NA"] + sorted(list(set(my_bound_staff)))
-                        
                         sel = all_p_cols[i].selectbox(
                             f"人員 {i+1}", 
                             options, 
                             index=options.index(p_val) if p_val in options else 0, 
-                            key=f"dlg_staff_final_{i}"
+                            key=f"dlg_final_sel_{i}"
                         )
                         new_wk.append(sel)
                 
@@ -157,17 +162,18 @@ else:
                         "最後更新": get_now_str(),
                         "人員1": new_wk[0], "人員2": new_wk[1], "人員3": new_wk[2], "人員4": new_wk[3], "人員5": new_wk[4]
                     }
-                    if "db_id" in current_data:
-                        requests.put(f"{DB_URL}/{current_data['db_id']}.json", data=json.dumps(new_payload))
+                    # 判斷是更新還是新增
+                    db_id = current_data.get("db_id")
+                    if db_id and db_id != "NA":
+                        requests.put(f"{DB_URL}/{db_id}.json", data=json.dumps(new_payload))
                     else:
-                        # 如果是全新派工
                         requests.post(f"{DB_URL}.json", data=json.dumps(new_payload))
                         
-                    st.success("✅ 人員指派已更新！")
+                    st.success("✅ 修改成功！")
                     time.sleep(0.8)
                     st.rerun()
 
-        # --- 顯示邏輯 ---
+        # --- 頁面顯示邏輯 ---
         my_procs = process_map.get(st.session_state.user, process_list)
         c1, c2 = st.columns(2)
         s_order = c1.selectbox("🔍 篩選製令", ["全部"] + sorted(list(set(order_list))))
@@ -190,7 +196,7 @@ else:
                     st.markdown(f'<div class="order-card"><div class="order-header"><div>📦 製令：{o_id}</div><div class="power-date-tag">⚡ 通電：{p_date}</div></div>', unsafe_allow_html=True)
                     
                     for p_idx, proc in enumerate(my_procs):
-                        u_key = f"v5_{str(o_id).replace('-','_')}_{p_idx}"
+                        u_key = f"v6_{str(o_id).replace('-','_')}_{p_idx}"
                         m_w = o_df[o_df["製造工序"] == proc]
                         
                         r_ui = st.columns([0.65, 0.1, 0.25])
@@ -209,9 +215,8 @@ else:
                         
                         with r_ui[1]:
                             if st.button("✏️", key=f"eb_{u_key}"):
-                                # 點擊時，若該工序完全沒資料，先預設基本欄位
                                 if not curr_data_dict:
-                                    curr_data_dict = {"製令": o_id, "製造工序": proc, "組長": st.session_state.user, "通電日期": "未設定"}
+                                    curr_data_dict = {"製令": o_id, "製造工序": proc, "組長": st.session_state.user}
                                 edit_task_dialog(o_id, proc, curr_data_dict)
                                 
                         with r_ui[2]:
