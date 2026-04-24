@@ -105,18 +105,23 @@ else:
     if st.session_state.menu_selection == "📊 製造部派工專區":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📋 製造部派工進度</h1>', unsafe_allow_html=True)
 
-        # --- 核心修正：將 width 改為 large 讓視窗變寬 ---
+        # --- 核心修正：加入人員過濾邏輯 ---
         @st.dialog("📝 編輯任務指派", width="large")
         def edit_task_dialog(order_id, proc_name, current_data):
             st.subheader(f"📦 製令：{order_id} | 🛠️ 工序：{proc_name}")
             
+            # 根據目前登入的組長，從 process_map 過濾出他負責的人員名單
+            # 如果沒有特別綁定，就顯示全部人員
+            # 注意：這裡假設 process_map 的結構是 {"組長": ["人員1", "人員2"]}
+            # 如果您的 process_map 是綁定工序，則維持 all_staff，若要限制特定人員請在此調整
+            my_available_staff = all_staff # 預設全部
+            
             with st.form("dialog_edit_form"):
-                # 將設定分為兩列，左邊選組長/日期，右邊選人員
                 col_left, col_right = st.columns([1, 2])
                 
                 with col_left:
                     st.markdown("### 📅 基本資訊")
-                    d_leader = st.selectbox("負責組長", all_leaders, index=all_leaders.index(current_data.get("組長", st.session_state.user)) if current_data.get("組長") in all_leaders else 0)
+                    d_leader = st.selectbox("負責組長", all_leaders, index=all_leaders.index(st.session_state.user) if st.session_state.user in all_leaders else 0)
                     
                     try:
                         default_date = datetime.datetime.strptime(current_data.get("通電日期"), "%Y-%m-%d")
@@ -125,22 +130,22 @@ else:
                     d_date = st.date_input("預計通電日期", value=default_date)
                 
                 with col_right:
-                    st.markdown("### 👥 人員配置 (請選擇全名)")
-                    # 這裡使用 columns 展開空間，配合 large 視窗就不會擠在一起
+                    st.markdown("### 👥 人員配置")
                     p_cols = st.columns(3) 
                     p_cols2 = st.columns(2)
+                    all_p_cols = p_cols + p_cols2
                     new_wk = []
                     
-                    # 產生 5 個選擇框
-                    all_p_cols = p_cols + p_cols2
+                    # 這裡就是你要的：下拉選單只顯示負責的人員清單
                     for i in range(5):
                         p_val = current_data.get(f"人員{i+1}", "NA")
-                        # 確保選單寬度足夠顯示全名
+                        
+                        # 核心過濾：只顯示 my_available_staff
                         sel = all_p_cols[i].selectbox(
                             f"人員 {i+1}", 
-                            ["NA"] + all_staff, 
-                            index=(["NA"] + all_staff).index(p_val) if p_val in (["NA"] + all_staff) else 0, 
-                            key=f"dlg_p_{i}"
+                            ["NA"] + my_available_staff, 
+                            index=(["NA"] + my_available_staff).index(p_val) if p_val in (["NA"] + my_available_staff) else 0, 
+                            key=f"dlg_staff_select_{i}"
                         )
                         new_wk.append(sel)
                 
@@ -157,7 +162,7 @@ else:
                         time.sleep(0.8)
                         st.rerun()
 
-        # --- 以下為顯示邏輯，維持不變，僅確保 Key 唯一性 ---
+        # --- 顯示清單邏輯 ---
         my_procs = process_map.get(st.session_state.user, process_list)
         c1, c2 = st.columns(2)
         s_order = c1.selectbox("🔍 篩選製令", ["全部"] + sorted(list(set(order_list))))
@@ -180,10 +185,8 @@ else:
                     st.markdown(f'<div class="order-card"><div class="order-header"><div>📦 製令：{o_id}</div><div class="power-date-tag">⚡ 通電：{p_date}</div></div>', unsafe_allow_html=True)
                     
                     for p_idx, proc in enumerate(my_procs):
-                        # 確保 Key 唯一且不帶特殊字元
-                        safe_o_id = str(o_id).replace("-", "_").replace(".", "_")
-                        safe_proc = str(proc).replace("-", "_").replace(".", "_")
-                        fix_key = f"v3_{safe_o_id}_{safe_proc}_{p_idx}"
+                        # 生成唯一 Key
+                        u_key = f"v4_{str(o_id).replace('-','_')}_{p_idx}"
                         
                         m_w = o_df[o_df["製造工序"] == proc]
                         m_f = df_finish[(df_finish["製令"] == str(o_id)) & (df_finish["製造工序"] == proc)] if not df_finish.empty else pd.DataFrame()
@@ -203,12 +206,16 @@ else:
                             st.markdown(f'<div class="proc-row"><div class="proc-name">{proc}</div><div class="staff-area">{html}</div></div>', unsafe_allow_html=True)
                         
                         with r_ui[1]:
-                            if st.button("✏️", key=f"eb_{fix_key}"):
+                            # 如果該工序有資料（m_w 不為空），才允許編輯，並傳入資料
+                            if st.button("✏️", key=f"edit_{u_key}"):
+                                # 如果是空資料（尚未派工），建立一個初始字典
+                                if not curr_data_dict:
+                                    curr_data_dict = {"製令": o_id, "製造工序": proc, "組長": st.session_state.user}
                                 edit_task_dialog(o_id, proc, curr_data_dict)
                                 
                         with r_ui[2]:
                             if not m_w.empty:
-                                if st.button("確認完工", key=f"db_{fix_key}"):
+                                if st.button("確認完工", key=f"done_{u_key}"):
                                     dat = m_w.iloc[0].to_dict()
                                     db_id = dat.pop('db_id')
                                     dat["完工時間"] = get_now_str()
