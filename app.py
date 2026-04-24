@@ -232,7 +232,6 @@ else:
                     st.markdown('</div>', unsafe_allow_html=True)
         except Exception as e:
             st.error(f"系統執行錯誤: {e}")
-
 # --- ⚙️ 設定管理 ---
     elif st.session_state.menu_selection == "⚙️ 設定管理":
         st.title("⚙️ 系統設定")
@@ -242,25 +241,24 @@ else:
             ss = st.text_area("人員清單 (逗號隔開)", ",".join(all_staff))
             sp = st.text_area("工序清單 (逗號隔開)", ",".join(process_list))
             
-            # 這是原本的 工序綁定
-            sm = st.text_area("組長:工序綁定 (格式 組長:工序1,工序2 每行一筆)", 
-                               "\n".join([f"{k}:{','.join(v)}" for k, v in process_map.items()]))
+            # 您原有的工序綁定
+            sm = st.text_area("組長:工序綁定 (格式 組長:工序1,工序2 每行一筆)", "\n".join([f"{k}:{','.join(v)}" for k, v in process_map.items()]))
             
-            # --- 核心補回：組長:人員綁定 ---
-            staff_m = st.text_area("組長:人員綁定 (格式 組長:人員1,人員2 每行一筆)", 
-                                    "\n".join([f"{k}:{','.join(v)}" for k, v in staff_map.items()]))
+            # --- 補回：組長:人員綁定欄位 ---
+            # 這裡使用 get 方法確保如果資料庫沒資料也不會噴錯
+            staff_m = st.text_area("組長:人員綁定 (格式 組長:人員1,人員2 每行一筆)", "\n".join([f"{k}:{','.join(v)}" for k, v in staff_map.items()]))
             
             if st.form_submit_button("💾 儲存設定"):
                 def split_s(s): return [x.strip() for x in s.split(",") if x.strip()]
                 
-                # 處理工序綁定 map
-                new_process_map = {}
+                # 處理工序綁定
+                new_map = {}
                 for line in sm.split("\n"):
                     if ":" in line:
                         k, v = line.split(":", 1)
-                        new_process_map[k.strip()] = split_s(v)
-
-                # 處理人員綁定 map
+                        new_map[k.strip()] = split_s(v)
+                
+                # --- 核心修正：儲存新的人員綁定邏輯 ---
                 new_staff_map = {}
                 for line in staff_m.split("\n"):
                     if ":" in line:
@@ -272,11 +270,11 @@ else:
                     "all_leaders": split_s(sl), 
                     "all_staff": split_s(ss),
                     "processes": split_s(sp), 
-                    "process_map": new_process_map,
-                    "staff_map": new_staff_map  # 確保寫入資料庫
+                    "process_map": new_map,
+                    "staff_map": new_staff_map  # 確保人員綁定也一起存進資料庫
                 }
                 
                 requests.put(f"{SETTING_URL}.json", data=json.dumps(final_conf))
-                st.success("✅ 所有設定已成功同步至資料庫！")
+                st.success("✅ 設定已更新，包含人員綁定資訊")
                 time.sleep(0.8)
                 st.rerun()
