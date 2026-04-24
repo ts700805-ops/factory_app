@@ -195,48 +195,88 @@ else:
             else: st.info("💡 目前歷史紀錄為空")
         except Exception as e: st.error(f"讀取失敗：{e}")
 
-    # --- 📝 任務派發 ---
+    # --- 📝 任務派發 (修改處) ---
     elif menu == "📝 任務派發":
         st.markdown('<h2 style="color:#1e40af;">📝 任務派發 / 內容修正</h2>', unsafe_allow_html=True)
-        c1, c2, c3, c4 = st.columns(4)
-        t_o = c1.selectbox("1. 製令編號", order_list)
-        t_l = c3.selectbox("3. 指派組長", all_leaders)
-
-        my_processes = process_map.get(t_l, [])
-        display_processes = my_processes if my_processes else process_list
-        t_p = c2.selectbox("2. 製造工序", display_processes)
-        t_d = c4.date_input("4. 通電日期")
+        
+        # 1. 選擇基礎資訊
+        c1, c2 = st.columns(2)
+        t_l = c1.selectbox("👤 1. 選擇組長", all_leaders)
+        t_d = c2.date_input("📅 2. 作業日期", datetime.date.today())
+        
         st.write("---")
         
+        # 2. 抓取該組長的對應名單與工序
         my_team = leader_map.get(t_l, [])
-        display_staff = my_team if my_team else all_staff
-        st.caption(f"💡 目前 {t_l} 的組員名單：{', '.join(display_staff) if display_staff else '未綁定'} | 負責工序：{', '.join(my_processes) if my_processes else '全部'}")
+        my_processes = process_map.get(t_l, [])
+        display_processes = my_processes if my_processes else process_list
         
-        pc = st.columns(5)
-        workers = []
-        for i in range(5):
-            w = pc[i].selectbox(f"人員 {i+1}", ["NA"] + display_staff, key=f"w{i}")
-            workers.append(w)
+        if not my_team:
+            st.warning(f"⚠️ 組長 {t_l} 目前尚未綁定任何組員，請至「⚙️ 設定管理」進行綁定。")
+        else:
+            st.markdown(f"### 👥 {t_l} 的組員任務快速設定")
+            st.caption("請為成員選擇負責的製令與工序。選為「不派工」的成員將不會提交紀錄。")
             
-        if st.button("🚀 準備發布", type="primary", use_container_width=True):
-            payload = {"製令": str(t_o), "製造工序": t_p, "組長": t_l, "通電日期": str(t_d), "提交時間": get_now_str()}
-            for i in range(5): payload[f"人員{i+1}"] = workers[i]
-            try:
-                r = requests.get(f"{DB_URL}.json")
-                r_check = r.json()
-                target_key = None
-                if r_check and isinstance(r_check, dict):
-                    target_key = next((k for k, v in r_check.items() if v and v.get("製令")==str(t_o) and v.get("製造工序")==t_p), None)
+            all_task_payloads = []
+            
+            # 為每一位組員建立一列下拉選單
+            for staff_name in my_team:
+                row_cols = st.columns([1, 2, 2])
+                with row_cols[0]:
+                    st.markdown(f"<div style='padding-top:10px;'><b>{staff_name}</b></div>", unsafe_allow_html=True)
+                with row_cols[1]:
+                    sel_o = st.selectbox(f"製令", ["不派工"] + order_list, key=f"o_{staff_name}")
+                with row_cols[2]:
+                    sel_p = st.selectbox(f"工序", display_processes, key=f"p_{staff_name}")
                 
-                if target_key: requests.put(f"{DB_URL}/{target_key}.json", data=json.dumps(payload))
-                else: requests.post(f"{DB_URL}.json", data=json.dumps(payload))
+                # 如果製令不是「不派工」，則準備提交資料
+                if sel_o != "不派工":
+                    all_task_payloads.append({
+                        "製令": str(sel_o),
+                        "製造工序": sel_p,
+                        "組長": t_l,
+                        "人員1": staff_name,
+                        "人員2": "NA", "人員3": "NA", "人員4": "NA", "人員5": "NA",
+                        "通電日期": str(t_d),
+                        "提交時間": get_now_str()
+                    })
+            
+            st.write("---")
+            if st.button("🚀 批次提交任務", type="primary", use_container_width=True):
+                if not all_task_payloads:
+                    st.error("❌ 尚未選擇任何有效的派工（製令皆為'不派工'）")
+                else:
+                    try:
+                        with st.spinner("正在同步資料至雲端..."):
+                            for payload in all_task_payloads:
+                                requests.post(f"{DB_URL}.json", data=json.dumps(payload))
+                        st.balloons()
+                        st.success(f"✅ 已成功發布 {len(all_task_payloads)} 筆任務紀錄！")
+                        time.sleep(1.5)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"發布失敗：{str(e)}")
+
+        # 保留手動自由派發選單 (當需要多人負責同一工序時使用)
+        with st.expander("🛠️ 手動單筆派發 (適用多人協作單一工序)"):
+            sc1, sc2, sc3 = st.columns(3)
+            xt_o = sc1.selectbox("選擇製令", order_list, key="manual_o")
+            xt_p = sc2.selectbox("選擇工序", display_processes, key="manual_p")
+            xt_d = sc3.date_input("通電日期", key="manual_d")
+            
+            pc = st.columns(5)
+            workers = []
+            for i in range(5):
+                w = pc[i].selectbox(f"人員 {i+1}", ["NA"] + my_team, key=f"mw{i}")
+                workers.append(w)
                 
-                # 這裡修正：先顯示氣球，暫停 1.5 秒後才重整頁面
-                st.balloons()
-                st.success(f"✅ 製令 {t_o} 發布完成！")
-                time.sleep(1.5)
+            if st.button("📤 送出單筆派發"):
+                payload = {"製令": str(xt_o), "製造工序": xt_p, "組長": t_l, "通電日期": str(xt_d), "提交時間": get_now_str()}
+                for i in range(5): payload[f"人員{i+1}"] = workers[i]
+                requests.post(f"{DB_URL}.json", data=json.dumps(payload))
+                st.success("手動派發成功")
+                time.sleep(1)
                 st.rerun()
-            except Exception as e: st.error(f"發布失敗：{str(e)}")
 
     # --- ⚙️ 設定管理 ---
     elif menu == "⚙️ 設定管理":
@@ -284,9 +324,7 @@ else:
                     st.success("✅ 工序連動已更新！")
                     time.sleep(1)
                     st.rerun()
-                except:
-                    # 原本的紅色格式錯誤區塊已依指令移除
-                    pass
+                except: pass
 
         st.markdown("---")
         
@@ -311,6 +349,4 @@ else:
                     st.success("✅ 人員綁定已更新！")
                     time.sleep(1)
                     st.rerun()
-                except:
-                    # 原本的紅色格式錯誤區塊已依指令移除
-                    pass
+                except: pass
