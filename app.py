@@ -106,9 +106,9 @@ else:
     if st.session_state.menu_selection == "📊 製造部派工專區":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📋 製造部派工進度</h1>', unsafe_allow_html=True)
 
-        # 【關鍵：在頁面頂端讀取人員對照表，防止 NameError】
+        # 【核心修正 1：確保頁面啟動即獲取最新綁定名單，解決 NameError】
         try:
-            # 取得 Firebase 上的組長成員綁定資料
+            # 取得 Firebase 上的設定資料 (包含 staff_map)
             settings_data = requests.get(f"{SETTINGS_URL}.json").json() or {}
             current_staff_map = settings_data.get("staff_map", {})
         except:
@@ -120,12 +120,11 @@ else:
             st.subheader(f"🛠️ {proc_name}")
             current_leader = st.session_state.user
             
-            # 【關鍵：下拉選單只顯示綁定該組長的成員】
-            # 若 staff_map 找不到該組長，則預設顯示全部人員 (all_staff)
+            # 【核心修正 2：下拉選單僅綁定該組長的成員】
+            # 根據目前登入的組長姓名 (current_leader)，從對照表中抓取其組員
             my_bound_staff = current_staff_map.get(current_leader, all_staff)
             options = ["NA"] + sorted(list(set(my_bound_staff)))
 
-            # 您照片中顯示的下拉選單內容就是在這裏定義的
             with st.form("staff_edit_form"):
                 st.write(f"📦 製令：{order_id}")
                 st.write(f"👤 負責組長：{current_leader}")
@@ -133,12 +132,12 @@ else:
                 new_wk = []
                 for i in range(5):
                     p_val = current_data.get(f"人員{i+1}", "NA")
-                    # 確保預設選中目前的人員
+                    # 確保目前的數值在選項中，避免程式出錯
                     d_idx = options.index(p_val) if p_val in options else 0
                     sel = st.selectbox(f"人員 {i+1}", options, index=d_idx, key=f"dlg_staff_{i}")
                     new_wk.append(sel)
                 
-                # 【修正：加入提交按鈕，解決 Missing Submit Button 錯誤】
+                # 【核心修正 3：加入儲存按鈕，解決 Missing Submit Button 錯誤】
                 if st.form_submit_button("💾 儲存人員修改", use_container_width=True):
                     new_payload = current_data.copy()
                     new_payload.update({
@@ -149,31 +148,13 @@ else:
                     db_id = new_payload.pop("db_id", None)
                     if db_id and db_id != "NA":
                         requests.put(f"{DB_URL}/{db_id}.json", data=json.dumps(new_payload))
-                        st.success("✅ 人員更新成功")
+                        st.success("✅ 人員已更新")
                         time.sleep(0.5)
                         st.rerun()
                     else:
-                        st.error("找不到資料庫 ID，無法更新。")
+                        st.error("系統錯誤：找不到紀錄 ID")
 
-        # --- 對話框：修改日期 ---
-        @st.dialog("📅 修改預計通電日期", width="small")
-        def edit_power_date_dialog(order_id, current_date_str, related_records):
-            st.subheader(f"📦 製令：{order_id}")
-            try:
-                default_date = datetime.datetime.strptime(current_date_str, "%Y-%m-%d") if current_date_str != "未設定" else datetime.date.today()
-            except:
-                default_date = datetime.date.today()
-            new_date = st.date_input("請選擇新的通電日期", value=default_date)
-            if st.button("💾 確認修改日期", use_container_width=True):
-                for db_id, data in related_records.items():
-                    data["通電日期"] = str(new_date)
-                    data["最後更新"] = get_now_str()
-                    requests.put(f"{DB_URL}/{db_id}.json", data=json.dumps(data))
-                st.success("✅ 日期已同步更新")
-                time.sleep(0.5)
-                st.rerun()
-
-        # --- 頁面主顯示區 ---
+        # --- 頁面主體邏輯 ---
         my_procs = process_map.get(st.session_state.user, process_list)
         c1, c2 = st.columns(2)
         s_order = c1.selectbox("🔍 篩選製令", ["全部"] + sorted(list(set(order_list))))
@@ -192,15 +173,8 @@ else:
                 with cols[idx % 2]:
                     st.markdown(f'<div class="order-card"><div class="order-header"><div>📦 製令：{o_id}</div><span class="power-date-tag">⚡ 通電：{p_date}</span></div>', unsafe_allow_html=True)
                     
-                    # 修改日期按鈕
-                    btn_date_col = st.columns([0.85, 0.15])
-                    with btn_date_col[1]:
-                        if st.button("📅", key=f"date_edit_{o_id}"):
-                            related = {k: v for k, v in r_work.items() if v.get("製令") == str(o_id)}
-                            edit_power_date_dialog(o_id, p_date, related)
-
                     for p_idx, proc in enumerate(my_procs):
-                        u_key = f"v12_{str(o_id).replace('-','_')}_{p_idx}"
+                        u_key = f"v13_{str(o_id).replace('-','_')}_{p_idx}"
                         m_w = o_df[o_df["製造工序"] == proc]
                         r_ui = st.columns([0.65, 0.1, 0.25])
                         
@@ -217,9 +191,10 @@ else:
                             st.markdown(f'<div class="proc-row"><div class="proc-name">{proc}</div><div class="staff-area">{html}</div></div>', unsafe_allow_html=True)
                         
                         with r_ui[1]:
-                            # 【核心修正：點擊 ✏️ 直接開啟對話框，若未派工則先自動建立紀錄】
+                            # 【修正 4：點擊 ✏️ 直接連結編輯對話框】
                             if st.button("✏️", key=f"eb_staff_{u_key}"):
                                 if m_w.empty:
+                                    # 若尚未派工，自動初始化該工序紀錄，讓使用者能直接編輯人員
                                     init_data = {
                                         "製令": str(o_id), "製造工序": proc, "組長": st.session_state.user,
                                         "通電日期": p_date, "人員1": "NA", "人員2": "NA", "人員3": "NA", "人員4": "NA", "人員5": "NA"
@@ -239,7 +214,7 @@ else:
                                 st.rerun()
                     st.markdown('</div>', unsafe_allow_html=True)
         except Exception as e:
-            st.error(f"系統錯誤: {e}")
+            st.error(f"頁面載入錯誤: {e}")
 # --- 📜 完工紀錄查詢 ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
         st.title("📜 歷史完工紀錄")
