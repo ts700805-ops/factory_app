@@ -104,23 +104,55 @@ else:
 
 # --- 📊 製造部派工專區 ---
     if st.session_state.menu_selection == "📊 製造部派工專區":
-        import uuid  # 導入唯一識別碼工具
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📋 製造部派工進度</h1>', unsafe_allow_html=True)
-        
-        my_procs = process_map.get(st.session_state.user, process_list)
 
+        # 1. 定義彈出式編輯視窗 (Dialog)
+        @st.dialog("📝 編輯任務指派")
+        def edit_task_dialog(order_id, proc_name, current_data):
+            st.write(f"正在編輯：**{order_id}** - **{proc_name}**")
+            
+            with st.form("dialog_edit_form"):
+                d_leader = st.selectbox("負責組長", all_leaders, index=all_leaders.index(current_data.get("組長", st.session_state.user)) if current_data.get("組長") in all_leaders else 0)
+                
+                # 處理日期格式
+                try:
+                    default_date = datetime.datetime.strptime(current_data.get("通電日期"), "%Y-%m-%d")
+                except:
+                    default_date = datetime.date.today()
+                d_date = st.date_input("預計通電日期", value=default_date)
+                
+                new_wk = []
+                cols = st.columns(5)
+                for i in range(5):
+                    p_val = current_data.get(f"人員{i+1}", "NA")
+                    new_wk.append(cols[i].selectbox(f"人員 {i+1}", ["NA"] + all_staff, index=(["NA"] + all_staff).index(p_val) if p_val in (["NA"] + all_staff) else 0, key=f"dlg_s_{i}"))
+                
+                if st.form_submit_button("💾 儲存修改", use_container_width=True):
+                    new_payload = {
+                        "製令": str(order_id), "製造工序": proc_name, "組長": d_leader, "通電日期": str(d_date), 
+                        "最後更新": get_now_str(),
+                        "人員1": new_wk[0], "人員2": new_wk[1], "人員3": new_wk[2], "人員4": new_wk[3], "人員5": new_wk[4]
+                    }
+                    # 找到該筆資料在 Firebase 的 ID 並更新
+                    if "db_id" in current_data:
+                        requests.put(f"{DB_URL}/{current_data['db_id']}.json", data=json.dumps(new_payload))
+                        st.success("修改成功！")
+                        time.sleep(0.5)
+                        st.rerun()
+
+        # 2. 顯示進度內容
+        my_procs = process_map.get(st.session_state.user, process_list)
         c1, c2 = st.columns(2)
-        s_order = c1.selectbox("🔍 篩選製令", ["全部"] + sorted(order_list))
+        s_order = c1.selectbox("🔍 篩選製令", ["全部"] + sorted(list(set(order_list))))
         s_staff = c2.selectbox("👤 篩選人員", ["全部"] + sorted(all_staff))
 
         try:
             r_work = requests.get(f"{DB_URL}.json").json() or {}
             r_finish = requests.get(f"{FINISH_URL}.json").json() or {}
-            df_work = pd.DataFrame([dict(v, id=k) for k, v in r_work.items()]).fillna("NA") if r_work else pd.DataFrame()
-            df_finish = pd.DataFrame([dict(v, id=k) for k, v in r_finish.items()]).fillna("NA") if r_finish else pd.DataFrame()
+            df_work = pd.DataFrame([dict(v, db_id=k) for k, v in r_work.items()]).fillna("NA") if r_work else pd.DataFrame()
+            df_finish = pd.DataFrame([dict(v, db_id=k) for k, v in r_finish.items()]).fillna("NA") if r_finish else pd.DataFrame()
 
-            # 使用 set 去重，防止 order_list 本身有重複導致 key 衝突
-            display_orders = sorted(list(set([o for o in order_list if (s_order == "全部" or str(o) == str(s_order))])))
+            display_orders = sorted([o for o in set(order_list) if (s_order == "全部" or str(o) == str(s_order))])
             
             cols = st.columns(2)
             for idx, o_id in enumerate(display_orders):
@@ -131,9 +163,8 @@ else:
                     st.markdown(f'<div class="order-card"><div class="order-header"><div>📦 製令：{o_id}</div><div class="power-date-tag">⚡ 通電：{p_date}</div></div>', unsafe_allow_html=True)
                     
                     for p_idx, proc in enumerate(my_procs):
-                        # --- 終極解決方案：使用隨機生成的唯一 Key ---
-                        random_key = str(uuid.uuid4())[:8]
-                        unique_id = f"{o_id}_{proc}_{p_idx}_{random_key}"
+                        # 唯一的 Key 避免重複錯誤
+                        fix_key = f"card_{o_id}_{proc}_{p_idx}".replace(".", "_").replace("-", "_")
                         
                         m_w = o_df[o_df["製造工序"] == proc]
                         m_f = df_finish[(df_finish["製令"] == str(o_id)) & (df_finish["製造工序"] == proc)] if not df_finish.empty else pd.DataFrame()
@@ -141,8 +172,10 @@ else:
                         r_ui = st.columns([0.65, 0.1, 0.25])
                         with r_ui[0]:
                             html = ""
+                            curr_data_dict = {} # 用於傳給編輯視窗
                             if not m_w.empty:
                                 row = m_w.iloc[0]
+                                curr_data_dict = row.to_dict()
                                 for i in range(1, 6):
                                     p = row.get(f"人員{i}")
                                     if p and p != "NA": html += f'<div class="badge-staff">{p}</div>'
@@ -151,23 +184,23 @@ else:
                             st.markdown(f'<div class="proc-row"><div class="proc-name">{proc}</div><div class="staff-area">{html}</div></div>', unsafe_allow_html=True)
                         
                         with r_ui[1]:
-                            if st.button("✏️", key=f"ed_btn_{unique_id}"):
-                                st.session_state.edit_target = {"order": str(o_id), "proc": proc}
-                                st.session_state.menu_selection = "📝 任務派發"
-                                st.rerun()
+                            # 點擊編輯按鈕後，觸發 Dialog 視窗
+                            if st.button("✏️", key=f"edit_btn_{fix_key}"):
+                                edit_task_dialog(o_id, proc, curr_data_dict)
                                 
                         with r_ui[2]:
                             if not m_w.empty:
-                                if st.button("確認完工", key=f"ok_btn_{unique_id}"):
+                                if st.button("確認完工", key=f"done_btn_{fix_key}"):
                                     dat = m_w.iloc[0].to_dict()
+                                    db_id = dat.pop('db_id')
                                     dat["完工時間"] = get_now_str()
                                     dat["完工人員"] = st.session_state.user
                                     requests.post(f"{FINISH_URL}.json", data=json.dumps(dat))
-                                    requests.delete(f"{DB_URL}/{dat['id']}.json")
+                                    requests.delete(f"{DB_URL}/{db_id}.json")
                                     st.rerun()
                     st.markdown('</div>', unsafe_allow_html=True)
         except Exception as e:
-            st.error(f"資料錯誤: {e}")
+            st.error(f"系統執行錯誤: {e}")
 
     # --- 📜 完工紀錄查詢 ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
