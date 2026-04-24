@@ -203,10 +203,52 @@ else:
         try:
             r = requests.get(f"{FINISH_URL}.json").json()
             if r:
-                f_df = pd.DataFrame([dict(v, id=k) for k, v in r.items() if v]).fillna("NA")
-                st.dataframe(f_df.sort_values("完工時間", ascending=False), use_container_width=True)
-            else: st.info("目前無完工紀錄")
-        except: st.error("讀取失敗")
+                # 1. 建立初始 DataFrame
+                f_df = pd.DataFrame([dict(v, db_id=k) for k, v in r.items() if v]).fillna("NA")
+                
+                # 2. 定義要顯示的順序與欄位 (製令擺第一，排除掉您不想要的欄位)
+                # 假設您的欄位名稱為：製令, 製造工序, 通電日期, 人員1...人員5, 完工時間, 完工人員
+                all_cols = f_df.columns.tolist()
+                
+                # 排除清單
+                exclude_cols = ["db_id", "id", "最後更新", "組長", "提交時間"]
+                display_cols = [c for c in all_cols if c not in exclude_cols]
+                
+                # 將 "製令" 移到最前面
+                if "製令" in display_cols:
+                    display_cols.insert(0, display_cols.pop(display_cols.index("製令")))
+                
+                # 3. 顯示過濾後的資料表
+                st.dataframe(f_df[display_cols].sort_values("完工時間", ascending=False), use_container_width=True)
+                
+                st.markdown("---")
+                st.subheader("🗑️ 紀錄管理")
+                
+                # 4. 刪除功能：讓使用者選擇製令與工序來刪除
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    # 建立選單顯示文字，方便辨識要刪哪一筆
+                    delete_options = {f"{row['製令']} - {row['製造工序']} (完工於: {row['完工時間']})": row['db_id'] 
+                                     for _, row in f_df.iterrows()}
+                    target_label = st.selectbox("請選擇要刪除的紀錄", list(delete_options.keys()))
+                
+                with col2:
+                    st.write(" ") # 調整對齊
+                    st.write(" ")
+                    if st.button("🔥 執行刪除", use_container_width=True, type="secondary"):
+                        target_id = delete_options[target_label]
+                        del_r = requests.delete(f"{FINISH_URL}/{target_id}.json")
+                        if del_r.status_code == 200:
+                            st.success("紀錄已刪除")
+                            time.sleep(0.5)
+                            st.rerun()
+                        else:
+                            st.error("刪除失敗")
+                            
+            else:
+                st.info("目前無完工紀錄")
+        except Exception as e:
+            st.error(f"讀取失敗: {e}")
 
     # --- 📝 任務派發 ---
     elif st.session_state.menu_selection == "📝 任務派發":
