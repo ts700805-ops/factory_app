@@ -240,29 +240,26 @@ else:
             sl = st.text_area("組長清單 (逗號隔開)", ",".join(all_leaders))
             ss = st.text_area("人員清單 (逗號隔開)", ",".join(all_staff))
             sp = st.text_area("工序清單 (逗號隔開)", ",".join(process_list))
-            
-            # 您原有的工序綁定
             sm = st.text_area("組長:工序綁定 (格式 組長:工序1,工序2 每行一筆)", "\n".join([f"{k}:{','.join(v)}" for k, v in process_map.items()]))
             
-            # --- 補回：組長:人員綁定欄位 ---
-            # 這裡使用 get 方法確保如果資料庫沒資料也不會噴錯
-            staff_m = st.text_area("組長:人員綁定 (格式 組長:人員1,人員2 每行一筆)", "\n".join([f"{k}:{','.join(v)}" for k, v in staff_map.items()]))
+            # --- 保持您的格式，僅新增人員綁定顯示 ---
+            st_m = st.text_area("組長:人員綁定 (格式 組長:人員1,人員2 每行一筆)", "\n".join([f"{k}:{','.join(v)}" for k, v in staff_map.items()]))
             
             if st.form_submit_button("💾 儲存設定"):
                 def split_s(s): return [x.strip() for x in s.split(",") if x.strip()]
                 
-                # 處理工序綁定
+                # 原有的工序綁定處理
                 new_map = {}
                 for line in sm.split("\n"):
                     if ":" in line:
-                        k, v = line.split(":", 1)
+                        k, v = line.split(":")
                         new_map[k.strip()] = split_s(v)
                 
-                # --- 核心修正：儲存新的人員綁定邏輯 ---
+                # 新增的人員綁定處理 (同樣邏輯)
                 new_staff_map = {}
-                for line in staff_m.split("\n"):
+                for line in st_m.split("\n"):
                     if ":" in line:
-                        k, v = line.split(":", 1)
+                        k, v = line.split(":")
                         new_staff_map[k.strip()] = split_s(v)
                 
                 final_conf = {
@@ -271,10 +268,10 @@ else:
                     "all_staff": split_s(ss),
                     "processes": split_s(sp), 
                     "process_map": new_map,
-                    "staff_map": new_staff_map  # 確保人員綁定也一起存進資料庫
+                    "staff_map": new_staff_map  # 補上這行，解決 NameError 報錯
                 }
                 
                 requests.put(f"{SETTING_URL}.json", data=json.dumps(final_conf))
-                st.success("✅ 設定已更新，包含人員綁定資訊")
+                st.success("設定已更新")
                 time.sleep(0.8)
                 st.rerun()
