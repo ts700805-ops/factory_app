@@ -37,7 +37,7 @@ def get_settings():
     except:
         return default_settings
 
-# --- 2. 介面樣式設定 (深度優化版本) ---
+# --- 2. 介面樣式設定 (維持原樣) ---
 st.set_page_config(page_title="超慧科技管理系統", layout="wide")
 
 st.markdown("""
@@ -163,7 +163,7 @@ else:
     if st.session_state.menu_selection == "📊 製造部派工專區":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900; margin-bottom:30px;">📋 製造部派工進度看板</h1>', unsafe_allow_html=True)
 
-        # --- 對話框 1：編輯人員 (邏輯不變) ---
+        # --- 對話框 1：編輯人員 ---
         @st.dialog("👥 編輯施工人員", width="medium")
         def edit_staff_dialog(order_id, proc_name, current_data):
             st.subheader(f"🛠️ {proc_name}")
@@ -195,7 +195,7 @@ else:
                         st.success("✅ 人員更新成功！")
                         time.sleep(0.5); st.rerun()
 
-        # --- 對話框 2：修改通電日期 (邏輯不變) ---
+        # --- 對話框 2：修改通電日期 ---
         @st.dialog("📅 修改預計通電日期", width="small")
         def edit_power_date_dialog(order_id, current_date_str, related_records):
             st.subheader(f"📦 製令：{order_id}")
@@ -245,16 +245,16 @@ else:
                             </div>
                     ''', unsafe_allow_html=True)
                     
-                    # 修改日期按鈕 (放在頭部下方一點)
+                    # 修改日期按鈕 (放在頭部下方)
                     date_edit_col = st.columns([0.88, 0.12])
                     with date_edit_col[1]:
                         if st.button("📅", key=f"date_edit_{o_id}", help="修改通電日期"):
                             related = {k: v for k, v in r_work.items() if v.get("製令") == str(o_id)}
                             edit_power_date_dialog(o_id, p_date, related)
 
-                    # 工序列表
+                    # --- 【優化後的工序列表】 ---
                     for p_idx, proc in enumerate(my_procs):
-                        u_key = f"v15_{str(o_id).replace('-','_')}_{p_idx}"
+                        u_key = f"v16_{str(o_id).replace('-','_')}_{p_idx}"
                         m_w = o_df[o_df["製造工序"] == proc]
                         m_f = f_df_order[f_df_order["製造工序"] == proc]
                         
@@ -262,9 +262,11 @@ else:
                         is_done = not m_f.empty
                         target_row = m_w.iloc[0] if not m_w.empty else (m_f.iloc[0] if not m_f.empty else None)
                         
-                        # 行佈局容器
                         st.markdown('<div class="proc-row-container">', unsafe_allow_html=True)
-                        r_ui = st.columns([0.4, 0.4, 0.2])
+                        
+                        # 核心修改點：縮小比例讓內容往左靠攏
+                        # [2.5, 3, 0.6, 2.5, 5] -> 最後的 5 是右側空白區塊
+                        r_ui = st.columns([2.5, 3, 0.6, 2.5, 5])
                         
                         with r_ui[0]:
                             st.markdown(f'<div class="proc-name">{proc}</div>', unsafe_allow_html=True)
@@ -285,32 +287,34 @@ else:
                                 st.markdown(f'<div class="staff-area">{html}</div>', unsafe_allow_html=True)
                         
                         with r_ui[2]:
-                            # 按鈕與狀態區
+                            # 編輯按鈕 (鉛筆)
+                            if not is_done:
+                                if st.button("✏️", key=f"eb_staff_{u_key}"):
+                                    if m_w.empty:
+                                        init_data = {"製令": str(o_id), "製造工序": proc, "組長": st.session_state.user, "通電日期": p_date, "人員1": "NA", "人員2": "NA", "人員3": "NA", "人員4": "NA", "人員5": "NA"}
+                                        res = requests.post(f"{DB_URL}.json", data=json.dumps(init_data))
+                                        init_data["db_id"] = res.json().get("name")
+                                        edit_staff_dialog(o_id, proc, init_data)
+                                    else:
+                                        edit_staff_dialog(o_id, proc, curr_data_dict)
+                        
+                        with r_ui[3]:
+                            # 狀態或完工按鈕
                             if is_done:
                                 st.markdown('<div class="status-done">✅ 已完工</div>', unsafe_allow_html=True)
                             else:
-                                btn_row = st.columns([1, 2])
-                                with btn_row[0]:
-                                    if st.button("✏️", key=f"eb_staff_{u_key}"):
-                                        if m_w.empty:
-                                            init_data = {"製令": str(o_id), "製造工序": proc, "組長": st.session_state.user, "通電日期": p_date, "人員1": "NA", "人員2": "NA", "人員3": "NA", "人員4": "NA", "人員5": "NA"}
-                                            res = requests.post(f"{DB_URL}.json", data=json.dumps(init_data))
-                                            init_data["db_id"] = res.json().get("name")
-                                            edit_staff_dialog(o_id, proc, init_data)
-                                        else:
-                                            edit_staff_dialog(o_id, proc, curr_data_dict)
-                                with btn_row[1]:
-                                    if not is_assigned:
-                                        st.write("⚠️ 請指派")
-                                    else:
-                                        if st.button("完工", key=f"db_{u_key}", type="primary"):
-                                            dat = m_w.iloc[0].to_dict(); db_id = dat.pop('db_id')
-                                            dat["完工時間"] = get_now_str(); dat["完工人員"] = st.session_state.user
-                                            requests.post(f"{FINISH_URL}.json", data=json.dumps(dat))
-                                            requests.delete(f"{DB_URL}/{db_id}.json")
-                                            st.rerun()
-                        st.markdown('</div>', unsafe_allow_html=True) # 關閉容器
-                    st.markdown('</div>', unsafe_allow_html=True) # 關閉卡片
+                                if not is_assigned:
+                                    st.warning("⚠️ 請指派")
+                                else:
+                                    if st.button("完工", key=f"db_{u_key}", type="primary", use_container_width=True):
+                                        dat = m_w.iloc[0].to_dict(); db_id = dat.pop('db_id')
+                                        dat["完工時間"] = get_now_str(); dat["完工人員"] = st.session_state.user
+                                        requests.post(f"{FINISH_URL}.json", data=json.dumps(dat))
+                                        requests.delete(f"{DB_URL}/{db_id}.json")
+                                        st.rerun()
+
+                        st.markdown('</div>', unsafe_allow_html=True) 
+                    st.markdown('</div>', unsafe_allow_html=True) 
         except Exception as e:
             st.error(f"讀取錯誤: {e}")
 
@@ -338,7 +342,6 @@ else:
                         order_records = display_df[display_df["製令"] == o_id]
                         with st.expander(f"📦 製令：{o_id} (已完工 {len(order_records)} 項工序)", expanded=bool(keyword)):
                             st.dataframe(order_records.drop(columns=['db_id']), use_container_width=True)
-                            # 提供單筆刪除功能 (維持原樣)
                             for _, row in order_records.iterrows():
                                 if st.button(f"🗑️ 刪除 {row['製造工序']}", key=f"del_{row['db_id']}"):
                                     requests.delete(f"{FINISH_URL}/{row['db_id']}.json")
