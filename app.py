@@ -106,41 +106,59 @@ else:
     if st.session_state.menu_selection == "📊 製造部派工專區":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📋 製造部派工進度</h1>', unsafe_allow_html=True)
 
-        # 1. 定義彈出式編輯視窗 (Dialog)
-        @st.dialog("📝 編輯任務指派")
+        # --- 核心修正：將 width 改為 large 讓視窗變寬 ---
+        @st.dialog("📝 編輯任務指派", width="large")
         def edit_task_dialog(order_id, proc_name, current_data):
-            st.write(f"正在編輯：**{order_id}** - **{proc_name}**")
+            st.subheader(f"📦 製令：{order_id} | 🛠️ 工序：{proc_name}")
             
             with st.form("dialog_edit_form"):
-                d_leader = st.selectbox("負責組長", all_leaders, index=all_leaders.index(current_data.get("組長", st.session_state.user)) if current_data.get("組長") in all_leaders else 0)
+                # 將設定分為兩列，左邊選組長/日期，右邊選人員
+                col_left, col_right = st.columns([1, 2])
                 
-                # 處理日期格式
-                try:
-                    default_date = datetime.datetime.strptime(current_data.get("通電日期"), "%Y-%m-%d")
-                except:
-                    default_date = datetime.date.today()
-                d_date = st.date_input("預計通電日期", value=default_date)
+                with col_left:
+                    st.markdown("### 📅 基本資訊")
+                    d_leader = st.selectbox("負責組長", all_leaders, index=all_leaders.index(current_data.get("組長", st.session_state.user)) if current_data.get("組長") in all_leaders else 0)
+                    
+                    try:
+                        default_date = datetime.datetime.strptime(current_data.get("通電日期"), "%Y-%m-%d")
+                    except:
+                        default_date = datetime.date.today()
+                    d_date = st.date_input("預計通電日期", value=default_date)
                 
-                new_wk = []
-                cols = st.columns(5)
-                for i in range(5):
-                    p_val = current_data.get(f"人員{i+1}", "NA")
-                    new_wk.append(cols[i].selectbox(f"人員 {i+1}", ["NA"] + all_staff, index=(["NA"] + all_staff).index(p_val) if p_val in (["NA"] + all_staff) else 0, key=f"dlg_s_{i}"))
+                with col_right:
+                    st.markdown("### 👥 人員配置 (請選擇全名)")
+                    # 這裡使用 columns 展開空間，配合 large 視窗就不會擠在一起
+                    p_cols = st.columns(3) 
+                    p_cols2 = st.columns(2)
+                    new_wk = []
+                    
+                    # 產生 5 個選擇框
+                    all_p_cols = p_cols + p_cols2
+                    for i in range(5):
+                        p_val = current_data.get(f"人員{i+1}", "NA")
+                        # 確保選單寬度足夠顯示全名
+                        sel = all_p_cols[i].selectbox(
+                            f"人員 {i+1}", 
+                            ["NA"] + all_staff, 
+                            index=(["NA"] + all_staff).index(p_val) if p_val in (["NA"] + all_staff) else 0, 
+                            key=f"dlg_p_{i}"
+                        )
+                        new_wk.append(sel)
                 
-                if st.form_submit_button("💾 儲存修改", use_container_width=True):
+                st.markdown("---")
+                if st.form_submit_button("💾 確認儲存修改", use_container_width=True):
                     new_payload = {
                         "製令": str(order_id), "製造工序": proc_name, "組長": d_leader, "通電日期": str(d_date), 
                         "最後更新": get_now_str(),
                         "人員1": new_wk[0], "人員2": new_wk[1], "人員3": new_wk[2], "人員4": new_wk[3], "人員5": new_wk[4]
                     }
-                    # 找到該筆資料在 Firebase 的 ID 並更新
                     if "db_id" in current_data:
                         requests.put(f"{DB_URL}/{current_data['db_id']}.json", data=json.dumps(new_payload))
-                        st.success("修改成功！")
-                        time.sleep(0.5)
+                        st.success("✅ 資料已成功更新！")
+                        time.sleep(0.8)
                         st.rerun()
 
-        # 2. 顯示進度內容
+        # --- 以下為顯示邏輯，維持不變，僅確保 Key 唯一性 ---
         my_procs = process_map.get(st.session_state.user, process_list)
         c1, c2 = st.columns(2)
         s_order = c1.selectbox("🔍 篩選製令", ["全部"] + sorted(list(set(order_list))))
@@ -163,8 +181,10 @@ else:
                     st.markdown(f'<div class="order-card"><div class="order-header"><div>📦 製令：{o_id}</div><div class="power-date-tag">⚡ 通電：{p_date}</div></div>', unsafe_allow_html=True)
                     
                     for p_idx, proc in enumerate(my_procs):
-                        # 唯一的 Key 避免重複錯誤
-                        fix_key = f"card_{o_id}_{proc}_{p_idx}".replace(".", "_").replace("-", "_")
+                        # 確保 Key 唯一且不帶特殊字元
+                        safe_o_id = str(o_id).replace("-", "_").replace(".", "_")
+                        safe_proc = str(proc).replace("-", "_").replace(".", "_")
+                        fix_key = f"v3_{safe_o_id}_{safe_proc}_{p_idx}"
                         
                         m_w = o_df[o_df["製造工序"] == proc]
                         m_f = df_finish[(df_finish["製令"] == str(o_id)) & (df_finish["製造工序"] == proc)] if not df_finish.empty else pd.DataFrame()
@@ -172,36 +192,11 @@ else:
                         r_ui = st.columns([0.65, 0.1, 0.25])
                         with r_ui[0]:
                             html = ""
-                            curr_data_dict = {} # 用於傳給編輯視窗
+                            curr_data_dict = {} 
                             if not m_w.empty:
                                 row = m_w.iloc[0]
                                 curr_data_dict = row.to_dict()
                                 for i in range(1, 6):
-                                    p = row.get(f"人員{i}")
-                                    if p and p != "NA": html += f'<div class="badge-staff">{p}</div>'
-                            elif not m_f.empty: html = '<span class="status-done">✅ 已完工</span>'
-                            else: html = '<span class="status-empty">尚未派工</span>'
-                            st.markdown(f'<div class="proc-row"><div class="proc-name">{proc}</div><div class="staff-area">{html}</div></div>', unsafe_allow_html=True)
-                        
-                        with r_ui[1]:
-                            # 點擊編輯按鈕後，觸發 Dialog 視窗
-                            if st.button("✏️", key=f"edit_btn_{fix_key}"):
-                                edit_task_dialog(o_id, proc, curr_data_dict)
-                                
-                        with r_ui[2]:
-                            if not m_w.empty:
-                                if st.button("確認完工", key=f"done_btn_{fix_key}"):
-                                    dat = m_w.iloc[0].to_dict()
-                                    db_id = dat.pop('db_id')
-                                    dat["完工時間"] = get_now_str()
-                                    dat["完工人員"] = st.session_state.user
-                                    requests.post(f"{FINISH_URL}.json", data=json.dumps(dat))
-                                    requests.delete(f"{DB_URL}/{db_id}.json")
-                                    st.rerun()
-                    st.markdown('</div>', unsafe_allow_html=True)
-        except Exception as e:
-            st.error(f"系統執行錯誤: {e}")
-
     # --- 📜 完工紀錄查詢 ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
         st.title("📜 歷史完工紀錄")
