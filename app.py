@@ -203,52 +203,49 @@ else:
         try:
             r = requests.get(f"{FINISH_URL}.json").json()
             if r:
-                # 1. 建立 DataFrame 並處理欄位
+                # 1. 建立 DataFrame 並清理欄位
                 f_df = pd.DataFrame([dict(v, db_id=k) for k, v in r.items() if v]).fillna("NA")
                 
-                # 排序：按完工時間倒序
+                # 排序：按完工時間倒序，確保最新的紀錄在前面
                 f_df = f_df.sort_values("完工時間", ascending=False)
 
-                # 2. 定義要顯示的欄位與順序 (排除 ID/提交時間/最後更新/組長)
-                # 核心要求：製令在最前面，刪除「最後更新」等欄位
-                target_cols = ["製令", "製造工序", "通電日期", "人員1", "人員2", "人員3", "人員4", "人員5", "完工人員", "完工時間"]
-                # 過濾掉資料中可能不存在的欄位，避免報錯
-                display_cols = [c for c in target_cols if c in f_df.columns]
+                # 2. 依照「製令」分組
+                unique_orders = f_df["製令"].unique()
 
-                # 3. 自定義表頭 (使用 columns 模擬表格)
-                st.markdown("---")
-                h_cols = st.columns([1.5, 1.5, 1.2, 1, 1, 1, 1, 1, 1.2, 1.8, 0.8])
-                header_names = ["製令", "工序", "通電日", "人1", "人2", "人3", "人4", "人5", "完工人員", "完工時間", "管理"]
-                for i, name in enumerate(header_names):
-                    h_cols[i].markdown(f"**{name}**")
-                st.markdown("---")
+                for o_id in unique_orders:
+                    # 篩選出該製令的所有紀錄
+                    order_records = f_df[f_df["製令"] == o_id]
+                    
+                    # 建立分組視窗 (Expander)
+                    with st.expander(f"📦 製令：{o_id} (共 {len(order_records)} 筆完工紀錄)", expanded=False):
+                        # 3. 自定義表頭
+                        h_cols = st.columns([1.5, 1.2, 1, 1, 1, 1, 1, 1.2, 1.8, 0.8])
+                        header_names = ["工序", "通電日", "人1", "人2", "人3", "人4", "人5", "完工人員", "完工時間", "管理"]
+                        for i, name in enumerate(header_names):
+                            h_cols[i].markdown(f"**{name}**")
+                        st.markdown("---")
 
-                # 4. 逐列顯示資料與刪除按鈕
-                for _, row in f_df.iterrows():
-                    r_cols = st.columns([1.5, 1.5, 1.2, 1, 1, 1, 1, 1, 1.2, 1.8, 0.8])
-                    
-                    # 顯示資料
-                    r_cols[0].write(row.get("製令", "NA"))
-                    r_cols[1].write(row.get("製造工序", "NA"))
-                    r_cols[2].write(row.get("通電日期", "NA"))
-                    r_cols[3].write(row.get("人員1", ""))
-                    r_cols[4].write(row.get("人員2", ""))
-                    r_cols[5].write(row.get("人員3", ""))
-                    r_cols[6].write(row.get("人員4", ""))
-                    r_cols[7].write(row.get("人員5", ""))
-                    r_cols[8].write(row.get("完工人員", "NA"))
-                    r_cols[9].write(row.get("完工時間", "NA"))
-                    
-                    # 5. 右側刪除按鈕
-                    if r_cols[10].button("🗑️", key=f"del_{row['db_id']}", help="點擊刪除此筆紀錄"):
-                        with st.spinner("正在刪除..."):
-                            res = requests.delete(f"{FINISH_URL}/{row['db_id']}.json")
-                            if res.status_code == 200:
-                                st.toast(f"✅ 已刪除：{row.get('製令')} - {row.get('製造工序')}")
-                                time.sleep(0.5)
-                                st.rerun()
-                            else:
-                                st.error("刪除失敗，請檢查網路。")
+                        # 4. 顯示該製令下的每一筆紀錄
+                        for _, row in order_records.iterrows():
+                            r_cols = st.columns([1.5, 1.2, 1, 1, 1, 1, 1, 1.2, 1.8, 0.8])
+                            
+                            r_cols[0].write(row.get("製造工序", "NA"))
+                            r_cols[1].write(row.get("通電日期", "NA"))
+                            r_cols[2].write(row.get("人員1", ""))
+                            r_cols[3].write(row.get("人員2", ""))
+                            r_cols[4].write(row.get("人員3", ""))
+                            r_cols[5].write(row.get("人員4", ""))
+                            r_cols[6].write(row.get("人員5", ""))
+                            r_cols[7].write(row.get("完工人員", "NA"))
+                            r_cols[8].write(row.get("完工時間", "NA"))
+                            
+                            # 5. 獨立刪除按鈕
+                            if r_cols[9].button("🗑️", key=f"del_fin_{row['db_id']}"):
+                                res = requests.delete(f"{FINISH_URL}/{row['db_id']}.json")
+                                if res.status_code == 200:
+                                    st.toast(f"✅ 已刪除 {o_id} 的工序紀錄")
+                                    time.sleep(0.5)
+                                    st.rerun()
             else:
                 st.info("目前無完工紀錄")
         except Exception as e:
