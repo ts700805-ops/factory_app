@@ -197,7 +197,59 @@ else:
                     st.markdown('</div>', unsafe_allow_html=True)
         except Exception as e:
             st.error(f"系統錯誤: {e}")
+# --- 📜 完工紀錄查詢 ---
+    elif st.session_state.menu_selection == "📜 完工紀錄查詢":
+        st.title("📜 歷史完工紀錄")
+        try:
+            r = requests.get(f"{FINISH_URL}.json").json()
+            if r:
+                f_df = pd.DataFrame([dict(v, id=k) for k, v in r.items() if v]).fillna("NA")
+                st.dataframe(f_df.sort_values("完工時間", ascending=False), use_container_width=True)
+            else: st.info("目前無完工紀錄")
+        except: st.error("讀取失敗")
 
+    # --- 📝 任務派發 ---
+    elif st.session_state.menu_selection == "📝 任務派發":
+        st.title("📝 任務指派與編輯")
+        
+        target_o = order_list[0] if order_list else ""
+        target_p = process_list[0] if process_list else ""
+        
+        if st.session_state.edit_target:
+            target_o = st.session_state.edit_target["order"]
+            target_p = st.session_state.edit_target["proc"]
+            st.info(f"📍 正在編輯：{target_o} - {target_p}")
+
+        with st.form("dispatch_form"):
+            v1, v2 = st.columns(2)
+            t_o = v1.selectbox("1. 選擇製令", order_list, index=order_list.index(target_o) if target_o in order_list else 0)
+            t_p = v2.selectbox("2. 選擇工序", process_list, index=process_list.index(target_p) if target_p in process_list else 0)
+            
+            v3, v4 = st.columns(2)
+            t_l = v3.selectbox("3. 負責組長", all_leaders, index=all_leaders.index(st.session_state.user) if st.session_state.user in all_leaders else 0)
+            t_d = v4.date_input("4. 預計通電日期")
+            
+            wk = []
+            cols = st.columns(5)
+            for i in range(5):
+                wk.append(cols[i].selectbox(f"人員 {i+1}", ["NA"] + all_staff, key=f"form_staff_{i}"))
+            
+            if st.form_submit_button("🚀 確認發布任務", use_container_width=True):
+                payload = {
+                    "製令": str(t_o), "製造工序": t_p, "組長": t_l, "通電日期": str(t_d), 
+                    "最後更新": get_now_str(),
+                    "人員1": wk[0], "人員2": wk[1], "人員3": wk[2], "人員4": wk[3], "人員5": wk[4]
+                }
+                r_c = requests.get(f"{DB_URL}.json").json() or {}
+                ek = next((k for k, v in r_c.items() if v.get("製令")==str(t_o) and v.get("製造工序")==t_p), None)
+                if ek: requests.put(f"{DB_URL}/{ek}.json", data=json.dumps(payload))
+                else: requests.post(f"{DB_URL}.json", data=json.dumps(payload))
+                
+                st.session_state.edit_target = None
+                st.success("任務指派成功！")
+                time.sleep(0.5)
+                st.session_state.menu_selection = "📊 製造部派工專區"
+                st.rerun()
     # --- ⚙️ 設定管理 ---
     elif st.session_state.menu_selection == "⚙️ 設定管理":
         st.title("⚙️ 系統設定")
