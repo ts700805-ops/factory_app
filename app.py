@@ -62,6 +62,7 @@ st.markdown("""
     .badge-main { background: #1e40af; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
     .badge-sub { background: #e2e8f0; color: #475569; padding: 2px 5px; border-radius: 4px; font-size: 10px; border: 1px solid #cbd5e1; }
     .no-data { color: #94a3b8; font-size: 12px; font-style: italic; padding-left: 5px; }
+    .is-done { color: #10b981; font-size: 14px; font-weight: bold; padding-left: 5px; }
     div[data-testid="column"] { display: flex; align-items: center; justify-content: center; }
     </style>
 """, unsafe_allow_html=True)
@@ -98,27 +99,32 @@ else:
         my_procs = process_map.get(current_user, process_list) 
         if not my_procs: my_procs = process_list
 
-        # 優先獲取資料
+        # 讀取進行中與已完工資料
         db_data = {}
+        finish_data = {}
         try:
-            r = requests.get(f"{DB_URL}.json", timeout=10)
-            if r.status_code == 200:
-                db_data = r.json() or {}
+            r_active = requests.get(f"{DB_URL}.json", timeout=10)
+            r_finish = requests.get(f"{FINISH_URL}.json", timeout=10)
+            if r_active.status_code == 200: db_data = r_active.json() or {}
+            if r_finish.status_code == 200: finish_data = r_finish.json() or {}
         except:
             st.error("⚠️ 無法連線至資料庫")
 
         all_df = pd.DataFrame([dict(v, id=k) for k, v in db_data.items()]) if db_data else pd.DataFrame()
+        done_df = pd.DataFrame([dict(v, id=k) for k, v in finish_data.items()]) if finish_data else pd.DataFrame()
 
         display_cols = st.columns(2)
         
         for idx, o_id in enumerate(order_list):
             with display_cols[idx % 2]:
                 o_match = all_df[all_df["製令"] == str(o_id)] if not all_df.empty else pd.DataFrame()
+                d_match = done_df[done_df["製令"] == str(o_id)] if not done_df.empty else pd.DataFrame()
                 
                 # 取得通電日期
                 p_date = "未設定"
-                if not o_match.empty:
-                    valid_dates = o_match["通電日期"].dropna()
+                combined_matches = pd.concat([o_match, d_match]) if not (o_match.empty and d_match.empty) else pd.DataFrame()
+                if not combined_matches.empty and "通電日期" in combined_matches.columns:
+                    valid_dates = combined_matches["通電日期"].dropna()
                     if not valid_dates.empty:
                         p_date = str(valid_dates.iloc[0])
 
@@ -132,10 +138,14 @@ else:
 
                 for proc in my_procs:
                     proc_match = o_match[o_match["製造工序"] == proc] if not o_match.empty else pd.DataFrame()
+                    is_done_match = d_match[d_match["製造工序"] == proc] if not d_match.empty else pd.DataFrame()
+                    
                     row_c1, row_c2, row_c3 = st.columns([0.7, 0.15, 0.15])
                     
                     with row_c1:
-                        if not proc_match.empty:
+                        if not is_done_match.empty:
+                            st.markdown(f'<div class="table-row-container"><div class="cell-proc">{proc}</div><div class="is-done">✅ 已完工</div></div>', unsafe_allow_html=True)
+                        elif not proc_match.empty:
                             row = proc_match.iloc[0]
                             staff_html = ""
                             for i in range(1, 6):
@@ -148,13 +158,12 @@ else:
                             st.markdown(f'<div class="table-row-container"><div class="cell-proc">{proc}</div><div class="no-data">尚未派工</div></div>', unsafe_allow_html=True)
                     
                     with row_c2:
-                        if not proc_match.empty:
+                        if not proc_match.empty and is_done_match.empty:
                             row = proc_match.iloc[0]
                             with st.popover("✏️"):
                                 try: curr_d = pd.to_datetime(row.get("通電日期", "today")).date()
                                 except: curr_d = datetime.date.today()
                                 new_d = st.date_input("通電日期", value=curr_d, key=f"ed_date_{row['id']}")
-                                
                                 staff_opts = ["NA"] + sorted(list(set(all_staff + all_leaders)))
                                 new_staff = []
                                 for i in range(1, 6):
@@ -162,20 +171,14 @@ else:
                                     d_idx = staff_opts.index(curr_p) if curr_p in staff_opts else 0
                                     s_sel = st.selectbox(f"人員{i}", staff_opts, index=d_idx, key=f"ed_s{i}_{row['id']}")
                                     new_staff.append(s_sel)
-                                
                                 if st.button("💾 儲存", key=f"save_{row['id']}", use_container_width=True):
                                     edit_payload = row.to_dict()
-                                    edit_payload.update({
-                                        "通電日期": str(new_d),
-                                        "人員1": new_staff[0], "人員2": new_staff[1], "人員3": new_staff[2], 
-                                        "人員4": new_staff[3], "人員5": new_staff[4],
-                                        "最後修改": get_now_str()
-                                    })
+                                    edit_payload.update({"通電日期": str(new_d), "人員1": new_staff[0], "人員2": new_staff[1], "人員3": new_staff[2], "人員4": new_staff[3], "人員5": new_staff[4], "最後修改": get_now_str()})
                                     requests.put(f"{DB_URL}/{row['id']}.json", data=json.dumps(edit_payload))
                                     st.rerun()
 
                     with row_c3:
-                        if not proc_match.empty:
+                        if not proc_match.empty and is_done_match.empty:
                             if st.button("✅", key=f"check_{o_id}_{proc}"):
                                 row = proc_match.iloc[0]
                                 clean_data = row.to_dict()
@@ -195,6 +198,15 @@ else:
             if f_data:
                 all_finish_logs = [dict(v, id=k) for k, v in f_data.items() if v]
                 f_df = pd.DataFrame(all_finish_logs).fillna("NA")
+                
+                # 調整欄位順序：製令置前，隱藏 ID
+                cols = f_df.columns.tolist()
+                if "製令" in cols:
+                    cols.insert(0, cols.pop(cols.index("製令")))
+                f_df = f_df[cols]
+                if "id" in f_df.columns:
+                    f_df = f_df.drop(columns=["id"])
+
                 sc1, sc2 = st.columns(2)
                 f_order_input = sc1.text_input("🔍 搜尋製令")
                 f_staff_s = sc2.selectbox("👤 搜尋人員", ["全部"] + sorted(all_staff))
@@ -206,7 +218,6 @@ else:
                     filtered_df = filtered_df[mask]
 
                 if not filtered_df.empty:
-                    # 修正處：確保括號正確閉合
                     st.dataframe(filtered_df.sort_values("完工時間", ascending=False), use_container_width=True)
                 else: st.info("查無資料")
         except: st.error("讀取失敗")
