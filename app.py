@@ -4,15 +4,17 @@ import datetime
 import requests
 import json
 import math
-import time  # 為了讓氣球效果能跑完
+import time
 
-# --- 1. 核心資料與設定 ---
+# --- 1. 核心資料與設定 (Firebase URL) ---
+# 提醒：請確保您的 Firebase Rules 設定為 { "rules": { ".read": true, ".write": true } } 以符合免授權需求
 DB_BASE_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
 DB_URL = f"{DB_BASE_URL}/work_logs"
 FINISH_URL = f"{DB_BASE_URL}/completed_logs"
 SETTING_URL = f"{DB_BASE_URL}/settings"
 
 def get_now_str():
+    # 設定台灣時區 (UTC+8)
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
     return now.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -30,6 +32,7 @@ def get_settings():
         if r.status_code == 200:
             data = r.json()
             if data and isinstance(data, dict):
+                # 確保基本欄位都存在，若缺漏則補上預設值
                 for key in ["all_leaders", "all_staff", "processes", "order_list"]:
                     if key not in data or not data[key]:
                         data[key] = default_settings[key]
@@ -40,9 +43,10 @@ def get_settings():
     except:
         return default_settings
 
-# --- 2. 介面樣式 ---
+# --- 2. 介面設定 ---
 st.set_page_config(page_title="超慧科技管理系統", layout="wide")
 
+# CSS 樣式維持不變
 st.markdown("""
     <style>
     .stApp { background-color: #f8fafc; }
@@ -69,6 +73,7 @@ order_list = settings.get("order_list", [])
 leader_map = settings.get("leader_map", {})
 process_map = settings.get("process_map", {})
 
+# 登入邏輯
 if "user" not in st.session_state:
     st.title("⚓ 超慧科技管理系統 - 登入")
     u = st.selectbox("👤 請選擇您的姓名", sorted(list(set(all_leaders + all_staff))))
@@ -83,7 +88,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 📊 製造部公佈欄 ---
+    # --- 📊 製造部派工專區 ---
     if menu == "📊 製造部派工專區":
         st.markdown('<h1 style="text-align:center; color:#1e40af; font-weight:900;">📋 超慧科技製造部派工進度</h1>', unsafe_allow_html=True)
         with st.container():
@@ -195,7 +200,7 @@ else:
             else: st.info("💡 目前歷史紀錄為空")
         except Exception as e: st.error(f"讀取失敗：{e}")
 
-    # --- 📝 任務派發 ---
+    # --- 📝 任務派發 (維持原樣) ---
     elif menu == "📝 任務派發":
         st.markdown('<h2 style="color:#1e40af;">📝 任務派發 / 內容修正</h2>', unsafe_allow_html=True)
         c1, c2, c3, c4 = st.columns(4)
@@ -231,7 +236,6 @@ else:
                 if target_key: requests.put(f"{DB_URL}/{target_key}.json", data=json.dumps(payload))
                 else: requests.post(f"{DB_URL}.json", data=json.dumps(payload))
                 
-                # 這裡修正：先顯示氣球，暫停 1.5 秒後才重整頁面
                 st.balloons()
                 st.success(f"✅ 製令 {t_o} 發布完成！")
                 time.sleep(1.5)
@@ -261,13 +265,11 @@ else:
                     st.rerun()
 
         st.markdown("---")
-        
-        # 組長工序綁定
         st.markdown("### 🛠️ 組長與工序對應綁定")
         p_map_text_list = [f"{leader}:{','.join(procs)}" for leader, procs in process_map.items()]
         current_p_map_str = "\n".join(p_map_text_list)
         with st.form("process_binding_form"):
-            st.info("💡 格式：組長姓名:工序1,工序2 (支援全形符號)")
+            st.info("💡 格式：組長姓名:工序1,工序2")
             new_p_map_str = st.text_area("工序綁定清單區", value=current_p_map_str, height=150)
             if st.form_submit_button("🔗 儲存工序綁定"):
                 new_p_map = {}
@@ -284,13 +286,9 @@ else:
                     st.success("✅ 工序連動已更新！")
                     time.sleep(1)
                     st.rerun()
-                except:
-                    # 原本的紅色格式錯誤區塊已依指令移除
-                    pass
+                except: pass
 
         st.markdown("---")
-        
-        # 組長人員綁定
         st.markdown("### 👥 組長與人員對應綁定")
         map_text_list = [f"{leader}:{','.join(staff_list)}" for leader, staff_list in leader_map.items()]
         current_map_str = "\n".join(map_text_list)
@@ -311,6 +309,4 @@ else:
                     st.success("✅ 人員綁定已更新！")
                     time.sleep(1)
                     st.rerun()
-                except:
-                    # 原本的紅色格式錯誤區塊已依指令移除
-                    pass
+                except: pass
