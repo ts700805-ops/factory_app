@@ -166,15 +166,28 @@ else:
         try:
             r = requests.get(f"{FINISH_URL}.json", timeout=10).json()
             if r:
+                # 轉換為 DataFrame
                 f_df = pd.DataFrame([dict(v, id=k) for k, v in r.items() if v]).fillna("NA")
+                
+                # 1. 刪除不需要的欄位
+                drop_cols = ["id", "提交時間", "最後修改時間"]
+                f_df = f_df.drop(columns=[c for c in drop_cols if c in f_df.columns])
+                
+                # 2. 重新排序欄位 (製令移至最前方)
+                if "製令" in f_df.columns:
+                    cols = ["製令"] + [c for c in f_df.columns if c != "製令"]
+                    f_df = f_df[cols]
+                
                 q1, q2 = st.columns(2)
                 sk = q1.text_input("🔍 搜尋製令")
                 sp = q2.selectbox("👤 搜尋人員", ["全部"] + sorted(all_staff))
+                
                 if sk: f_df = f_df[f_df["製令"].astype(str).str.contains(sk)]
                 if sp != "全部": f_df = f_df[f_df[["人員1", "人員2", "人員3", "人員4", "人員5"]].apply(lambda x: sp in x.values, axis=1)]
+                
                 st.dataframe(f_df.sort_values("完工時間", ascending=False), use_container_width=True)
             else: st.info("無紀錄")
-        except: st.error("讀取失敗")
+        except Exception as e: st.error(f"讀取失敗: {e}")
 
     # --- 📝 任務派發 ---
     elif menu == "📝 任務派發":
