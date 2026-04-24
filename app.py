@@ -102,7 +102,7 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 📊 製造部派工專區 ---
+ # --- 📊 製造部派工專區 ---
     if st.session_state.menu_selection == "📊 製造部派工專區":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📋 製造部派工進度</h1>', unsafe_allow_html=True)
         
@@ -128,9 +128,11 @@ else:
                 with cols[idx % 2]:
                     st.markdown(f'<div class="order-card"><div class="order-header"><div>📦 製令：{o_id}</div><div class="power-date-tag">⚡ 通電：{p_date}</div></div>', unsafe_allow_html=True)
                     
+                    # 遍歷工序
                     for p_idx, proc in enumerate(my_procs):
-                        # 為了解決重複 Key 問題，將製令 ID、工序名、以及在循環中的索引結合
-                        unique_suffix = f"{o_id}_{proc}_{p_idx}"
+                        # --- 核心修正：使用絕對唯一的 Key 組合 ---
+                        # 包含：製令ID + 工序名稱 + 該工序在清單中的位置索引
+                        unique_id = f"{o_id}_{proc}_{p_idx}"
                         
                         m_w = o_df[o_df["製造工序"] == proc]
                         m_f = df_finish[(df_finish["製令"] == str(o_id)) & (df_finish["製造工序"] == proc)] if not df_finish.empty else pd.DataFrame()
@@ -148,16 +150,15 @@ else:
                             st.markdown(f'<div class="proc-row"><div class="proc-name">{proc}</div><div class="staff-area">{html}</div></div>', unsafe_allow_html=True)
                         
                         with r_ui[1]:
-                            # 修正點：使用 unique_suffix 確保 key 唯一
-                            if st.button("✏️", key=f"btn_ed_{unique_suffix}"):
+                            # 加上 prefix 確保與其他功能按鈕不衝突
+                            if st.button("✏️", key=f"edit_btn_{unique_id}"):
                                 st.session_state.edit_target = {"order": str(o_id), "proc": proc}
                                 st.session_state.menu_selection = "📝 任務派發"
                                 st.rerun()
                                 
                         with r_ui[2]:
                             if not m_w.empty:
-                                # 修正點：使用 unique_suffix 確保 key 唯一
-                                if st.button("確認完工", key=f"btn_ok_{unique_suffix}"):
+                                if st.button("確認完工", key=f"finish_btn_{unique_id}"):
                                     dat = m_w.iloc[0].to_dict()
                                     dat["完工時間"] = get_now_str()
                                     dat["完工人員"] = st.session_state.user
