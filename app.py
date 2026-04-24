@@ -97,24 +97,44 @@ else:
     # --- 📊 製造部派工專區 ---
     if menu == "📊 製造部派工專區":
         st.markdown('<h2 style="text-align:center; color:#1e40af; font-weight:900;">📋 製造部派工進度</h2>', unsafe_allow_html=True)
+        
+        # --- 新增篩選功能區 ---
+        filter_c1, filter_c2 = st.columns(2)
+        sel_order = filter_c1.selectbox("📦 篩選製令", ["全部"] + order_list)
+        sel_staff = filter_c2.selectbox("👤 篩選人員", ["全部"] + sorted(all_staff))
+        st.divider()
+
         current_user = st.session_state.user
         my_procs = process_map.get(current_user, process_list) 
 
         try:
-            # 同時抓取「未完工」與「已完工」資料來比對狀態
             db_res = requests.get(f"{DB_URL}.json", timeout=10).json() or {}
             fn_res = requests.get(f"{FINISH_URL}.json", timeout=10).json() or {}
             
             all_df = pd.DataFrame([dict(v, id=k) for k, v in db_res.items()]) if db_res else pd.DataFrame()
             done_df = pd.DataFrame([v for v in fn_res.values()]) if fn_res else pd.DataFrame()
 
+            # 決定要顯示的製令清單 (若有篩選則只顯示該製令)
+            display_orders = [sel_order] if sel_order != "全部" else order_list
+            
             display_cols = st.columns(2)
-            for idx, o_id in enumerate(order_list):
-                with display_cols[idx % 2]:
-                    o_match = all_df[all_df["製令"] == str(o_id)] if not all_df.empty else pd.DataFrame()
-                    o_done = done_df[done_df["製令"] == str(o_id)] if not done_df.empty else pd.DataFrame()
-                    
-                    # 抓取通電日期 (優先從進行中抓，沒有則顯示未設定)
+            card_idx = 0
+            
+            for o_id in display_orders:
+                o_match = all_df[all_df["製令"] == str(o_id)] if not all_df.empty else pd.DataFrame()
+                o_done = done_df[done_df["製令"] == str(o_id)] if not done_df.empty else pd.DataFrame()
+
+                # 如果有篩選人員，檢查此製令是否有該人員參與
+                if sel_staff != "全部":
+                    has_staff = False
+                    if not o_match.empty:
+                        staff_cols = [f"人員{i}" for i in range(1, 6)]
+                        if o_match[staff_cols].apply(lambda x: sel_staff in x.values, axis=1).any():
+                            has_staff = True
+                    if not has_staff: # 如果進行中沒找到，不顯示此卡片
+                        continue
+
+                with display_cols[card_idx % 2]:
                     p_date = str(o_match.iloc[0].get("通電日期", "未設定")) if not o_match.empty else "未設定"
                     
                     st.markdown(f"""
@@ -129,6 +149,12 @@ else:
                         proc_match = o_match[o_match["製造工序"] == proc] if not o_match.empty else pd.DataFrame()
                         is_done = not o_done[o_done["製造工序"] == proc].empty if not o_done.empty else False
                         
+                        # 如果篩選人員，且該工序不是由該人員負責，則跳過顯示此行
+                        if sel_staff != "全部" and not proc_match.empty:
+                            row_staffs = proc_match.iloc[0][[f"人員{i}" for i in range(1, 6)]].values
+                            if sel_staff not in row_staffs:
+                                continue
+
                         row_c1, row_c2, row_c3 = st.columns([0.7, 0.15, 0.15])
                         with row_c1:
                             if not proc_match.empty:
@@ -165,6 +191,7 @@ else:
                                     requests.delete(f"{DB_URL}/{row['id']}.json")
                                     st.rerun()
                     st.markdown('</div>', unsafe_allow_html=True)
+                    card_idx += 1
         except Exception as e: st.error(f"連線錯誤: {e}")
 
     # --- 📜 完工紀錄查詢 ---
@@ -174,15 +201,11 @@ else:
             r = requests.get(f"{FINISH_URL}.json", timeout=10).json()
             if r:
                 f_df = pd.DataFrame([dict(v, id=k) for k, v in r.items() if v]).fillna("NA")
-                
-                # 刪除指定欄位
                 drop_cols = ["提交時間", "最後修改時間", "最後修改"]
                 f_df = f_df.drop(columns=[c for c in drop_cols if c in f_df.columns])
-                
-                # 重新排序 (製令在最前)
                 if "製令" in f_df.columns:
                     cols = ["製令"] + [c for c in f_df.columns if c not in ["製令", "id"]]
-                    f_df = f_df[cols + ["id"]] # 把 id 藏在最後用來刪除
+                    f_df = f_df[cols + ["id"]]
                 
                 q1, q2 = st.columns(2)
                 sk = q1.text_input("🔍 搜尋製令")
@@ -191,13 +214,11 @@ else:
                 if sk: f_df = f_df[f_df["製令"].astype(str).str.contains(sk)]
                 if sp != "全部": f_df = f_df[f_df[["人員1", "人員2", "人員3", "人員4", "人員5"]].apply(lambda x: sp in x.values, axis=1)]
                 
-                # 顯示表格 (不顯示最後一欄 id)
                 st.dataframe(f_df.drop(columns=["id"]).sort_values("完工時間", ascending=False), use_container_width=True)
                 
-                # 刪除功能區
                 with st.expander("🗑️ 刪除紀錄管理"):
                     st.warning("注意：刪除後無法復原。")
-                    del_id = st.selectbox("選擇要刪除的製令工序 ID", f_df["id"].tolist(), format_func=lambda x: f"{f_df[f_df['id']==x]['製令'].values[0]} - {f_df[f_df['id']==x]['製造工序'].values[0]}")
+                    del_id = st.selectbox("選擇要刪除的紀錄 ID", f_df["id"].tolist(), format_func=lambda x: f"{f_df[f_df['id']==x]['製令'].values[0]} - {f_df[f_df['id']==x]['製造工序'].values[0]}")
                     if st.button("確認刪除該筆完工紀錄", type="primary"):
                         requests.delete(f"{FINISH_URL}/{del_id}.json")
                         st.success("已刪除"); time.sleep(0.5); st.rerun()
