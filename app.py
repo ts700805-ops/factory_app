@@ -201,66 +201,73 @@ else:
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
         st.title("📜 歷史完工紀錄")
         try:
+            # 直接從 Firebase 獲取資料
             r = requests.get(f"{FINISH_URL}.json").json()
             if r:
-                # 1. 建立 DataFrame 並清理
+                # 1. 建立 DataFrame 並清理欄位
                 f_df = pd.DataFrame([dict(v, db_id=k) for k, v in r.items() if v]).fillna("NA")
+                
+                # 排序：按完工時間倒序 (最新的在上面)
                 f_df = f_df.sort_values("完工時間", ascending=False)
 
-                # --- 核心新增：關鍵字篩選功能 ---
-                keyword = st.text_input("🔍 關鍵字搜尋 (輸入製令、工序或人員姓名)", "").strip()
+                # --- 核心優化：即時搜尋框 ---
+                # 只要內容改變，Streamlit 就會自動重新執行下方邏輯，達成「即時尋找」效果
+                keyword = st.text_input("🔍 搜尋 (輸入製令、工序、人員即時過濾)", key="instant_search").strip()
 
+                # 2. 進行篩選邏輯
                 if keyword:
-                    # 搜尋所有欄位，只要包含關鍵字就顯示
+                    # 搜尋所有欄位字串，只要包含關鍵字就納入
                     mask = f_df.astype(str).apply(lambda x: x.str.contains(keyword, case=False)).any(axis=1)
                     display_df = f_df[mask]
                 else:
                     display_df = f_df
 
-                # 2. 依照「製令」分組顯示
+                # 3. 依照「製令」分組顯示
                 unique_orders = display_df["製令"].unique()
 
                 if len(unique_orders) == 0:
-                    st.warning(f"找不到包含 '{keyword}' 的相關紀錄")
+                    st.warning(f"查無包含 '{keyword}' 的紀錄")
                 else:
+                    # 顯示搜尋結果統計
+                    if keyword:
+                        st.info(f"💡 關鍵字 '{keyword}': 找到 {len(display_df)} 筆工序，分布於 {len(unique_orders)} 個製令中")
+
                     for o_id in unique_orders:
-                        # 篩選出該製令的所有紀錄
                         order_records = display_df[display_df["製令"] == o_id]
                         
-                        # 建立分組視窗 (Expander)
-                        with st.expander(f"📦 製令：{o_id} (搜尋到 {len(order_records)} 筆相關工序)", expanded=True if keyword else False):
-                            # 3. 自定義表頭
+                        # 搜尋時自動展開 Expander (expanded=True)
+                        with st.expander(f"📦 製令：{o_id} (已完工 {len(order_records)} 項工序)", expanded=bool(keyword)):
+                            # 自定義表頭
                             h_cols = st.columns([1.5, 1.2, 1, 1, 1, 1, 1, 1.2, 1.8, 0.8])
                             header_names = ["工序", "通電日", "人1", "人2", "人3", "人4", "人5", "完工人員", "完工時間", "管理"]
                             for i, name in enumerate(header_names):
                                 h_cols[i].markdown(f"**{name}**")
                             st.markdown("---")
 
-                            # 4. 顯示每一筆紀錄
+                            # 顯示該製令下的明細
                             for _, row in order_records.iterrows():
                                 r_cols = st.columns([1.5, 1.2, 1, 1, 1, 1, 1, 1.2, 1.8, 0.8])
                                 
                                 r_cols[0].write(row.get("製造工序", "NA"))
                                 r_cols[1].write(row.get("通電日期", "NA"))
-                                r_cols[3].write(row.get("人員1", ""))
-                                r_cols[4].write(row.get("人員2", ""))
-                                r_cols[5].write(row.get("人員3", ""))
-                                r_cols[6].write(row.get("人員4", ""))
-                                r_cols[7].write(row.get("人員5", ""))
-                                r_cols[2].write(row.get("完工人員", "NA"))
+                                r_cols[2].write(row.get("人員1", ""))
+                                r_cols[3].write(row.get("人員2", ""))
+                                r_cols[4].write(row.get("人員3", ""))
+                                r_cols[5].write(row.get("人員4", ""))
+                                r_cols[6].write(row.get("人員5", ""))
+                                r_cols[7].write(row.get("完工人員", "NA"))
                                 r_cols[8].write(row.get("完工時間", "NA"))
                                 
-                                # 5. 獨立刪除按鈕
+                                # 獨立刪除按鈕
                                 if r_cols[9].button("🗑️", key=f"del_fin_{row['db_id']}"):
-                                    res = requests.delete(f"{FINISH_URL}/{row['db_id']}.json")
-                                    if res.status_code == 200:
-                                        st.toast(f"✅ 已刪除 {o_id} 的紀錄")
+                                    if requests.delete(f"{FINISH_URL}/{row['db_id']}.json").status_code == 200:
+                                        st.toast(f"已刪除 {o_id} 的一項紀錄")
                                         time.sleep(0.5)
                                         st.rerun()
             else:
                 st.info("目前無完工紀錄")
         except Exception as e:
-            st.error(f"讀取失敗: {e}")
+            st.error(f"連線資料庫錯誤: {e}")
 
     # --- 📝 任務派發 ---
     elif st.session_state.menu_selection == "📝 任務派發":
