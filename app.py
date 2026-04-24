@@ -7,14 +7,12 @@ import math
 import time
 
 # --- 1. 核心資料與設定 (Firebase URL) ---
-# 提醒：請確保您的 Firebase Rules 設定為 { "rules": { ".read": true, ".write": true } } 以符合免授權需求
 DB_BASE_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
 DB_URL = f"{DB_BASE_URL}/work_logs"
 FINISH_URL = f"{DB_BASE_URL}/completed_logs"
 SETTING_URL = f"{DB_BASE_URL}/settings"
 
 def get_now_str():
-    # 設定台灣時區 (UTC+8)
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
     return now.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -32,7 +30,6 @@ def get_settings():
         if r.status_code == 200:
             data = r.json()
             if data and isinstance(data, dict):
-                # 確保基本欄位都存在，若缺漏則補上預設值
                 for key in ["all_leaders", "all_staff", "processes", "order_list"]:
                     if key not in data or not data[key]:
                         data[key] = default_settings[key]
@@ -46,21 +43,27 @@ def get_settings():
 # --- 2. 介面設定 ---
 st.set_page_config(page_title="超慧科技管理系統", layout="wide")
 
-# CSS 樣式維持不變
+# CSS 針對手機觀看進行強化，鎖定介面大小
 st.markdown("""
     <style>
     .stApp { background-color: #f8fafc; }
-    .order-card { background: white; border-radius: 8px; border: 2px solid #1e40af; margin-bottom: 25px; overflow: hidden; }
-    .order-title { background: #1e40af; color: white; padding: 10px 15px; font-weight: 900; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1e40af; }
-    .power-date { background: #fbbf24; color: #1e40af; padding: 2px 10px; border-radius: 4px; font-size: 13px; font-weight: bold; }
-    .table-row-container { border-bottom: 1px solid #dee2e6; display: flex; align-items: stretch; }
-    .cell-proc { width: 100px; min-width: 100px; background: #f1f5f9; color: #1e40af; font-weight: 800; padding: 10px; display: flex; align-items: center; border-right: 1px solid #dee2e6; font-size: 14px; }
-    .cell-staff { flex-grow: 1; padding: 10px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; background: white; }
-    .badge-leader { background: #f59e0b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+    /* 卡片大小鎖定，適合手機垂直觀看 */
+    .order-card { 
+        background: white; 
+        border-radius: 8px; 
+        border: 2px solid #1e40af; 
+        margin-bottom: 20px; 
+        width: 100%;
+        overflow: hidden;
+    }
+    .order-title { background: #1e40af; color: white; padding: 10px 15px; font-weight: 900; display: flex; justify-content: space-between; align-items: center; }
+    .power-date { background: #fbbf24; color: #1e40af; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+    .table-row-container { border-bottom: 1px solid #dee2e6; display: flex; align-items: center; padding: 5px 0; }
+    .cell-proc { width: 90px; min-width: 90px; color: #1e40af; font-weight: 800; padding: 10px; font-size: 14px; }
+    .cell-staff { flex-grow: 1; display: flex; flex-wrap: wrap; gap: 4px; padding: 5px; }
     .badge-main { background: #1e40af; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
     .badge-sub { background: #e2e8f0; color: #475569; padding: 2px 5px; border-radius: 4px; font-size: 10px; border: 1px solid #cbd5e1; }
-    .search-panel { background: white; padding: 15px; border-radius: 10px; border: 1px solid #cbd5e1; margin-bottom: 20px; }
-    .history-header { background: #f1f5f9; font-weight: bold; border-bottom: 2px solid #cbd5e1; padding: 10px 5px; text-align: left; }
+    .no-data { color: #94a3b8; font-size: 12px; font-style: italic; padding-left: 5px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -88,64 +91,77 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- 📊 製造部派工專區 ---
+    # --- 📊 製造部派工專區 (修改後的主頁) ---
     if menu == "📊 製造部派工專區":
-        st.markdown('<h1 style="text-align:center; color:#1e40af; font-weight:900;">📋 超慧科技製造部派工進度</h1>', unsafe_allow_html=True)
-        with st.container():
-            st.markdown('<div class="search-panel">', unsafe_allow_html=True)
-            c1, c2 = st.columns(2)
-            s_order = c1.selectbox("🔍 篩選製令", ["全部"] + sorted(order_list))
-            s_staff = c2.selectbox("👤 篩選人員/組長", ["全部"] + sorted(list(set(all_leaders + all_staff))))
-            st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('<h2 style="text-align:center; color:#1e40af; font-weight:900;">📋 超慧科技製造部派工進度</h2>', unsafe_allow_html=True)
+        
+        # 決定當前登入者要顯示哪些工序
+        current_user = st.session_state.user
+        my_procs = process_map.get(current_user, process_list) # 若沒綁定則顯示全部
+        if not my_procs: my_procs = process_list
 
         try:
+            # 讀取 Firebase 資料
             r = requests.get(f"{DB_URL}.json", timeout=10)
             db_data = r.json()
-            if db_data and isinstance(db_data, dict):
-                all_logs = [dict(v, id=k) for k, v in db_data.items() if v and isinstance(v, dict)]
-                df = pd.DataFrame(all_logs).fillna("NA")
-                unique_orders = df["製令"].unique()
-                filtered_orders = [o for o in unique_orders if (s_order == "全部" or str(o) == str(s_order))]
-                
-                cols = st.columns(3)
-                display_count = 0
-                for o_id in filtered_orders:
-                    o_df = df[df["製令"] == o_id]
-                    if s_staff != "全部":
-                        check_cols = ["組長", "人員1", "人員2", "人員3", "人員4", "人員5"]
-                        if not o_df[[c for c in check_cols if c in o_df.columns]].apply(lambda x: s_staff in x.values, axis=1).any(): continue
+            all_df = pd.DataFrame([dict(v, id=k) for k, v in db_data.items()]) if db_data else pd.DataFrame()
 
-                    p_date = str(o_df.iloc[0].get("通電日期", "未設定"))
-                    with cols[display_count % 3]:
-                        st.markdown(f'<div class="order-card"><div class="order-title"><span>📦 製令：{o_id}</span><span class="power-date">⚡ 通電：{p_date}</span></div>', unsafe_allow_html=True)
-                        for proc in process_list:
-                            match = o_df[o_df["製造工序"] == proc]
-                            if not match.empty:
-                                row = match.iloc[0]
-                                row_cols = st.columns([0.85, 0.15]) 
-                                staff_html = f'<div class="badge-leader">L: {row.get("組長","")}</div>'
+            # 設定介面：一行顯示兩個
+            display_cols = st.columns(2)
+            
+            # 以後台設定的「製令清單」為準，不論有沒有派工都要顯示
+            for idx, o_id in enumerate(order_list):
+                with display_cols[idx % 2]:
+                    # 取得該製令的通電日期
+                    o_match = all_df[all_df["製令"] == str(o_id)] if not all_df.empty else pd.DataFrame()
+                    p_date = str(o_match.iloc[0].get("通電日期", "未設定")) if not o_match.empty else "未設定"
+                    
+                    st.markdown(f"""
+                        <div class="order-card">
+                            <div class="order-title">
+                                <span>📦 製令：{o_id}</span>
+                                <span class="power-date">⚡ 通電：{p_date}</span>
+                            </div>
+                    """, unsafe_allow_html=True)
+
+                    # 顯示該組長對應的工序內容
+                    for proc in my_procs:
+                        # 檢查資料庫是否已有此工序的派工紀錄
+                        proc_match = o_match[o_match["製造工序"] == proc] if not o_match.empty else pd.DataFrame()
+                        
+                        r_c1, r_c2 = st.columns([0.8, 0.2])
+                        
+                        with r_c1:
+                            if not proc_match.empty:
+                                row = proc_match.iloc[0]
+                                staff_html = ""
                                 for i in range(1, 6):
                                     p_val = row.get(f"人員{i}")
-                                    if p_val not in ["NA", ""]:
+                                    if p_val and p_val != "NA":
                                         badge_class = "badge-main" if i == 1 else "badge-sub"
                                         staff_html += f'<div class="{badge_class}">{p_val}</div>'
-                                
-                                with row_cols[0]: 
-                                    st.markdown(f'<div class="table-row-container"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
-                                with row_cols[1]:
-                                    if st.button("✅", key=f"fin_{row['id']}"):
-                                        clean_data = {k: (v if not (isinstance(v, float) and math.isnan(v)) else "NA") for k, v in row.to_dict().items()}
-                                        clean_data["完工時間"] = get_now_str()
-                                        clean_data["完工人員"] = st.session_state.user
-                                        if requests.post(f"{FINISH_URL}.json", data=json.dumps(clean_data)).status_code == 200:
-                                            requests.delete(f"{DB_URL}/{row['id']}.json")
-                                            st.rerun()
-                        st.markdown('</div>', unsafe_allow_html=True)
-                    display_count += 1
-            else: st.info("💡 目前資料庫為空，尚無派工紀錄")
-        except: st.warning("💡 系統提示：目前無可顯示之派工資料。")
+                                st.markdown(f'<div class="table-row-container"><div class="cell-proc">{proc}</div><div class="cell-staff">{staff_html}</div></div>', unsafe_allow_html=True)
+                            else:
+                                # 沒有派工資料時，也要顯示該工序但標註「尚未派工」
+                                st.markdown(f'<div class="table-row-container"><div class="cell-proc">{proc}</div><div class="no-data">尚未派工</div></div>', unsafe_allow_html=True)
+                        
+                        with r_c2:
+                            # 只有有派工資料的工序才能按完工
+                            if not proc_match.empty:
+                                if st.button("✅", key=f"fin_{o_id}_{proc}"):
+                                    row = proc_match.iloc[0]
+                                    clean_data = row.to_dict()
+                                    clean_data["完工時間"] = get_now_str()
+                                    clean_data["完工人員"] = current_user
+                                    if requests.post(f"{FINISH_URL}.json", data=json.dumps(clean_data)).status_code == 200:
+                                        requests.delete(f"{DB_URL}/{row['id']}.json")
+                                        st.rerun()
+                    
+                    st.markdown('</div>', unsafe_allow_html=True)
+        except:
+            st.warning("⚠️ 無法讀取派工資料。")
 
-    # --- 📜 完工紀錄查詢 ---
+    # --- 📜 完工紀錄查詢 (以下維持原樣) ---
     elif menu == "📜 完工紀錄查詢":
         st.markdown('<h2 style="color:#1e40af;">📜 歷史完工紀錄查詢</h2>', unsafe_allow_html=True)
         try:
@@ -242,10 +258,9 @@ else:
                 st.rerun()
             except Exception as e: st.error(f"發布失敗：{str(e)}")
 
-    # --- ⚙️ 設定管理 ---
+    # --- ⚙️ 設定管理 (維持原樣) ---
     elif menu == "⚙️ 設定管理":
         st.markdown('<h2 style="color:#1e40af;">⚙️ 系統資料後台管理</h2>', unsafe_allow_html=True)
-        
         with st.expander("📌 基本名單設定", expanded=False):
             with st.form("admin_settings"):
                 e_o = st.text_area("製令編號 (逗號隔開)", value=",".join(order_list))
