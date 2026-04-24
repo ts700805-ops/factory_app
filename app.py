@@ -81,7 +81,7 @@ if "menu_selection" not in st.session_state:
 if "edit_target" not in st.session_state:
     st.session_state.edit_target = None
 
-# --- 4. 登入介面 (僅限組長) ---
+# --- 4. 登入介面 ---
 if "user" not in st.session_state:
     st.markdown('<h1 style="text-align:center; color:#1e3a8a;">⚓ 超慧科技管理系統</h1>', unsafe_allow_html=True)
     with st.columns([1,2,1])[1]:
@@ -106,7 +106,6 @@ else:
     if st.session_state.menu_selection == "📊 製造部派工專區":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📋 製造部派工進度</h1>', unsafe_allow_html=True)
         
-        # 根據登入組長過濾工序 (首頁不顯示其他組長的工序)
         my_procs = process_map.get(st.session_state.user, process_list)
 
         c1, c2 = st.columns(2)
@@ -129,7 +128,10 @@ else:
                 with cols[idx % 2]:
                     st.markdown(f'<div class="order-card"><div class="order-header"><div>📦 製令：{o_id}</div><div class="power-date-tag">⚡ 通電：{p_date}</div></div>', unsafe_allow_html=True)
                     
-                    for proc in my_procs:
+                    for p_idx, proc in enumerate(my_procs):
+                        # 為了解決重複 Key 問題，將製令 ID、工序名、以及在循環中的索引結合
+                        unique_suffix = f"{o_id}_{proc}_{p_idx}"
+                        
                         m_w = o_df[o_df["製造工序"] == proc]
                         m_f = df_finish[(df_finish["製令"] == str(o_id)) & (df_finish["製造工序"] == proc)] if not df_finish.empty else pd.DataFrame()
 
@@ -146,15 +148,16 @@ else:
                             st.markdown(f'<div class="proc-row"><div class="proc-name">{proc}</div><div class="staff-area">{html}</div></div>', unsafe_allow_html=True)
                         
                         with r_ui[1]:
-                            # 編輯功能找回
-                            if st.button("✏️", key=f"ed_{o_id}_{proc}"):
+                            # 修正點：使用 unique_suffix 確保 key 唯一
+                            if st.button("✏️", key=f"btn_ed_{unique_suffix}"):
                                 st.session_state.edit_target = {"order": str(o_id), "proc": proc}
                                 st.session_state.menu_selection = "📝 任務派發"
                                 st.rerun()
                                 
                         with r_ui[2]:
                             if not m_w.empty:
-                                if st.button("確認完工", key=f"ok_{o_id}_{proc}"):
+                                # 修正點：使用 unique_suffix 確保 key 唯一
+                                if st.button("確認完工", key=f"btn_ok_{unique_suffix}"):
                                     dat = m_w.iloc[0].to_dict()
                                     dat["完工時間"] = get_now_str()
                                     dat["完工人員"] = st.session_state.user
@@ -180,7 +183,6 @@ else:
     elif st.session_state.menu_selection == "📝 任務派發":
         st.title("📝 任務指派與編輯")
         
-        # 處理首頁跳轉過來的編輯目標
         target_o = order_list[0] if order_list else ""
         target_p = process_list[0] if process_list else ""
         
@@ -201,7 +203,7 @@ else:
             wk = []
             cols = st.columns(5)
             for i in range(5):
-                wk.append(cols[i].selectbox(f"人員 {i+1}", ["NA"] + all_staff, key=f"s_{i}"))
+                wk.append(cols[i].selectbox(f"人員 {i+1}", ["NA"] + all_staff, key=f"form_staff_{i}"))
             
             if st.form_submit_button("🚀 確認發布任務", use_container_width=True):
                 payload = {
