@@ -98,17 +98,13 @@ else:
     if menu == "📊 製造部派工專區":
         st.markdown('<h2 style="text-align:center; color:#1e40af; font-weight:900;">📋 製造部派工進度</h2>', unsafe_allow_html=True)
         
-        current_user = st.session_state.user
-        # 取得該組長對應的成員清單
-        my_staff_list = leader_map.get(current_user, all_staff) 
-
-        # --- 篩選功能區 ---
+        # --- 新增篩選功能區 ---
         filter_c1, filter_c2 = st.columns(2)
         sel_order = filter_c1.selectbox("📦 篩選製令", ["全部"] + order_list)
-        # 篩選人員只顯示該組長的成員
-        sel_staff = filter_c2.selectbox("👤 篩選人員", ["全部"] + sorted(my_staff_list))
+        sel_staff = filter_c2.selectbox("👤 篩選人員", ["全部"] + sorted(all_staff))
         st.divider()
 
+        current_user = st.session_state.user
         my_procs = process_map.get(current_user, process_list) 
 
         try:
@@ -118,6 +114,7 @@ else:
             all_df = pd.DataFrame([dict(v, id=k) for k, v in db_res.items()]) if db_res else pd.DataFrame()
             done_df = pd.DataFrame([v for v in fn_res.values()]) if fn_res else pd.DataFrame()
 
+            # 決定要顯示的製令清單 (若有篩選則只顯示該製令)
             display_orders = [sel_order] if sel_order != "全部" else order_list
             
             display_cols = st.columns(2)
@@ -134,7 +131,7 @@ else:
                         staff_cols = [f"人員{i}" for i in range(1, 6)]
                         if o_match[staff_cols].apply(lambda x: sel_staff in x.values, axis=1).any():
                             has_staff = True
-                    if not has_staff:
+                    if not has_staff: # 如果進行中沒找到，不顯示此卡片
                         continue
 
                 with display_cols[card_idx % 2]:
@@ -152,6 +149,7 @@ else:
                         proc_match = o_match[o_match["製造工序"] == proc] if not o_match.empty else pd.DataFrame()
                         is_done = not o_done[o_done["製造工序"] == proc].empty if not o_done.empty else False
                         
+                        # 如果篩選人員，且該工序不是由該人員負責，則跳過顯示此行
                         if sel_staff != "全部" and not proc_match.empty:
                             row_staffs = proc_match.iloc[0][[f"人員{i}" for i in range(1, 6)]].values
                             if sel_staff not in row_staffs:
@@ -176,7 +174,7 @@ else:
                                     try: curr_d = pd.to_datetime(row.get("通電日期", "today")).date()
                                     except: curr_d = datetime.date.today()
                                     new_d = st.date_input("日期", value=curr_d, key=f"d_{row['id']}")
-                                    staff_opts = ["NA"] + my_staff_list
+                                    staff_opts = ["NA"] + leader_map.get(row.get("組長", current_user), all_staff)
                                     new_staff = [st.selectbox(f"人員{i}", staff_opts, index=staff_opts.index(row.get(f"人員{i}", "NA")) if row.get(f"人員{i}") in staff_opts else 0, key=f"s{i}_{row['id']}") for i in range(1, 6)]
                                     if st.button("儲存", key=f"sv_{row['id']}", use_container_width=True):
                                         edit_p = row.to_dict()
