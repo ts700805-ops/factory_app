@@ -106,94 +106,119 @@ else:
     if st.session_state.menu_selection == "📊 製造部派工專區":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📋 製造部派工進度</h1>', unsafe_allow_html=True)
 
-        # 1. 核心修正：從設定字串中精準解析出組員名單
+        # 【核心修正 1】在頁面啟動時先讀取人員對照表，防止變數找不到
         try:
-            settings_res = requests.get(f"{SETTINGS_URL}.json").json() or {}
-            # 取得您在 image_885b93.png 看到的設定字串
-            raw_binding_str = settings_res.get("leader_staff_binding", "") 
-            
-            parsed_staff_map = {}
-            if raw_binding_str:
-                # 處理每一行設定 (例如 陳德文:徐梓翔,牟育玄...)
-                for line in raw_binding_str.split('\n'):
-                    if ":" in line:
-                        leader, members = line.split(":", 1)
-                        # 將成員字串轉為清單，並去除空白
-                        member_list = [m.strip() for m in members.split(",") if m.strip()]
-                        parsed_staff_map[leader.strip()] = member_list
+            # 讀取 Firebase 上的設定資料
+            s_data = requests.get(f"{SETTINGS_URL}.json").json() or {}
+            local_staff_map = s_data.get("staff_map", {})
         except:
-            parsed_staff_map = {}
+            local_staff_map = {}
 
-        # 2. 定義編輯對話框 (強制對比解析後的名單)
+        # --- 對話框 1：編輯人員 ---
         @st.dialog("👥 編輯施工人員", width="medium")
         def edit_staff_dialog(order_id, proc_name, current_data):
             st.subheader(f"🛠️ {proc_name}")
+            current_leader = st.session_state.user
             
-            # 取得目前登入組長 (如：陳德文)
-            login_user = st.session_state.user 
-            
-            # 【關鍵】：根據解析後的字典抓取名單
-            # 如果解析成功，my_team 就只會有您設定的那幾位組員
-            my_team = parsed_staff_map.get(login_user, [])
-            
-            # 製作選單：NA + 該組長的組員
-            # 若解析結果為空，才顯示全部(all_staff)作為備案
-            options = ["NA"] + sorted(list(set(my_team if my_team else all_staff)))
+            # 取得該組長綁定的成員，若無則顯示全部
+            my_bound_staff = local_staff_map.get(current_leader, all_staff)
+            options = ["NA"] + sorted(list(set(my_bound_staff)))
 
             with st.form("staff_edit_form"):
-                st.write(f"📦 製令：{order_id} | 👤 負責組長：**{login_user}**")
+                st.write(f"📦 製令：{order_id}")
+                st.write(f"👤 負責組長：{current_leader}")
                 
-                updated_workers = []
+                new_wk = []
+                # 建立 5 個選擇框，並自動帶入目前的數值
                 for i in range(5):
-                    # 抓取現有的值
-                    old_v = current_data.get(f"人員{i+1}", "NA")
-                    # 確保預設索引正確
-                    d_idx = options.index(old_v) if old_v in options else 0
-                    
-                    # 這裡是您要求的下拉式選單
-                    sel = st.selectbox(f"人員 {i+1}", options, index=d_idx, key=f"dlg_p_{i}")
-                    updated_workers.append(sel)
+                    p_val = current_data.get(f"人員{i+1}", "NA")
+                    d_idx = options.index(p_val) if p_val in options else 0
+                    sel = st.selectbox(f"人員 {i+1}", options, index=d_idx, key=f"dlg_staff_{i}")
+                    new_wk.append(sel)
                 
+                # 【核心修正 2】加上表單提交按鈕
                 if st.form_submit_button("💾 儲存人員修改", use_container_width=True):
-                    upd_payload = current_data.copy()
-                    upd_payload.update({
+                    # 更新 payload
+                    new_payload = current_data.copy()
+                    new_payload.update({
                         "最後更新": get_now_str(),
-                        "人員1": updated_workers[0], "人員2": updated_workers[1], 
-                        "人員3": updated_workers[2], "人員4": updated_workers[3], "人員5": updated_workers[4]
+                        "人員1": new_wk[0], "人員2": new_wk[1], "人員3": new_wk[2], "人員4": new_wk[3], "人員5": new_wk[4]
                     })
                     
-                    db_id = upd_payload.pop("db_id", None)
+                    db_id = new_payload.pop("db_id", None)
                     if db_id and db_id != "NA":
-                        requests.put(f"{DB_URL}/{db_id}.json", data=json.dumps(upd_payload))
-                        st.success(f"✅ {login_user} 組員更新成功")
+                        requests.put(f"{DB_URL}/{db_id}.json", data=json.dumps(new_payload))
+                        st.success("✅ 人員更新成功！")
                         time.sleep(0.5)
                         st.rerun()
+                    else:
+                        st.error("系統錯誤：找不到紀錄 ID")
 
-        # 3. 顯示主頁面卡片
+        # --- 對話框 2：修改通電日期 ---
+        @st.dialog("📅 修改預計通電日期", width="small")
+        def edit_power_date_dialog(order_id, current_date_str, related_records):
+            st.subheader(f"📦 製令：{order_id}")
+            try:
+                default_date = datetime.datetime.strptime(current_date_str, "%Y-%m-%d") if current_date_str != "未設定" else datetime.date.today()
+            except:
+                default_date = datetime.date.today()
+            
+            new_date = st.date_input("請選擇新的通電日期", value=default_date)
+            
+            if st.button("💾 確認修改日期", use_container_width=True):
+                for db_id, data in related_records.items():
+                    data["通電日期"] = str(new_date)
+                    data["最後更新"] = get_now_str()
+                    requests.put(f"{DB_URL}/{db_id}.json", data=json.dumps(data))
+                st.success("✅ 通電日期已同步更新")
+                time.sleep(0.5)
+                st.rerun()
+
+        # --- 頁面篩選與顯示 ---
+        my_procs = process_map.get(st.session_state.user, process_list)
+        c1, c2 = st.columns(2)
+        s_order = c1.selectbox("🔍 篩選製令", ["全部"] + sorted(list(set(order_list))))
+        s_staff = c2.selectbox("👤 篩選人員", ["全部"] + sorted(all_staff))
+
         try:
             r_work = requests.get(f"{DB_URL}.json").json() or {}
             df_work = pd.DataFrame([dict(v, db_id=k) for k, v in r_work.items()]).fillna("NA") if r_work else pd.DataFrame()
-            
-            my_procs = process_map.get(st.session_state.user, process_list)
+            display_orders = sorted([o for o in set(order_list) if (s_order == "全部" or str(o) == str(s_order))])
             
             cols = st.columns(2)
-            for idx, o_id in enumerate(sorted(list(set(order_list)))):
+            for idx, o_id in enumerate(display_orders):
                 o_df = df_work[df_work["製令"] == str(o_id)]
+                # 抓取該製令的第一筆日期作為顯示
                 p_date = str(o_df.iloc[0].get("通電日期", "未設定")) if not o_df.empty else "未設定"
                 
                 with cols[idx % 2]:
                     # 卡片標題
-                    st.markdown(f'<div class="order-card"><div class="order-header">📦 製令：{o_id}</div>', unsafe_allow_html=True)
+                    st.markdown(f'''
+                        <div class="order-card">
+                        <div class="order-header">
+                            <div>📦 製令：{o_id}</div>
+                            <span class="power-date-tag">⚡ 通電：{p_date}</span>
+                        </div>
+                    ''', unsafe_allow_html=True)
                     
+                    # 頂部編輯日期按鈕
+                    btn_date_col = st.columns([0.85, 0.15])
+                    with btn_date_col[1]:
+                        if st.button("📅", key=f"date_edit_{o_id}", help="修改通電日期"):
+                            related = {k: v for k, v in r_work.items() if v.get("製令") == str(o_id)}
+                            edit_power_date_dialog(o_id, p_date, related)
+
+                    # 逐一顯示工序
                     for p_idx, proc in enumerate(my_procs):
+                        u_key = f"v11_{str(o_id).replace('-','_')}_{p_idx}"
                         m_w = o_df[o_df["製造工序"] == proc]
                         r_ui = st.columns([0.65, 0.1, 0.25])
                         
                         with r_ui[0]:
                             html = ""
-                            curr_row = {}
+                            curr_data_dict = {} 
                             if not m_w.empty:
-                                row = m_w.iloc[0]; curr_row = row.to_dict()
+                                row = m_w.iloc[0]; curr_data_dict = row.to_dict()
                                 for i in range(1, 6):
                                     p = row.get(f"人員{i}")
                                     if p and p != "NA": html += f'<div class="badge-staff">{p}</div>'
@@ -202,17 +227,31 @@ else:
                             st.markdown(f'<div class="proc-row"><div class="proc-name">{proc}</div><div class="staff-area">{html}</div></div>', unsafe_allow_html=True)
                         
                         with r_ui[1]:
-                            if st.button("✏️", key=f"edit_{o_id}_{p_idx}"):
+                            # 【核心修正 3】編輯按鈕邏輯
+                            if st.button("✏️", key=f"eb_staff_{u_key}"):
                                 if m_w.empty:
-                                    init = {"製令": str(o_id), "製造工序": proc, "組長": st.session_state.user, "通電日期": p_date, "人員1": "NA", "人員2": "NA", "人員3": "NA", "人員4": "NA", "人員5": "NA"}
-                                    new_id = requests.post(f"{DB_URL}.json", data=json.dumps(init)).json().get("name")
-                                    init["db_id"] = new_id
-                                    edit_staff_dialog(o_id, proc, init)
+                                    # 若尚未派工，自動建立一筆初始紀錄
+                                    init_data = {
+                                        "製令": str(o_id), "製造工序": proc, "組長": st.session_state.user,
+                                        "通電日期": p_date, "人員1": "NA", "人員2": "NA", "人員3": "NA", "人員4": "NA", "人員5": "NA"
+                                    }
+                                    res = requests.post(f"{DB_URL}.json", data=json.dumps(init_data))
+                                    init_data["db_id"] = res.json().get("name")
+                                    edit_staff_dialog(o_id, proc, init_data)
                                 else:
-                                    edit_staff_dialog(o_id, proc, curr_row)
+                                    # 若已有資料，直接開啟編輯
+                                    edit_staff_dialog(o_id, proc, curr_data_dict)
+                                    
+                        with r_ui[2]:
+                            if not m_w.empty and st.button("確認完工", key=f"db_{u_key}"):
+                                dat = m_w.iloc[0].to_dict(); db_id = dat.pop('db_id')
+                                dat["完工時間"] = get_now_str(); dat["完工人員"] = st.session_state.user
+                                requests.post(f"{FINISH_URL}.json", data=json.dumps(dat))
+                                requests.delete(f"{DB_URL}/{db_id}.json")
+                                st.rerun()
                     st.markdown('</div>', unsafe_allow_html=True)
         except Exception as e:
-            st.error(f"連線錯誤: {e}")
+            st.error(f"讀取錯誤: {e}")
 # --- 📜 完工紀錄查詢 ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
         st.title("📜 歷史完工紀錄")
