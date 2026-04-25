@@ -321,36 +321,43 @@ else:
                         st.markdown('</div>', unsafe_allow_html=True)
         except Exception as e: st.error(f"系統錯誤: {e}")
 
-    # --- 📜 完工紀錄查詢 (此處已修正紅色框框不顯示) ---
+    # --- 📜 完工紀錄查詢 ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
         st.title("📜 歷史完工紀錄")
         try:
             r = requests.get(f"{FINISH_URL}.json").json()
             if r:
+                # 取得資料並加上 db_id
                 f_df = pd.DataFrame([dict(v, db_id=k) for k, v in r.items() if v]).fillna("NA")
                 f_df = f_df.sort_values("完工時間", ascending=False)
                 
                 keyword = st.text_input("🔍 搜尋 (製令、工序、人員)", key="instant_search").strip()
                 display_df = f_df if not keyword else f_df[f_df.astype(str).apply(lambda x: x.str.contains(keyword, case=False)).any(axis=1)]
                 
-                # 定義要排除不顯示的欄位 (根據照片紅色框框)
-                hide_cols = ['db_id', '提交時間', '最後修改', '最後更新']
+                # --- 強制排除不想顯示的欄位 ---
+                hide_cols = ['db_id', '提交時間', '最後修改', '最後更新', 'id']
                 
                 for o_id in display_df["製令"].unique():
                     order_records = display_df[display_df["製令"] == o_id]
                     with st.expander(f"📦 製令：{o_id} (已完工 {len(order_records)} 項)"):
-                        # 核心修正：只保留表格中存在的欄位進行 drop，防止報錯，並確保不顯示紅色框框內容
-                        cols_to_drop = [c for c in hide_cols if c in order_records.columns]
-                        st.dataframe(order_records.drop(columns=cols_to_drop), use_container_width=True)
+                        # 核心修正：動態檢查並移除欄位，確保不顯示
+                        cols_to_show = [c for c in order_records.columns if c not in hide_cols]
+                        st.dataframe(order_records[cols_to_show], use_container_width=True)
                         
+                        # 刪除按鈕邏輯
                         for _, row in order_records.iterrows():
-                            if st.button(f"🗑️ 刪除紀錄: {row['製造工序']}", key=f"del_{row['db_id']}"):
+                            # 建立刪除按鈕
+                            btn_label = f"🗑️ 刪除紀錄: {row['製造工序']}"
+                            if st.button(btn_label, key=f"del_{row['db_id']}"):
                                 try:
-                                    requests.delete(f"{FINISH_URL}/{row['db_id']}.json")
-                                    st.success(f"已刪除: {row['製造工序']}")
-                                    time.sleep(0.5); st.rerun()
+                                    resp = requests.delete(f"{FINISH_URL}/{row['db_id']}.json")
+                                    if resp.status_code == 200:
+                                        st.success(f"已刪除: {row['製造工序']}")
+                                        time.sleep(0.5); st.rerun()
+                                    else:
+                                        st.error("刪除失敗，請檢查網路連線")
                                 except:
-                                    st.error("刪除失敗，請檢查網路連線")
+                                    st.error("刪除時發生異常")
             else:
                 st.info("目前無完工紀錄")
         except Exception as e:
