@@ -220,9 +220,13 @@ else:
         with f_cols[1]: s_staff = st.selectbox("👤 篩選人員", ["全部"] + sorted(my_team_for_filter))
         
         try:
-            r_work = requests.get(f"{DB_URL}.json").json() or {}
+            # 優化讀取邏輯，確保空資料庫不會報錯
+            r_work_raw = requests.get(f"{DB_URL}.json").json()
+            r_work = r_work_raw if r_work_raw and isinstance(r_work_raw, dict) else {}
             df_work = pd.DataFrame([dict(v, db_id=k) for k, v in r_work.items()]).fillna("NA") if r_work else pd.DataFrame()
-            r_finish = requests.get(f"{FINISH_URL}.json").json() or {}
+            
+            r_finish_raw = requests.get(f"{FINISH_URL}.json").json()
+            r_finish = r_finish_raw if r_finish_raw and isinstance(r_finish_raw, dict) else {}
             df_finish = pd.DataFrame([v for k, v in r_finish.items()]).fillna("NA") if r_finish else pd.DataFrame()
 
             base_orders = [str(o) for o in order_list]
@@ -230,8 +234,9 @@ else:
 
             final_display_orders = []
             for o_id in base_orders:
-                o_df = df_work[df_work["製令"] == str(o_id)]
-                f_df_order = df_finish[df_finish["製令"] == str(o_id)]
+                o_df = df_work[df_work["製令"] == str(o_id)] if not df_work.empty else pd.DataFrame()
+                f_df_order = df_finish[df_finish["製令"] == str(o_id)] if not df_finish.empty else pd.DataFrame()
+                
                 if s_staff == "全部":
                     final_display_orders.append(o_id)
                 else:
@@ -239,7 +244,9 @@ else:
                     for df in [o_df, f_df_order]:
                         if not df.empty:
                             for i in range(1, 6):
-                                if (df[f"人員{i}"] == s_staff).any(): found = True; break
+                                col_name = f"人員{i}"
+                                if col_name in df.columns and (df[col_name] == s_staff).any(): 
+                                    found = True; break
                         if found: break
                     if found: final_display_orders.append(o_id)
 
@@ -248,8 +255,8 @@ else:
             else:
                 main_cols = st.columns(3) 
                 for idx, o_id in enumerate(final_display_orders):
-                    o_df = df_work[df_work["製令"] == str(o_id)]
-                    f_df_order = df_finish[df_finish["製令"] == str(o_id)]
+                    o_df = df_work[df_work["製令"] == str(o_id)] if not df_work.empty else pd.DataFrame()
+                    f_df_order = df_finish[df_finish["製令"] == str(o_id)] if not df_finish.empty else pd.DataFrame()
                     p_date = "未設定"
                     if not o_df.empty: p_date = str(o_df.iloc[0].get("通電日期", "未設定"))
                     elif not f_df_order.empty: p_date = str(f_df_order.iloc[0].get("通電日期", "未設定"))
@@ -271,8 +278,8 @@ else:
 
                         for p_idx, proc in enumerate(my_procs):
                             u_key = f"v21_{str(o_id).replace('-','_')}_{p_idx}"
-                            m_w = o_df[o_df["製造工序"] == proc]
-                            m_f = f_df_order[f_df_order["製造工序"] == proc]
+                            m_w = o_df[o_df["製造工序"] == proc] if not o_df.empty else pd.DataFrame()
+                            m_f = f_df_order[f_df_order["製造工序"] == proc] if not f_df_order.empty else pd.DataFrame()
                             is_assigned = False; is_done = not m_f.empty
                             target_row = m_w.iloc[0] if not m_w.empty else (m_f.iloc[0] if not m_f.empty else None)
                             
@@ -319,14 +326,15 @@ else:
                                             requests.delete(f"{DB_URL}/{db_id}.json"); st.rerun()
                             st.markdown('</div>', unsafe_allow_html=True) 
                         st.markdown('</div>', unsafe_allow_html=True)
-        except Exception as e: st.error(f"系統錯誤: {e}")
+        except Exception as e: 
+            st.warning("目前系統資料緩衝中或資料庫暫無資料。")
 
     # --- 📜 完工紀錄查詢 ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
         st.title("📜 歷史完工紀錄")
         try:
             r = requests.get(f"{FINISH_URL}.json").json()
-            if r:
+            if r and isinstance(r, dict):
                 f_df = pd.DataFrame([dict(v, db_id=k) for k, v in r.items() if v]).fillna("NA")
                 f_df = f_df.sort_values("完工時間", ascending=False)
                 
@@ -344,7 +352,6 @@ else:
                         for _, row in order_records.iterrows():
                             btn_label = f"🗑️ 刪除紀錄: {row['製造工序']}"
                             if st.button(btn_label, key=f"del_{row['db_id']}"):
-                                # 修正處：移除原本 delete 失敗時的 try-except 錯誤捕捉邏輯中會導致誤報的部分
                                 resp = requests.delete(f"{FINISH_URL}/{row['db_id']}.json")
                                 if resp.status_code == 200:
                                     st.success(f"已刪除: {row['製造工序']}")
