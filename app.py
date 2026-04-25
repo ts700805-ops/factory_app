@@ -321,7 +321,7 @@ else:
                         st.markdown('</div>', unsafe_allow_html=True)
         except Exception as e: st.error(f"系統錯誤: {e}")
 
-    # --- 📜 完工紀錄查詢 ---
+    # --- 📜 完工紀錄查詢 (此處已修正紅色框框不顯示) ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
         st.title("📜 歷史完工紀錄")
         try:
@@ -333,13 +333,13 @@ else:
                 keyword = st.text_input("🔍 搜尋 (製令、工序、人員)", key="instant_search").strip()
                 display_df = f_df if not keyword else f_df[f_df.astype(str).apply(lambda x: x.str.contains(keyword, case=False)).any(axis=1)]
                 
-                # --- 這裡進行修正：定義要刪除的欄位 ---
+                # 定義要排除不顯示的欄位 (根據照片紅色框框)
                 hide_cols = ['db_id', '提交時間', '最後修改', '最後更新']
                 
                 for o_id in display_df["製令"].unique():
                     order_records = display_df[display_df["製令"] == o_id]
                     with st.expander(f"📦 製令：{o_id} (已完工 {len(order_records)} 項)"):
-                        # --- 修正邏輯：只移除存在的欄位，避免紅字報錯 ---
+                        # 核心修正：只保留表格中存在的欄位進行 drop，防止報錯，並確保不顯示紅色框框內容
                         cols_to_drop = [c for c in hide_cols if c in order_records.columns]
                         st.dataframe(order_records.drop(columns=cols_to_drop), use_container_width=True)
                         
