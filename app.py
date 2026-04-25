@@ -327,32 +327,28 @@ else:
         try:
             r = requests.get(f"{FINISH_URL}.json").json()
             if r:
-                # 取得資料並補空值
                 f_df = pd.DataFrame([dict(v, db_id=k) for k, v in r.items() if v]).fillna("NA")
                 f_df = f_df.sort_values("完工時間", ascending=False)
                 
-                # 關鍵字搜尋
                 keyword = st.text_input("🔍 搜尋 (製令、工序、人員)", key="instant_search").strip()
                 display_df = f_df if not keyword else f_df[f_df.astype(str).apply(lambda x: x.str.contains(keyword, case=False)).any(axis=1)]
                 
-                # 要隱藏的欄位清單
+                # --- 這裡進行修正：定義要刪除的欄位 ---
                 hide_cols = ['db_id', '提交時間', '最後修改', '最後更新']
                 
                 for o_id in display_df["製令"].unique():
                     order_records = display_df[display_df["製令"] == o_id]
                     with st.expander(f"📦 製令：{o_id} (已完工 {len(order_records)} 項)"):
-                        # 顯示表格時自動移除不需要的欄位 (如果欄位存在的話)
+                        # --- 修正邏輯：只移除存在的欄位，避免紅字報錯 ---
                         cols_to_drop = [c for c in hide_cols if c in order_records.columns]
                         st.dataframe(order_records.drop(columns=cols_to_drop), use_container_width=True)
                         
-                        # 刪除按鈕
                         for _, row in order_records.iterrows():
                             if st.button(f"🗑️ 刪除紀錄: {row['製造工序']}", key=f"del_{row['db_id']}"):
                                 try:
                                     requests.delete(f"{FINISH_URL}/{row['db_id']}.json")
                                     st.success(f"已刪除: {row['製造工序']}")
-                                    time.sleep(0.5)
-                                    st.rerun()
+                                    time.sleep(0.5); st.rerun()
                                 except:
                                     st.error("刪除失敗，請檢查網路連線")
             else:
