@@ -174,7 +174,7 @@ else:
     if st.session_state.menu_selection == "📊 製造部派工專區":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900; margin-bottom:30px;">📋 製造部派工進度看板</h1>', unsafe_allow_html=True)
 
-        # --- 對話框 1：編輯人員 (維持原樣) ---
+        # --- 對話框 1：編輯人員 ---
         @st.dialog("👥 編輯施工人員", width="medium")
         def edit_staff_dialog(order_id, proc_name, current_data):
             st.subheader(f"🛠️ {proc_name}")
@@ -206,7 +206,7 @@ else:
                         st.success("✅ 人員更新成功！")
                         time.sleep(0.5); st.rerun()
 
-        # --- 對話框 2：修改通電日期 (維持原樣) ---
+        # --- 對話框 2：修改通電日期 ---
         @st.dialog("📅 修改預計通電日期", width="small")
         def edit_power_date_dialog(order_id, current_date_str, related_records):
             st.subheader(f"📦 製令：{order_id}")
@@ -236,7 +236,7 @@ else:
 
             display_orders = sorted([o for o in set(order_list) if (s_order == "全部" or str(o) == str(s_order))])
             
-            # --- 修改處：將 columns 從 2 改為 3 ---
+            # --- 核心修改：3 欄式卡片佈局 ---
             main_cols = st.columns(3) 
             for idx, o_id in enumerate(display_orders):
                 o_df = df_work[df_work["製令"] == str(o_id)]
@@ -247,7 +247,7 @@ else:
                 elif not f_df_order.empty: p_date = str(f_df_order.iloc[0].get("通電日期", "未設定"))
 
                 with main_cols[idx % 3]:
-                    # 卡片頭部
+                    # 卡片開始
                     st.markdown(f'''
                         <div class="order-card">
                             <div class="order-header">
@@ -256,14 +256,14 @@ else:
                             </div>
                     ''', unsafe_allow_html=True)
                     
-                    # 修改日期按鈕
+                    # 修改日期小按鈕
                     date_edit_col = st.columns([0.8, 0.2])
                     with date_edit_col[1]:
                         if st.button("📅", key=f"date_edit_{o_id}", help="修改通電日期"):
                             related = {k: v for k, v in r_work.items() if v.get("製令") == str(o_id)}
                             edit_power_date_dialog(o_id, p_date, related)
 
-                    # --- 【工序清單顯示區域】 ---
+                    # --- 工序內容列 ---
                     for p_idx, proc in enumerate(my_procs):
                         u_key = f"v21_{str(o_id).replace('-','_')}_{p_idx}"
                         m_w = o_df[o_df["製造工序"] == proc]
@@ -275,7 +275,7 @@ else:
                         
                         st.markdown('<div class="proc-row-container">', unsafe_allow_html=True)
                         
-                        # 欄位寬度調整：確保名稱、人員、狀態、按鈕在不同裝置上比例適中
+                        # UI 欄位：[名稱, 人員, 編輯, 狀態/按鈕]
                         r_ui = st.columns([3.0, 3.5, 0.8, 2.7])
                         
                         with r_ui[0]:
@@ -322,11 +322,11 @@ else:
                                         st.rerun()
 
                         st.markdown('</div>', unsafe_allow_html=True) 
-                    st.markdown('</div>', unsafe_allow_html=True) 
+                    st.markdown('</div>', unsafe_allow_html=True) # 卡片結束
         except Exception as e:
             st.error(f"讀取錯誤: {e}")
 
-    # --- 其他頁面維持原樣 ---
+    # --- 📜 完工紀錄查詢 ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
         st.title("📜 歷史完工紀錄")
         try:
@@ -359,6 +359,7 @@ else:
         except Exception as e:
             st.error(f"連線失敗: {e}")
 
+    # --- 📝 任務派發 ---
     elif st.session_state.menu_selection == "📝 任務派發":
         st.title("📝 任務指派與編輯")
         current_leader = st.session_state.user
@@ -390,6 +391,7 @@ else:
                 st.success("任務指派成功！")
                 time.sleep(0.5); st.session_state.menu_selection = "📊 製造部派工專區"; st.rerun()
 
+    # --- ⚙️ 設定管理 ---
     elif st.session_state.menu_selection == "⚙️ 設定管理":
         st.title("⚙️ 系統設定")
         with st.form("config_form"):
