@@ -42,16 +42,16 @@ st.set_page_config(page_title="超慧科技管理系統", layout="wide")
 
 st.markdown("""
     <style>
-    .stApp { background-color: #f8fafc; }
+    .stApp { background-color: #f1f5f9; }
     
     /* 製令卡片主體 */
     .order-card { 
         background: white; 
         border-radius: 12px; 
-        border: 1px solid #e2e8f0; 
+        border: 1px solid #cbd5e1; 
         margin-bottom: 25px; 
         overflow: hidden; 
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
     }
     
     /* 卡片標題藍色區塊 */
@@ -78,62 +78,62 @@ st.markdown("""
         align-items: center;
     }
     
-    /* 工序每一列的容器 (已改為深灰色底) */
+    /* 工序每一列的容器 (改為淺灰色底) */
     .proc-row-container {
         padding: 15px 18px;
-        border-bottom: 1px solid #475569;
-        background-color: #334155;
+        border-bottom: 1px solid #e2e8f0;
+        background-color: #f8fafc;
     }
     .proc-row-container:hover { 
-        background-color: #1e293b; 
+        background-color: #f1f5f9; 
     }
     
-    /* 工序名稱與左側紅條 (改為白色字體以對應深色底) */
+    /* 工序名稱 (深藍色字體，對比度高) */
     .proc-name { 
         font-weight: 800; 
-        color: #ffffff; 
+        color: #1e3a8a; 
         font-size: 1.05rem;
         border-left: 5px solid #ef4444;
         padding-left: 12px;
     }
     
-    /* 人員標籤樣式 (還原為藍色系區塊) */
+    /* 人員標籤樣式 (亮藍色) */
     .badge-staff { 
-        background: #3b82f6; 
-        color: #ffffff; 
+        background: #eff6ff; 
+        color: #1e40af; 
         padding: 4px 10px; 
         border-radius: 6px; 
         font-size: 0.95rem; 
         font-weight: 700;
-        border: 1px solid #2563eb;
+        border: 1px solid #bfdbfe;
     }
     
-    /* 已完工標籤 (綠底白字) */
+    /* 已完工標籤 */
     .status-done-box { 
-        background: #22c55e;
-        color: white; 
+        background: #dcfce7;
+        color: #166534; 
         font-weight: 800; 
         font-size: 0.9rem; 
         padding: 6px 12px;
         border-radius: 6px;
         text-align: center;
         display: inline-block;
+        border: 1px solid #bbf7d0;
     }
     
-    /* 請指派標籤 (黃底) */
+    /* 請指派標籤 */
     .status-assign-box {
-        background: #fef9c3;
+        background: #fff9db;
         color: #854d0e;
         font-weight: 700;
         padding: 6px 12px;
         border-radius: 6px;
-        border: 1px solid #fde047;
+        border: 1px solid #ffe066;
         font-size: 0.9rem;
     }
 
-    .status-empty { color: #cbd5e1; font-style: italic; font-size: 0.95rem; }
+    .status-empty { color: #94a3b8; font-style: italic; font-size: 0.95rem; }
     
-    /* 自定義按鈕樣式 */
     div.stButton > button {
         border-radius: 8px;
     }
