@@ -37,7 +37,7 @@ def get_settings():
     except:
         return default_settings
 
-# --- 2. 介面樣式設定 (深度仿圖風格) ---
+# --- 2. 介面樣式設定 ---
 st.set_page_config(page_title="超慧科技管理系統", layout="wide")
 
 st.markdown("""
@@ -97,15 +97,15 @@ st.markdown("""
         padding-left: 12px;
     }
     
-    /* 人員標籤樣式 */
+    /* 人員標籤樣式 (已修改為深灰色底) */
     .badge-staff { 
-        background: #dbeafe; 
-        color: #1e40af; 
+        background: #4b5563; 
+        color: #ffffff; 
         padding: 4px 10px; 
         border-radius: 6px; 
         font-size: 0.95rem; 
         font-weight: 700;
-        border: 1px solid #bfdbfe;
+        border: 1px solid #374151;
     }
     
     /* 已完工標籤 (綠底白字) */
@@ -184,6 +184,7 @@ else:
             st.subheader(f"🛠️ {proc_name}")
             current_leader = st.session_state.user
             my_team = staff_map.get(current_leader, [])
+            # 編輯時僅能選擇自己組內的人員，若無設定則顯示全部
             display_options = my_team if my_team else all_staff
             options = ["NA"] + sorted(list(set(display_options)))
             with st.form("staff_edit_form"):
@@ -220,9 +221,12 @@ else:
 
         # --- 頁面篩選列 ---
         my_procs = process_map.get(st.session_state.user, process_list)
+        # 篩選人員選單改回組長屬下人員
+        my_team_for_filter = staff_map.get(st.session_state.user, all_staff)
+        
         f_cols = st.columns([1, 1, 1])
         with f_cols[0]: s_order = st.selectbox("🔍 篩選製令", ["全部"] + sorted(list(set(order_list))))
-        with f_cols[1]: s_staff = st.selectbox("👤 篩選人員", ["全部"] + sorted(all_staff))
+        with f_cols[1]: s_staff = st.selectbox("👤 篩選人員", ["全部"] + sorted(my_team_for_filter))
         
         try:
             r_work = requests.get(f"{DB_URL}.json").json() or {}
@@ -364,7 +368,7 @@ else:
                 requests.post(f"{DB_URL}.json", data=json.dumps(payload))
                 st.success("任務指派成功！"); time.sleep(0.5); st.session_state.menu_selection = "📊 製造部派工專區"; st.rerun()
 
-    # --- ⚙️ 設定管理 (完整版) ---
+    # --- ⚙️ 設定管理 ---
     elif st.session_state.menu_selection == "⚙️ 設定管理":
         st.title("⚙️ 系統核心設定")
         st.warning("注意：修改後將影響全系統顯示。")
