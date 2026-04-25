@@ -44,7 +44,6 @@ st.markdown("""
     <style>
     .stApp { background-color: #f1f5f9; }
     
-    /* 製令卡片主體 */
     .order-card { 
         background: white; 
         border-radius: 12px; 
@@ -54,7 +53,6 @@ st.markdown("""
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
     }
     
-    /* 卡片標題藍色區塊 */
     .order-header { 
         background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%); 
         color: white; 
@@ -66,7 +64,6 @@ st.markdown("""
         font-size: 1.2rem;
     }
     
-    /* 通電日期標籤 */
     .power-date-tag { 
         background: #fbbf24; 
         color: #1e3a8a; 
@@ -78,27 +75,24 @@ st.markdown("""
         align-items: center;
     }
     
-    /* 工序每一列的容器 (加深底色) */
     .proc-row-container {
         padding: 15px 18px;
         border-bottom: 1px solid #cbd5e1;
-        background-color: #e2e8f0; /* 從 f8fafc 加深到 e2e8f0 */
+        background-color: #e2e8f0;
     }
     .proc-row-container:hover { 
         background-color: #d1d5db; 
     }
     
-    /* 工序名稱 (深色且更清晰) */
     .proc-name { 
         font-weight: 900; 
-        color: #0f172a; /* 更深的黑藍色 */
+        color: #0f172a; 
         font-size: 1.05rem;
         border-left: 5px solid #ef4444;
         padding-left: 12px;
-        text-shadow: 0.5px 0.5px 0px rgba(255,255,255,0.5); /* 增加輕微白影讓字體浮現 */
+        text-shadow: 0.5px 0.5px 0px rgba(255,255,255,0.5);
     }
     
-    /* 人員標籤樣式 (亮藍色) */
     .badge-staff { 
         background: #eff6ff; 
         color: #1e40af; 
@@ -109,7 +103,6 @@ st.markdown("""
         border: 1px solid #bfdbfe;
     }
     
-    /* 已完工標籤 */
     .status-done-box { 
         background: #dcfce7;
         color: #166534; 
@@ -122,7 +115,6 @@ st.markdown("""
         border: 1px solid #bbf7d0;
     }
     
-    /* 請指派標籤 */
     .status-assign-box {
         background: #fff9db;
         color: #854d0e;
@@ -335,19 +327,38 @@ else:
         try:
             r = requests.get(f"{FINISH_URL}.json").json()
             if r:
+                # 取得資料並補空值
                 f_df = pd.DataFrame([dict(v, db_id=k) for k, v in r.items() if v]).fillna("NA")
                 f_df = f_df.sort_values("完工時間", ascending=False)
+                
+                # 關鍵字搜尋
                 keyword = st.text_input("🔍 搜尋 (製令、工序、人員)", key="instant_search").strip()
                 display_df = f_df if not keyword else f_df[f_df.astype(str).apply(lambda x: x.str.contains(keyword, case=False)).any(axis=1)]
+                
+                # 要隱藏的欄位清單
+                hide_cols = ['db_id', '提交時間', '最後修改', '最後更新']
+                
                 for o_id in display_df["製令"].unique():
                     order_records = display_df[display_df["製令"] == o_id]
                     with st.expander(f"📦 製令：{o_id} (已完工 {len(order_records)} 項)"):
-                        st.dataframe(order_records.drop(columns=['db_id']), use_container_width=True)
+                        # 顯示表格時自動移除不需要的欄位 (如果欄位存在的話)
+                        cols_to_drop = [c for c in hide_cols if c in order_records.columns]
+                        st.dataframe(order_records.drop(columns=cols_to_drop), use_container_width=True)
+                        
+                        # 刪除按鈕
                         for _, row in order_records.iterrows():
                             if st.button(f"🗑️ 刪除紀錄: {row['製造工序']}", key=f"del_{row['db_id']}"):
-                                requests.delete(f"{FINISH_URL}/{row['db_id']}.json"); st.rerun()
-            else: st.info("目前無完工紀錄")
-        except: st.error("資料連線失敗")
+                                try:
+                                    requests.delete(f"{FINISH_URL}/{row['db_id']}.json")
+                                    st.success(f"已刪除: {row['製造工序']}")
+                                    time.sleep(0.5)
+                                    st.rerun()
+                                except:
+                                    st.error("刪除失敗，請檢查網路連線")
+            else:
+                st.info("目前無完工紀錄")
+        except Exception as e:
+            st.error(f"資料讀取錯誤")
 
     # --- 📝 任務派發 ---
     elif st.session_state.menu_selection == "📝 任務派發":
