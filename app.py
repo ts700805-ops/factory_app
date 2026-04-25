@@ -327,37 +327,30 @@ else:
         try:
             r = requests.get(f"{FINISH_URL}.json").json()
             if r:
-                # 取得資料並加上 db_id
                 f_df = pd.DataFrame([dict(v, db_id=k) for k, v in r.items() if v]).fillna("NA")
                 f_df = f_df.sort_values("完工時間", ascending=False)
                 
                 keyword = st.text_input("🔍 搜尋 (製令、工序、人員)", key="instant_search").strip()
                 display_df = f_df if not keyword else f_df[f_df.astype(str).apply(lambda x: x.str.contains(keyword, case=False)).any(axis=1)]
                 
-                # --- 強制排除不想顯示的欄位 ---
                 hide_cols = ['db_id', '提交時間', '最後修改', '最後更新', 'id']
                 
                 for o_id in display_df["製令"].unique():
                     order_records = display_df[display_df["製令"] == o_id]
                     with st.expander(f"📦 製令：{o_id} (已完工 {len(order_records)} 項)"):
-                        # 核心修正：動態檢查並移除欄位，確保不顯示
                         cols_to_show = [c for c in order_records.columns if c not in hide_cols]
                         st.dataframe(order_records[cols_to_show], use_container_width=True)
                         
-                        # 刪除按鈕邏輯
                         for _, row in order_records.iterrows():
-                            # 建立刪除按鈕
                             btn_label = f"🗑️ 刪除紀錄: {row['製造工序']}"
                             if st.button(btn_label, key=f"del_{row['db_id']}"):
-                                try:
-                                    resp = requests.delete(f"{FINISH_URL}/{row['db_id']}.json")
-                                    if resp.status_code == 200:
-                                        st.success(f"已刪除: {row['製造工序']}")
-                                        time.sleep(0.5); st.rerun()
-                                    else:
-                                        st.error("刪除失敗，請檢查網路連線")
-                                except:
-                                    st.error("刪除時發生異常")
+                                # 修正處：移除原本 delete 失敗時的 try-except 錯誤捕捉邏輯中會導致誤報的部分
+                                resp = requests.delete(f"{FINISH_URL}/{row['db_id']}.json")
+                                if resp.status_code == 200:
+                                    st.success(f"已刪除: {row['製造工序']}")
+                                    time.sleep(0.5); st.rerun()
+                                else:
+                                    st.error("刪除失敗，請檢查網路連線")
             else:
                 st.info("目前無完工紀錄")
         except Exception as e:
