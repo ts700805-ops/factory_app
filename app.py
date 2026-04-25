@@ -78,34 +78,34 @@ st.markdown("""
         align-items: center;
     }
     
-    /* 工序每一列的容器 */
+    /* 工序每一列的容器 (已改為深灰色底) */
     .proc-row-container {
         padding: 15px 18px;
-        border-bottom: 1px solid #edf2f7;
-        background-color: #ffffff;
+        border-bottom: 1px solid #475569;
+        background-color: #334155;
     }
     .proc-row-container:hover { 
-        background-color: #f1f5f9; 
+        background-color: #1e293b; 
     }
     
-    /* 工序名稱與左側紅條 */
+    /* 工序名稱與左側紅條 (改為白色字體以對應深色底) */
     .proc-name { 
         font-weight: 800; 
-        color: #1e293b; 
+        color: #ffffff; 
         font-size: 1.05rem;
         border-left: 5px solid #ef4444;
         padding-left: 12px;
     }
     
-    /* 人員標籤樣式 (已修改為深灰色底) */
+    /* 人員標籤樣式 (還原為藍色系區塊) */
     .badge-staff { 
-        background: #4b5563; 
+        background: #3b82f6; 
         color: #ffffff; 
         padding: 4px 10px; 
         border-radius: 6px; 
         font-size: 0.95rem; 
         font-weight: 700;
-        border: 1px solid #374151;
+        border: 1px solid #2563eb;
     }
     
     /* 已完工標籤 (綠底白字) */
@@ -131,7 +131,7 @@ st.markdown("""
         font-size: 0.9rem;
     }
 
-    .status-empty { color: #94a3b8; font-style: italic; font-size: 0.95rem; }
+    .status-empty { color: #cbd5e1; font-style: italic; font-size: 0.95rem; }
     
     /* 自定義按鈕樣式 */
     div.stButton > button {
@@ -184,7 +184,6 @@ else:
             st.subheader(f"🛠️ {proc_name}")
             current_leader = st.session_state.user
             my_team = staff_map.get(current_leader, [])
-            # 編輯時僅能選擇自己組內的人員，若無設定則顯示全部
             display_options = my_team if my_team else all_staff
             options = ["NA"] + sorted(list(set(display_options)))
             with st.form("staff_edit_form"):
@@ -221,7 +220,6 @@ else:
 
         # --- 頁面篩選列 ---
         my_procs = process_map.get(st.session_state.user, process_list)
-        # 篩選人員選單改回組長屬下人員
         my_team_for_filter = staff_map.get(st.session_state.user, all_staff)
         
         f_cols = st.columns([1, 1, 1])
