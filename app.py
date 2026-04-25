@@ -37,24 +37,38 @@ def get_settings():
     except:
         return default_settings
 
-# --- 2. 介面樣式設定 (維持原樣) ---
+# --- 2. 介面樣式設定 (修改處：加強字體清晰度與紅色外框) ---
 st.set_page_config(page_title="超慧科技管理系統", layout="wide")
 
 st.markdown("""
     <style>
     .stApp { background-color: #f1f5f9; }
     
-    /* 製令卡片 */
+    /* 1. 製令卡片優化：加上紅色外框與陰影 */
     .order-card { 
         background: white; 
         border-radius: 16px; 
-        border: 1px solid #e2e8f0; 
+        border: 2px solid #ff4d4d; /* 紅色外框 */
         margin-bottom: 25px; 
         overflow: hidden; 
-        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+        box-shadow: 0 0 15px rgba(255, 77, 77, 0.3); /* 紅色發光效果 */
     }
     
-    /* 卡片標題區 */
+    /* 2. 手機版與整體字體優化 */
+    html, body, [data-testid="stMarkdownContainer"] p {
+        font-size: 1.15rem !important; /* 加大基本字體 */
+        font-weight: 500;
+    }
+
+    /* 針對手機版 (螢幕小於 768px) 特別加大 */
+    @media (max-width: 768px) {
+        .proc-name { font-size: 1.3rem !important; }
+        .badge-staff { font-size: 1.1rem !important; }
+        .order-header { font-size: 1.4rem !important; }
+        .status-done { font-size: 1.2rem !important; }
+        .stButton button { height: 50px !important; font-size: 1.2rem !important; }
+    }
+    
     .order-header { 
         background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%); 
         color: white; 
@@ -63,62 +77,59 @@ st.markdown("""
         display: flex; 
         justify-content: space-between; 
         align-items: center; 
-        font-size: 1.2rem;
+        font-size: 1.3rem;
     }
     
-    /* 通電日期標籤 */
     .power-date-tag { 
         background: #fbbf24; 
         color: #1e3a8a; 
         padding: 5px 15px; 
         border-radius: 50px; 
-        font-size: 14px; 
+        font-size: 15px; 
         font-weight: 800;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
-    /* 工序行 */
     .proc-row-container {
-        padding: 10px 20px;
-        border-bottom: 1px solid #f1f5f9;
+        padding: 12px 20px;
+        border-bottom: 2px solid #f1f5f9;
         transition: background 0.3s;
     }
-    .proc-row-container:hover { background-color: #f8fafc; }
+    .proc-row-container:hover { background-color: #fff5f5; }
     
     .proc-name { 
-        font-weight: 800; 
-        color: #334155; 
-        font-size: 16px;
-        border-left: 4px solid #3b82f6;
-        padding-left: 10px;
+        font-weight: 900; 
+        color: #1e293b; 
+        font-size: 17px;
+        border-left: 5px solid #ff4d4d; /* 側邊也改紅色呼應 */
+        padding-left: 12px;
     }
     
-    /* 人員標籤樣式優化 */
-    .staff-area { display: flex; flex-wrap: wrap; gap: 6px; }
+    .staff-area { display: flex; flex-wrap: wrap; gap: 8px; }
     .badge-staff { 
-        background: #e6f3ff; 
-        color: #0066cc; 
-        padding: 2px 10px; 
-        border-radius: 4px; 
-        font-size: 13px; 
-        font-weight: 600;
+        background: #eff6ff; 
+        color: #1d4ed8; 
+        padding: 4px 12px; 
+        border-radius: 6px; 
+        font-size: 15px; 
+        font-weight: 700;
         border: 1px solid #bfdbfe;
         display: inline-block;
     }
     
-    /* 狀態顯示 */
     .status-done { 
-        color: #059669; 
+        color: #ffffff; 
         font-weight: 800; 
-        font-size: 15px; 
-        background: #ecfdf5;
-        padding: 4px 12px;
+        font-size: 16px; 
+        background: #10b981;
+        padding: 6px 14px;
         border-radius: 8px;
         display: inline-block;
+        text-align: center;
     }
-    .status-empty { color: #94a3b8; font-style: italic; font-size: 14px; }
+    .status-empty { color: #94a3b8; font-style: italic; font-size: 15px; }
     
-    .stButton>button { border-radius: 8px; }
+    .stButton>button { border-radius: 8px; font-weight: 700; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -140,7 +151,7 @@ if "edit_target" not in st.session_state:
 if "user" not in st.session_state:
     st.markdown('<div style="height:100px;"></div>', unsafe_allow_html=True)
     st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-size:3rem;">⚓ 超慧科技</h1>', unsafe_allow_html=True)
-    st.markdown('<p style="text-align:center; color:#64748b;">生產管理系統 v2.0</p>', unsafe_allow_html=True)
+    st.markdown('<p style="text-align:center; color:#64748b;">生產管理系統 v2.1 (手機優化版)</p>', unsafe_allow_html=True)
     with st.columns([1,1.5,1])[1]:
         with st.container(border=True):
             u = st.selectbox("👤 請選擇您的組長姓名", sorted(all_leaders))
@@ -163,7 +174,7 @@ else:
     if st.session_state.menu_selection == "📊 製造部派工專區":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900; margin-bottom:30px;">📋 製造部派工進度看板</h1>', unsafe_allow_html=True)
 
-        # --- 對話框 1：編輯人員 ---
+        # --- 對話框 1：編輯人員 (維持原樣) ---
         @st.dialog("👥 編輯施工人員", width="medium")
         def edit_staff_dialog(order_id, proc_name, current_data):
             st.subheader(f"🛠️ {proc_name}")
@@ -195,7 +206,7 @@ else:
                         st.success("✅ 人員更新成功！")
                         time.sleep(0.5); st.rerun()
 
-        # --- 對話框 2：修改通電日期 ---
+        # --- 對話框 2：修改通電日期 (維持原樣) ---
         @st.dialog("📅 修改預計通電日期", width="small")
         def edit_power_date_dialog(order_id, current_date_str, related_records):
             st.subheader(f"📦 製令：{order_id}")
@@ -225,7 +236,8 @@ else:
 
             display_orders = sorted([o for o in set(order_list) if (s_order == "全部" or str(o) == str(s_order))])
             
-            main_cols = st.columns(2)
+            # --- 修改處：將 columns 從 2 改為 3 ---
+            main_cols = st.columns(3) 
             for idx, o_id in enumerate(display_orders):
                 o_df = df_work[df_work["製令"] == str(o_id)]
                 f_df_order = df_finish[df_finish["製令"] == str(o_id)]
@@ -234,18 +246,18 @@ else:
                 if not o_df.empty: p_date = str(o_df.iloc[0].get("通電日期", "未設定"))
                 elif not f_df_order.empty: p_date = str(f_df_order.iloc[0].get("通電日期", "未設定"))
 
-                with main_cols[idx % 2]:
+                with main_cols[idx % 3]:
                     # 卡片頭部
                     st.markdown(f'''
                         <div class="order-card">
                             <div class="order-header">
-                                <span>📦 製令：{o_id}</span>
-                                <span class="power-date-tag">⚡ 預計通電：{p_date}</span>
+                                <span>📦 {o_id}</span>
+                                <span class="power-date-tag">⚡ {p_date}</span>
                             </div>
                     ''', unsafe_allow_html=True)
                     
-                    # 修改日期按鈕 (放在頭部下方)
-                    date_edit_col = st.columns([0.88, 0.12])
+                    # 修改日期按鈕
+                    date_edit_col = st.columns([0.8, 0.2])
                     with date_edit_col[1]:
                         if st.button("📅", key=f"date_edit_{o_id}", help="修改通電日期"):
                             related = {k: v for k, v in r_work.items() if v.get("製令") == str(o_id)}
@@ -253,7 +265,7 @@ else:
 
                     # --- 【工序清單顯示區域】 ---
                     for p_idx, proc in enumerate(my_procs):
-                        u_key = f"v17_{str(o_id).replace('-','_')}_{p_idx}"
+                        u_key = f"v21_{str(o_id).replace('-','_')}_{p_idx}"
                         m_w = o_df[o_df["製造工序"] == proc]
                         m_f = f_df_order[f_df_order["製造工序"] == proc]
                         
@@ -263,14 +275,13 @@ else:
                         
                         st.markdown('<div class="proc-row-container">', unsafe_allow_html=True)
                         
-                        # 修正：縮小比例並穩定渲染，防止內容消失
-                        r_ui = st.columns([2.5, 3.5, 0.6, 2.0, 4.0])
+                        # 欄位寬度調整：確保名稱、人員、狀態、按鈕在不同裝置上比例適中
+                        r_ui = st.columns([3.0, 3.5, 0.8, 2.7])
                         
                         with r_ui[0]:
                             st.markdown(f'<div class="proc-name">{proc}</div>', unsafe_allow_html=True)
                         
                         with r_ui[1]:
-                            # 使用 Markdown 渲染人員標籤，最為穩定
                             staff_html = ""
                             curr_data_dict = {}
                             if target_row is not None:
@@ -315,7 +326,7 @@ else:
         except Exception as e:
             st.error(f"讀取錯誤: {e}")
 
-    # --- 其他頁面 (維持原樣) ---
+    # --- 其他頁面維持原樣 ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
         st.title("📜 歷史完工紀錄")
         try:
