@@ -78,23 +78,24 @@ st.markdown("""
         align-items: center;
     }
     
-    /* 工序每一列的容器 (改為淺灰色底) */
+    /* 工序每一列的容器 (加深底色) */
     .proc-row-container {
         padding: 15px 18px;
-        border-bottom: 1px solid #e2e8f0;
-        background-color: #f8fafc;
+        border-bottom: 1px solid #cbd5e1;
+        background-color: #e2e8f0; /* 從 f8fafc 加深到 e2e8f0 */
     }
     .proc-row-container:hover { 
-        background-color: #f1f5f9; 
+        background-color: #d1d5db; 
     }
     
-    /* 工序名稱 (深藍色字體，對比度高) */
+    /* 工序名稱 (深色且更清晰) */
     .proc-name { 
-        font-weight: 800; 
-        color: #1e3a8a; 
+        font-weight: 900; 
+        color: #0f172a; /* 更深的黑藍色 */
         font-size: 1.05rem;
         border-left: 5px solid #ef4444;
         padding-left: 12px;
+        text-shadow: 0.5px 0.5px 0px rgba(255,255,255,0.5); /* 增加輕微白影讓字體浮現 */
     }
     
     /* 人員標籤樣式 (亮藍色) */
@@ -132,7 +133,7 @@ st.markdown("""
         font-size: 0.9rem;
     }
 
-    .status-empty { color: #94a3b8; font-style: italic; font-size: 0.95rem; }
+    .status-empty { color: #64748b; font-style: italic; font-weight: 700; font-size: 0.95rem; }
     
     div.stButton > button {
         border-radius: 8px;
@@ -270,7 +271,6 @@ else:
                                 </div>
                         ''', unsafe_allow_html=True)
                         
-                        # 日期修改按鈕
                         d_col = st.columns([0.85, 0.15])
                         with d_col[1]:
                             if st.button("📅", key=f"date_edit_{o_id}", help="修改日期"):
