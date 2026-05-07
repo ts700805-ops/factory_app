@@ -216,37 +216,24 @@ else:
                         st.markdown('</div>', unsafe_allow_html=True)
         except: st.warning("目前系統資料緩衝中。")
 
-# --- 📈 工時統計分析 (強力抓取版：解決下拉選單空白問題) ---
+我看過你完整的主程式了，問題點找出來了！
+
+在你的「設定管理」儲存邏輯中，製令清單是存放在 order_list 這個欄位裡，而目前的工時分析程式碼是在 settings/orders（多了一層 orders）或是掃描整個 settings。
+
+為了最精準地對接你的主程式結構，請將 # --- 📈 工時統計分析 --- 這一整段替換成以下程式碼，這段程式碼會直接讀取你主程式開頭定義好的 order_list 變數：
+
+Python
+    # --- 📈 工時統計分析 (精準對接版) ---
     elif st.session_state.menu_selection == "📈 工時統計分析":
         import time 
         
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">⏱️ 生產工時管理系統</h1>', unsafe_allow_html=True)
         
-        # 1. 深度掃描設定管理內的製令
-        order_options = []
-        try:
-            # 掃描 settings 下的所有子路徑 (包括 orders, order_list 等)
-            all_settings = requests.get(f"{DB_BASE_URL}/settings.json").json()
-            if all_settings:
-                temp_list = []
-                # 第一層可能是 'orders', 'user_settings' 等
-                for category in all_settings.values():
-                    if isinstance(category, dict):
-                        # 第二層才是具體的格子內容
-                        for item in category.values():
-                            if isinstance(item, dict):
-                                for key, val in item.items():
-                                    if isinstance(val, str) and ("," in val or "，" in val or "-" in val):
-                                        # 只要字串包含逗號或橫槓(製令特徵)，就嘗試拆解
-                                        parts = val.replace("，", ",").split(",")
-                                        temp_list.extend([p.strip() for p in parts if p.strip()])
-                            elif isinstance(item, str):
-                                parts = item.replace("，", ",").split(",")
-                                temp_list.extend([p.strip() for p in parts if p.strip()])
-                
-                # 去重、排序，並過濾掉太短的無效字串
-                order_options = sorted(list(set([o for o in temp_list if len(o) > 2])))
-        except:
+        # 1. 直接使用主程式已經從資料庫抓好的 order_list
+        # 確保格式正確（去除空白、排序）
+        if order_list:
+            order_options = sorted([str(o).strip() for o in order_list if str(o).strip()])
+        else:
             order_options = []
 
         # 2. 任務輸入區
@@ -254,16 +241,14 @@ else:
             st.markdown('<div style="background-color:#f8f9fa; padding:20px; border-radius:15px; border:1px solid #dee2e6; margin-bottom:20px;">', unsafe_allow_html=True)
             c1, c2, c3 = st.columns([2, 2, 1])
             with c1:
-                # 檢查是否真的有抓到選項
                 if order_options:
                     t_oid = st.selectbox("📦 選擇製令編號", order_options, key="t_oid_final_select")
                 else:
-                    # 如果深度掃描還是失敗，顯示這個提示幫助除錯
-                    st.error("⚠️ 依舊抓不到設定！請確認『設定管理』中該欄位的標題。")
-                    t_oid = st.text_input("📦 手動輸入 (保底)", placeholder="25M0051-07", key="t_oid_manual_fix")
+                    st.warning("⚠️ 設定管理內無製令資料")
+                    t_oid = st.text_input("📦 手動錄入製令", key="t_oid_manual")
             with c2:
-                # 這裡的工序如果你也想從「設定管理」抓，邏輯是一樣的，目前先維持手動選單
-                t_proc = st.selectbox("🛠️ 選擇執行工序", ["骨架作業", "前置作業", "配電作業", "模組作業", "通電作業", "IPQC查檢"], key="t_proc_final_input")
+                # 工序也直接對接你設定管理內的 process_list
+                t_proc = st.selectbox("🛠️ 選擇執行工序", process_list if process_list else ["預設工序"], key="t_proc_final_input")
             with c3:
                 st.write(" ")
                 if st.button("➕ 加入看板", type="primary", use_container_width=True):
@@ -277,7 +262,7 @@ else:
                         st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
-        # 3. 監控看板 (使用 JS 計時，維持不吃資源且資料持久化)
+        # 3. 監控看板 (計時器邏輯)
         TIMER_DB_URL = f"{DB_BASE_URL}/active_timers"
         active_timers = requests.get(f"{TIMER_DB_URL}.json").json() or {}
 
