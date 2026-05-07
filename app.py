@@ -43,93 +43,15 @@ st.set_page_config(page_title="超慧科技管理系統", layout="wide")
 st.markdown("""
     <style>
     .stApp { background-color: #f1f5f9; }
-    
-    .order-card { 
-        background: white; 
-        border-radius: 12px; 
-        border: 1px solid #cbd5e1; 
-        margin-bottom: 25px; 
-        overflow: hidden; 
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-    }
-    
-    .order-header { 
-        background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%); 
-        color: white; 
-        padding: 12px 18px; 
-        font-weight: 800; 
-        display: flex; 
-        justify-content: space-between; 
-        align-items: center; 
-        font-size: 1.2rem;
-    }
-    
-    .power-date-tag { 
-        background: #fbbf24; 
-        color: #1e3a8a; 
-        padding: 4px 12px; 
-        border-radius: 8px; 
-        font-size: 0.9rem; 
-        font-weight: 800;
-        display: flex;
-        align-items: center;
-    }
-    
-    .proc-row-container {
-        padding: 15px 18px;
-        border-bottom: 1px solid #cbd5e1;
-        background-color: #e2e8f0;
-    }
-    .proc-row-container:hover { 
-        background-color: #d1d5db; 
-    }
-    
-    .proc-name { 
-        font-weight: 900; 
-        color: #0f172a; 
-        font-size: 1.05rem;
-        border-left: 5px solid #ef4444;
-        padding-left: 12px;
-        text-shadow: 0.5px 0.5px 0px rgba(255,255,255,0.5);
-    }
-    
-    .badge-staff { 
-        background: #eff6ff; 
-        color: #1e40af; 
-        padding: 4px 10px; 
-        border-radius: 6px; 
-        font-size: 0.95rem; 
-        font-weight: 700;
-        border: 1px solid #bfdbfe;
-    }
-    
-    .status-done-box { 
-        background: #dcfce7;
-        color: #166534; 
-        font-weight: 800; 
-        font-size: 0.9rem; 
-        padding: 6px 12px;
-        border-radius: 6px;
-        text-align: center;
-        display: inline-block;
-        border: 1px solid #bbf7d0;
-    }
-    
-    .status-assign-box {
-        background: #fff9db;
-        color: #854d0e;
-        font-weight: 700;
-        padding: 6px 12px;
-        border-radius: 6px;
-        border: 1px solid #ffe066;
-        font-size: 0.9rem;
-    }
-
+    .order-card { background: white; border-radius: 12px; border: 1px solid #cbd5e1; margin-bottom: 25px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+    .order-header { background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%); color: white; padding: 12px 18px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; font-size: 1.2rem; }
+    .power-date-tag { background: #fbbf24; color: #1e3a8a; padding: 4px 12px; border-radius: 8px; font-size: 0.9rem; font-weight: 800; display: flex; align-items: center; }
+    .proc-row-container { padding: 15px 18px; border-bottom: 1px solid #cbd5e1; background-color: #e2e8f0; }
+    .proc-name { font-weight: 900; color: #0f172a; font-size: 1.05rem; border-left: 5px solid #ef4444; padding-left: 12px; }
+    .badge-staff { background: #eff6ff; color: #1e40af; padding: 4px 10px; border-radius: 6px; font-size: 0.95rem; font-weight: 700; border: 1px solid #bfdbfe; }
+    .status-done-box { background: #dcfce7; color: #166534; font-weight: 800; font-size: 0.9rem; padding: 6px 12px; border-radius: 6px; border: 1px solid #bbf7d0; display: inline-block; }
+    .status-assign-box { background: #fff9db; color: #854d0e; font-weight: 700; padding: 6px 12px; border-radius: 6px; border: 1px solid #ffe066; font-size: 0.9rem; }
     .status-empty { color: #64748b; font-style: italic; font-weight: 700; font-size: 0.95rem; }
-    
-    div.stButton > button {
-        border-radius: 8px;
-    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -156,9 +78,9 @@ if "user" not in st.session_state:
                 st.session_state.user = u
                 st.rerun()
 else:
-    # 側邊欄導航
+    # 側邊欄導航 (新增「工時統計分析」選項)
     st.sidebar.markdown(f"### 👤 當前人員：**{st.session_state.user}**")
-    nav = st.sidebar.radio("功能導航", ["📊 製造部派工專區", "📜 完工紀錄查詢", "📝 任務派發", "⚙️ 設定管理"])
+    nav = st.sidebar.radio("功能導航", ["📊 製造部派工專區", "📈 工時統計分析", "📜 完工紀錄查詢", "📝 任務派發", "⚙️ 設定管理"])
     
     if nav != st.session_state.menu_selection:
         st.session_state.menu_selection = nav
@@ -220,7 +142,6 @@ else:
         with f_cols[1]: s_staff = st.selectbox("👤 篩選人員", ["全部"] + sorted(my_team_for_filter))
         
         try:
-            # 優化讀取邏輯，確保空資料庫不會報錯
             r_work_raw = requests.get(f"{DB_URL}.json").json()
             r_work = r_work_raw if r_work_raw and isinstance(r_work_raw, dict) else {}
             df_work = pd.DataFrame([dict(v, db_id=k) for k, v in r_work.items()]).fillna("NA") if r_work else pd.DataFrame()
@@ -236,7 +157,6 @@ else:
             for o_id in base_orders:
                 o_df = df_work[df_work["製令"] == str(o_id)] if not df_work.empty else pd.DataFrame()
                 f_df_order = df_finish[df_finish["製令"] == str(o_id)] if not df_finish.empty else pd.DataFrame()
-                
                 if s_staff == "全部":
                     final_display_orders.append(o_id)
                 else:
@@ -244,10 +164,8 @@ else:
                     for df in [o_df, f_df_order]:
                         if not df.empty:
                             for i in range(1, 6):
-                                col_name = f"人員{i}"
-                                if col_name in df.columns and (df[col_name] == s_staff).any(): 
+                                if f"人員{i}" in df.columns and (df[f"人員{i}"] == s_staff).any():
                                     found = True; break
-                        if found: break
                     if found: final_display_orders.append(o_id)
 
             if not final_display_orders:
@@ -257,111 +175,96 @@ else:
                 for idx, o_id in enumerate(final_display_orders):
                     o_df = df_work[df_work["製令"] == str(o_id)] if not df_work.empty else pd.DataFrame()
                     f_df_order = df_finish[df_finish["製令"] == str(o_id)] if not df_finish.empty else pd.DataFrame()
-                    p_date = "未設定"
-                    if not o_df.empty: p_date = str(o_df.iloc[0].get("通電日期", "未設定"))
-                    elif not f_df_order.empty: p_date = str(f_df_order.iloc[0].get("通電日期", "未設定"))
+                    p_date = str(o_df.iloc[0].get("通電日期", "未設定")) if not o_df.empty else (str(f_df_order.iloc[0].get("通電日期", "未設定")) if not f_df_order.empty else "未設定")
 
                     with main_cols[idx % 3]:
-                        st.markdown(f'''
-                            <div class="order-card">
-                                <div class="order-header">
-                                    <span>📦 製令：{o_id}</span>
-                                    <span class="power-date-tag">⚡ 通電：{p_date}</span>
-                                </div>
-                        ''', unsafe_allow_html=True)
-                        
-                        d_col = st.columns([0.85, 0.15])
-                        with d_col[1]:
-                            if st.button("📅", key=f"date_edit_{o_id}", help="修改日期"):
-                                related = {k: v for k, v in r_work.items() if v.get("製令") == str(o_id)}
-                                edit_power_date_dialog(o_id, p_date, related)
+                        st.markdown(f'<div class="order-card"><div class="order-header"><span>📦 製令：{o_id}</span><span class="power-date-tag">⚡ 通電：{p_date}</span></div>', unsafe_allow_html=True)
+                        if st.button("📅", key=f"date_edit_{o_id}"):
+                            related = {k: v for k, v in r_work.items() if v.get("製令") == str(o_id)}
+                            edit_power_date_dialog(o_id, p_date, related)
 
                         for p_idx, proc in enumerate(my_procs):
                             u_key = f"v21_{str(o_id).replace('-','_')}_{p_idx}"
                             m_w = o_df[o_df["製造工序"] == proc] if not o_df.empty else pd.DataFrame()
                             m_f = f_df_order[f_df_order["製造工序"] == proc] if not f_df_order.empty else pd.DataFrame()
-                            is_assigned = False; is_done = not m_f.empty
+                            is_done = not m_f.empty
                             target_row = m_w.iloc[0] if not m_w.empty else (m_f.iloc[0] if not m_f.empty else None)
                             
                             st.markdown('<div class="proc-row-container">', unsafe_allow_html=True)
                             r_ui = st.columns([3.2, 4.0, 0.8, 2.0])
-                            
-                            with r_ui[0]: 
-                                st.markdown(f'<div class="proc-name">{proc}</div>', unsafe_allow_html=True)
-                            
+                            with r_ui[0]: st.markdown(f'<div class="proc-name">{proc}</div>', unsafe_allow_html=True)
                             with r_ui[1]:
-                                staff_html = ""
-                                if target_row is not None:
-                                    for i in range(1, 6):
-                                        p = target_row.get(f"人員{i}")
-                                        if p and p != "NA": 
-                                            staff_html += f'<span class="badge-staff">{p}</span> '
-                                            is_assigned = True
-                                if not staff_html: 
-                                    st.markdown('<span class="status-empty">尚未派工</span>', unsafe_allow_html=True)
-                                else: 
-                                    st.markdown(f'<div style="display:flex; flex-wrap:wrap; gap:4px;">{staff_html}</div>', unsafe_allow_html=True)
-                            
+                                staff_html = "".join([f'<span class="badge-staff">{target_row.get(f"人員{i}")}</span> ' for i in range(1,6) if target_row is not None and target_row.get(f"人員{i}") != "NA"])
+                                st.markdown(f'<div style="display:flex; flex-wrap:wrap; gap:4px;">{staff_html if staff_html else "尚未派工"}</div>', unsafe_allow_html=True)
                             with r_ui[2]:
-                                if not is_done:
-                                    if st.button("✏️", key=f"eb_staff_{u_key}"):
-                                        if m_w.empty:
-                                            init_data = {"製令": str(o_id), "製造工序": proc, "組長": st.session_state.user, "通電日期": p_date, "人員1": "NA", "人員2": "NA", "人員3": "NA", "人員4": "NA", "人員5": "NA"}
-                                            res = requests.post(f"{DB_URL}.json", data=json.dumps(init_data))
-                                            init_data["db_id"] = res.json().get("name"); edit_staff_dialog(o_id, proc, init_data)
-                                        else: 
-                                            edit_staff_dialog(o_id, proc, target_row.to_dict())
-                            
+                                if not is_done and st.button("✏️", key=f"eb_staff_{u_key}"):
+                                    if m_w.empty:
+                                        init_data = {"製令": str(o_id), "製造工序": proc, "組長": st.session_state.user, "通電日期": p_date, "人員1": "NA", "人員2": "NA", "人員3": "NA", "人員4": "NA", "人員5": "NA"}
+                                        res = requests.post(f"{DB_URL}.json", data=json.dumps(init_data))
+                                        init_data["db_id"] = res.json().get("name"); edit_staff_dialog(o_id, proc, init_data)
+                                    else: edit_staff_dialog(o_id, proc, target_row.to_dict())
                             with r_ui[3]:
-                                if is_done: 
-                                    st.markdown('<div class="status-done-box">✅ 已完工</div>', unsafe_allow_html=True)
-                                else:
-                                    if not is_assigned: 
-                                        st.markdown('<div class="status-assign-box">⚠️ 請指派</div>', unsafe_allow_html=True)
-                                    else:
-                                        if st.button("完工", key=f"db_{u_key}", type="primary", use_container_width=True):
-                                            dat = m_w.iloc[0].to_dict(); db_id = dat.pop('db_id')
-                                            dat["完工時間"] = get_now_str(); dat["完工人員"] = st.session_state.user
-                                            requests.post(f"{FINISH_URL}.json", data=json.dumps(dat))
-                                            requests.delete(f"{DB_URL}/{db_id}.json"); st.rerun()
-                            st.markdown('</div>', unsafe_allow_html=True) 
+                                if is_done: st.markdown('<div class="status-done-box">✅ 已完工</div>', unsafe_allow_html=True)
+                                elif target_row is not None and any(target_row.get(f"人員{i}") != "NA" for i in range(1,6)):
+                                    if st.button("完工", key=f"db_{u_key}", type="primary", use_container_width=True):
+                                        dat = m_w.iloc[0].to_dict(); db_id = dat.pop('db_id')
+                                        dat["完工時間"] = get_now_str(); dat["完工人員"] = st.session_state.user
+                                        requests.post(f"{FINISH_URL}.json", data=json.dumps(dat))
+                                        requests.delete(f"{DB_URL}/{db_id}.json"); st.rerun()
+                                else: st.markdown('<div class="status-assign-box">⚠️ 請指派</div>', unsafe_allow_html=True)
+                            st.markdown('</div>', unsafe_allow_html=True)
                         st.markdown('</div>', unsafe_allow_html=True)
-        except Exception as e: 
-            st.warning("目前系統資料緩衝中或資料庫暫無資料。")
+        except: st.warning("目前系統資料緩衝中。")
+
+    # --- 📈 工時統計分析 (新功能區塊) ---
+    elif st.session_state.menu_selection == "📈 工時統計分析":
+        st.title("📈 工時與產能分析")
+        try:
+            r = requests.get(f"{FINISH_URL}.json").json()
+            if r:
+                df = pd.DataFrame([v for k, v in r.items() if v]).fillna("NA")
+                
+                # 簡單計算每個人出現的次數 (因為目前資料結構人員分散在5個欄位)
+                st.subheader("👥 人員完工貢獻統計 (次數)")
+                all_working_staff = []
+                for i in range(1, 6):
+                    all_working_staff.extend(df[f"人員{i}"].tolist())
+                staff_counts = pd.Series([s for s in all_working_staff if s != "NA"]).value_counts()
+                st.bar_chart(staff_counts)
+
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.subheader("🛠️ 各工序完成數量")
+                    proc_counts = df["製造工序"].value_counts()
+                    st.dataframe(proc_counts, use_container_width=True)
+                with col2:
+                    st.subheader("📦 各製令完工進度")
+                    order_counts = df["製令"].value_counts()
+                    st.pie_chart(order_counts)
+            else:
+                st.info("尚無完工紀錄可供分析")
+        except:
+            st.error("讀取統計資料時出錯")
 
     # --- 📜 完工紀錄查詢 ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
         st.title("📜 歷史完工紀錄")
         try:
             r = requests.get(f"{FINISH_URL}.json").json()
-            if r and isinstance(r, dict):
+            if r:
                 f_df = pd.DataFrame([dict(v, db_id=k) for k, v in r.items() if v]).fillna("NA")
                 f_df = f_df.sort_values("完工時間", ascending=False)
-                
                 keyword = st.text_input("🔍 搜尋 (製令、工序、人員)", key="instant_search").strip()
                 display_df = f_df if not keyword else f_df[f_df.astype(str).apply(lambda x: x.str.contains(keyword, case=False)).any(axis=1)]
-                
-                hide_cols = ['db_id', '提交時間', '最後修改', '最後更新', 'id']
-                
                 for o_id in display_df["製令"].unique():
                     order_records = display_df[display_df["製令"] == o_id]
                     with st.expander(f"📦 製令：{o_id} (已完工 {len(order_records)} 項)"):
-                        cols_to_show = [c for c in order_records.columns if c not in hide_cols]
-                        st.dataframe(order_records[cols_to_show], use_container_width=True)
-                        
+                        st.dataframe(order_records.drop(columns=['db_id'], errors='ignore'), use_container_width=True)
                         for _, row in order_records.iterrows():
-                            btn_label = f"🗑️ 刪除紀錄: {row['製造工序']}"
-                            if st.button(btn_label, key=f"del_{row['db_id']}"):
-                                resp = requests.delete(f"{FINISH_URL}/{row['db_id']}.json")
-                                if resp.status_code == 200:
-                                    st.success(f"已刪除: {row['製造工序']}")
-                                    time.sleep(0.5); st.rerun()
-                                else:
-                                    st.error("刪除失敗，請檢查網路連線")
-            else:
-                st.info("目前無完工紀錄")
-        except Exception as e:
-            st.error(f"資料讀取錯誤")
+                            if st.button(f"🗑️ 刪除: {row['製造工序']}", key=f"del_{row['db_id']}"):
+                                requests.delete(f"{FINISH_URL}/{row['db_id']}.json"); st.rerun()
+            else: st.info("目前無完工紀錄")
+        except: st.error("資料讀取錯誤")
 
     # --- 📝 任務派發 ---
     elif st.session_state.menu_selection == "📝 任務派發":
@@ -383,27 +286,17 @@ else:
     # --- ⚙️ 設定管理 ---
     elif st.session_state.menu_selection == "⚙️ 設定管理":
         st.title("⚙️ 系統核心設定")
-        st.warning("注意：修改後將影響全系統顯示。")
         with st.form("config_form"):
             so = st.text_area("製令清單 (以逗號隔開)", ",".join(order_list))
             sl = st.text_area("組長清單 (以逗號隔開)", ",".join(all_leaders))
             ss = st.text_area("人員清單 (以逗號隔開)", ",".join(all_staff))
             sp = st.text_area("工序清單 (以逗號隔開)", ",".join(process_list))
-            sm = st.text_area("組長對應工序 (格式 組長:工序1,工序2)", "\n".join([f"{k}:{','.join(v)}" for k, v in process_map.items()]))
-            staff_in = st.text_area("組長屬下人員 (格式 組長:人員1,人員2)", "\n".join([f"{k}:{','.join(v)}" for k, v in staff_map.items()]))
-            
+            sm = st.text_area("組長對應工序 (組長:工序1,工序2)", "\n".join([f"{k}:{','.join(v)}" for k, v in process_map.items()]))
+            staff_in = st.text_area("組長屬下人員 (組長:人員1,人員2)", "\n".join([f"{k}:{','.join(v)}" for k, v in staff_map.items()]))
             if st.form_submit_button("💾 儲存所有設定"):
                 def split_s(s): return [x.strip() for x in s.split(",") if x.strip()]
-                new_proc_map = {}
-                for line in sm.split("\n"):
-                    if ":" in line: k, v = line.split(":", 1); new_proc_map[k.strip()] = split_s(v)
-                new_staff_map = {}
-                for line in staff_in.split("\n"):
-                    if ":" in line: k, v = line.split(":", 1); new_staff_map[k.strip()] = split_s(v)
-                
-                final_conf = {
-                    "order_list": split_s(so), "all_leaders": split_s(sl), "all_staff": split_s(ss),
-                    "processes": split_s(sp), "process_map": new_proc_map, "staff_map": new_staff_map
-                }
+                new_proc_map = {line.split(":")[0].strip(): split_s(line.split(":")[1]) for line in sm.split("\n") if ":" in line}
+                new_staff_map = {line.split(":")[0].strip(): split_s(line.split(":")[1]) for line in staff_in.split("\n") if ":" in line}
+                final_conf = {"order_list": split_s(so), "all_leaders": split_s(sl), "all_staff": split_s(ss), "processes": split_s(sp), "process_map": new_proc_map, "staff_map": new_staff_map}
                 requests.put(f"{SETTING_URL}.json", data=json.dumps(final_conf))
                 st.success("設定已存入資料庫"); time.sleep(0.8); st.rerun()
