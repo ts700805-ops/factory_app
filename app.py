@@ -216,29 +216,31 @@ else:
                         st.markdown('</div>', unsafe_allow_html=True)
         except: st.warning("目前系統資料緩衝中。")
 
-# --- 📈 工時統計分析 (修正版：支援逗號隔開的製令清單) ---
+# --- 📈 工時統計分析 (增強版：自動匹配設定欄位) ---
     elif st.session_state.menu_selection == "📈 工時統計分析":
         import time 
         
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">⏱️ 生產工時管理系統</h1>', unsafe_allow_html=True)
         
-        # 1. 取得設定管理內的製令清單 (解析逗號隔開的字串)
-        # 根據您的截圖，資料可能存在 settings/orders 或 settings/order_list 下
+        # 1. 取得設定管理內的製令 (全自動掃描所有欄位)
         ORDERS_DB_URL = f"{DB_BASE_URL}/settings/orders" 
         order_options = []
         try:
             orders_data = requests.get(f"{ORDERS_DB_URL}.json").json()
             if orders_data:
-                # 處理邏輯：遍歷所有欄位，尋找包含逗號的字串並拆解
                 temp_list = []
                 for v in orders_data.values():
-                    # 抓取製令編號欄位，如果是字串則按逗號拆分
-                    raw_str = v.get("製令編號", "")
-                    if raw_str:
-                        # 將全形逗號轉半形並拆分，去除空白
-                        parts = raw_str.replace("，", ",").split(",")
-                        temp_list.extend([p.strip() for p in parts if p.strip()])
-                order_options = sorted(list(set(temp_list))) # 去重並排序
+                    # 掃描該筆資料下所有的數值
+                    for key, val in v.items():
+                        if isinstance(val, str) and val.strip():
+                            # 只要字串內有逗號，或是看起來像製令的字串
+                            # 統一將全形逗號轉半形並拆分
+                            parts = val.replace("，", ",").split(",")
+                            for p in parts:
+                                if p.strip():
+                                    temp_list.append(p.strip())
+                # 去重並排序
+                order_options = sorted(list(set(temp_list)))
         except:
             order_options = []
 
@@ -248,13 +250,13 @@ else:
             c1, c2, c3 = st.columns([2, 2, 1])
             with c1:
                 if order_options:
-                    t_oid = st.selectbox("📦 選擇製令編號", order_options, key="t_oid_select_new")
+                    t_oid = st.selectbox("📦 選擇製令編號", order_options, key="t_oid_final_select")
                 else:
-                    # 如果還是抓不到，顯示您看到的警告訊息
-                    st.warning("⚠️ 系統抓不到製令，請確認『設定管理』內的欄位名稱是否為『製令編號』")
-                    t_oid = None
+                    # 這是保底方案：如果抓不到設定，允許手動輸入
+                    t_oid = st.text_input("📦 手動錄入製令", placeholder="抓不到設定時請手動輸入", key="t_oid_manual_input")
+                    st.caption("💡 提示：若要在下拉選單看到，請確認『設定管理』已填寫製令。")
             with c2:
-                t_proc = st.selectbox("🛠️ 選擇執行工序", ["骨架作業", "前置作業", "配電作業", "模組作業", "通電作業", "IPQC查檢"], key="t_proc_input_new")
+                t_proc = st.selectbox("🛠️ 選擇執行工序", ["骨架作業", "前置作業", "配電作業", "模組作業", "通電作業", "IPQC查檢"], key="t_proc_final_input")
             with c3:
                 st.write(" ")
                 if st.button("➕ 加入看板", type="primary", use_container_width=True):
