@@ -216,13 +216,7 @@ else:
                         st.markdown('</div>', unsafe_allow_html=True)
         except: st.warning("目前系統資料緩衝中。")
 
-我看過你完整的主程式了，問題點找出來了！
 
-在你的「設定管理」儲存邏輯中，製令清單是存放在 order_list 這個欄位裡，而目前的工時分析程式碼是在 settings/orders（多了一層 orders）或是掃描整個 settings。
-
-為了最精準地對接你的主程式結構，請將 # --- 📈 工時統計分析 --- 這一整段替換成以下程式碼，這段程式碼會直接讀取你主程式開頭定義好的 order_list 變數：
-
-Python
   # --- 📈 工時統計分析 (精準對接版) ---
     elif st.session_state.menu_selection == "📈 工時統計分析":
         import time 
