@@ -216,21 +216,29 @@ else:
                         st.markdown('</div>', unsafe_allow_html=True)
         except: st.warning("目前系統資料緩衝中。")
 
-# --- 📈 工時統計分析 (優化版：下拉式製令選單 + JS計時) ---
+# --- 📈 工時統計分析 (修正版：支援逗號隔開的製令清單) ---
     elif st.session_state.menu_selection == "📈 工時統計分析":
         import time 
         
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">⏱️ 生產工時管理系統</h1>', unsafe_allow_html=True)
         
-        # 1. 取得設定管理內的製令清單 (從 Firebase 抓取)
-        ORDERS_DB_URL = f"{DB_BASE_URL}/settings/orders"
+        # 1. 取得設定管理內的製令清單 (解析逗號隔開的字串)
+        # 根據您的截圖，資料可能存在 settings/orders 或 settings/order_list 下
+        ORDERS_DB_URL = f"{DB_BASE_URL}/settings/orders" 
+        order_options = []
         try:
             orders_data = requests.get(f"{ORDERS_DB_URL}.json").json()
             if orders_data:
-                # 提取製令編號並過濾掉空白，轉成清單
-                order_options = [str(v.get("製令編號")) for v in orders_data.values() if v.get("製令編號")]
-            else:
-                order_options = []
+                # 處理邏輯：遍歷所有欄位，尋找包含逗號的字串並拆解
+                temp_list = []
+                for v in orders_data.values():
+                    # 抓取製令編號欄位，如果是字串則按逗號拆分
+                    raw_str = v.get("製令編號", "")
+                    if raw_str:
+                        # 將全形逗號轉半形並拆分，去除空白
+                        parts = raw_str.replace("，", ",").split(",")
+                        temp_list.extend([p.strip() for p in parts if p.strip()])
+                order_options = sorted(list(set(temp_list))) # 去重並排序
         except:
             order_options = []
 
@@ -239,14 +247,14 @@ else:
             st.markdown('<div style="background-color:#f8f9fa; padding:20px; border-radius:15px; border:1px solid #dee2e6; margin-bottom:20px;">', unsafe_allow_html=True)
             c1, c2, c3 = st.columns([2, 2, 1])
             with c1:
-                # --- 修改重點：改為 selectbox 下拉選單 ---
                 if order_options:
-                    t_oid = st.selectbox("📦 選擇製令編號", order_options, key="t_oid_select")
+                    t_oid = st.selectbox("📦 選擇製令編號", order_options, key="t_oid_select_new")
                 else:
-                    st.warning("⚠️ 請先至『設定管理』新增製令")
+                    # 如果還是抓不到，顯示您看到的警告訊息
+                    st.warning("⚠️ 系統抓不到製令，請確認『設定管理』內的欄位名稱是否為『製令編號』")
                     t_oid = None
             with c2:
-                t_proc = st.selectbox("🛠️ 選擇執行工序", ["骨架作業", "前置作業", "配電作業", "模組作業", "通電作業", "IPQC查檢"], key="t_proc_input")
+                t_proc = st.selectbox("🛠️ 選擇執行工序", ["骨架作業", "前置作業", "配電作業", "模組作業", "通電作業", "IPQC查檢"], key="t_proc_input_new")
             with c3:
                 st.write(" ")
                 if st.button("➕ 加入看板", type="primary", use_container_width=True):
@@ -260,7 +268,7 @@ else:
                         st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
-        # 3. 監控看板 (從 Firebase 讀取 active_timers)
+        # 3. 監控看板 (其餘計時邏輯維持不變...)
         TIMER_DB_URL = f"{DB_BASE_URL}/active_timers"
         active_timers = requests.get(f"{TIMER_DB_URL}.json").json() or {}
 
@@ -273,7 +281,6 @@ else:
                 start = task.get("start_time", 0)
 
                 with st.expander(f"📦 {o_id} - {p_name}", expanded=True):
-                    # JavaScript 計時器 (保持不吃資源)
                     timer_html = f"""
                     <div style="background:white; padding:15px; border-radius:10px; border-left:8px solid #1e3a8a; display:flex; justify-content:space-between; align-items:center;">
                         <b style="font-size:1.1rem;">🛠️ {p_name}</b>
@@ -281,15 +288,11 @@ else:
                     </div>
                     <script>
                         (function() {{
-                            var acc = {acc};
-                            var start = {start};
-                            var status = '{status}';
+                            var acc = {acc}; var start = {start}; var status = '{status}';
                             var display = document.getElementById('timer_{db_id}');
                             function update() {{
                                 var total = acc;
-                                if (status === 'running') {{
-                                    total += (Date.now() / 1000) - start;
-                                }}
+                                if (status === 'running') {{ total += (Date.now() / 1000) - start; }}
                                 var h = Math.floor(total / 3600).toString().padStart(2, '0');
                                 var m = Math.floor((total % 3600) / 60).toString().padStart(2, '0');
                                 var s = Math.floor(total % 60).toString().padStart(2, '0');
@@ -301,21 +304,15 @@ else:
                     """
                     st.components.v1.html(timer_html, height=100)
 
-                    # 按鈕控制
                     b1, b2, b3 = st.columns(3)
                     with b1:
                         if status != 'running':
                             if st.button("▶️ 開始", key=f"s_{db_id}"):
-                                requests.patch(f"{TIMER_DB_URL}/{db_id}.json", data=json.dumps({
-                                    "status": "running", "start_time": time.time()
-                                }))
+                                requests.patch(f"{TIMER_DB_URL}/{db_id}.json", data=json.dumps({"status": "running", "start_time": time.time()}))
                                 st.rerun()
                         else:
                             if st.button("⏸️ 暫停", key=f"p_{db_id}"):
-                                new_acc = acc + (time.time() - start)
-                                requests.patch(f"{TIMER_DB_URL}/{db_id}.json", data=json.dumps({
-                                    "status": "paused", "accumulated": new_acc, "start_time": 0
-                                }))
+                                requests.patch(f"{TIMER_DB_URL}/{db_id}.json", data=json.dumps({"status": "paused", "accumulated": acc + (time.time() - start), "start_time": 0}))
                                 st.rerun()
                     with b2:
                         if st.button("⏹️ 結束", key=f"e_{db_id}"):
@@ -328,8 +325,6 @@ else:
                         if st.button("🗑️ 刪除", key=f"d_{db_id}"):
                             requests.delete(f"{TIMER_DB_URL}/{db_id}.json")
                             st.rerun()
-        else:
-            st.info("💡 目前無進行中任務。")
 
     # --- 📜 完工紀錄查詢 (優化版：製令自動合併顯示) ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
