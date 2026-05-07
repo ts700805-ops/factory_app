@@ -216,111 +216,113 @@ else:
                         st.markdown('</div>', unsafe_allow_html=True)
         except: st.warning("目前系統資料緩衝中。")
 
-  # --- 📈 工時統計分析 (最終穩定版：修復不跳秒問題) ---
+ # --- 📈 工時統計分析 (高效穩定版：JS計時 + Firebase存檔) ---
     elif st.session_state.menu_selection == "📈 工時統計分析":
-        import time 
-        
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">⏱️ 生產工時管理系統</h1>', unsafe_allow_html=True)
         
-        # 1. 確保 Session State 初始化
-        if 'timer_tasks' not in st.session_state:
-            st.session_state.timer_tasks = {} 
-        if 'timer_logs' not in st.session_state:
-            st.session_state.timer_logs = [] 
+        # 1. 從 Firebase 讀取現有任務 (確保資料重開不消失)
+        TIMER_DB_URL = f"{DB_BASE_URL}/active_timers"
+        
+        def get_active_timers():
+            try:
+                r = requests.get(f"{TIMER_DB_URL}.json").json()
+                return r if r else {}
+            except: return {}
+
+        active_timers = get_active_timers()
 
         # 2. 任務輸入區
         with st.container():
             st.markdown('<div style="background-color:#f8f9fa; padding:20px; border-radius:15px; border:1px solid #dee2e6; margin-bottom:20px;">', unsafe_allow_html=True)
             c1, c2, c3 = st.columns([2, 2, 1])
             with c1:
-                t_oid = st.text_input("📦 錄入製令編號", placeholder="例如: 26M0103-01", key="timer_input_oid")
+                t_oid = st.text_input("📦 錄入製令編號", placeholder="例如: 26M0103-01", key="t_oid_input")
             with c2:
-                t_proc = st.selectbox("🛠️ 選擇執行工序", ["骨架作業", "前置作業", "配電作業", "模組作業", "通電作業", "IPQC查檢"], key="timer_input_proc")
+                t_proc = st.selectbox("🛠️ 選擇執行工序", ["骨架作業", "前置作業", "配電作業", "模組作業", "通電作業", "IPQC查檢"], key="t_proc_input")
             with c3:
-                st.write(" ") 
-                if st.button("➕ 加入看板", type="primary", use_container_width=True, key="timer_add_btn"):
+                st.write(" ")
+                if st.button("➕ 加入看板", type="primary", use_container_width=True):
                     if t_oid:
-                        tk = (t_oid, t_proc)
-                        if tk not in st.session_state.timer_tasks:
-                            # 初始化狀態：確保有 start_time 欄位
-                            st.session_state.timer_tasks[tk] = {'status': 'stop', 'accumulated': 0, 'start_time': None}
-                            st.rerun()
+                        # 初始資料存入 Firebase
+                        new_timer = {
+                            "製令": t_oid, "工序": t_proc, "status": "stop",
+                            "accumulated": 0, "start_time": 0
+                        }
+                        requests.post(f"{TIMER_DB_URL}.json", data=json.dumps(new_timer))
+                        st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
-        # 3. 監控看板
-        u_orders = sorted(list(set([k[0] for k in st.session_state.timer_tasks.keys()])))
-        
-        if not u_orders:
-            st.info("💡 目前無計時任務，請在上方輸入製令後點擊「加入看板」。")
-        
-        for o_id in u_orders:
-            with st.expander(f"📦 製令：{o_id}", expanded=True):
-                procs = [k for k in st.session_state.timer_tasks.keys() if k[0] == o_id]
-                for k in procs:
-                    p_name = k[1]
-                    task = st.session_state.timer_tasks[k]
-                    
-                    # --- 重點：計算即時秒數 ---
-                    display_sec = task['accumulated']
-                    if task['status'] == 'running' and task['start_time'] is not None:
-                        # 當前時間 減去 開始時間 = 經過的秒數
-                        display_sec += (time.time() - task['start_time'])
-                    
-                    t_str = time.strftime("%H:%M:%S", time.gmtime(display_sec))
-                    
-                    st.markdown(f"""
-                        <div style="background-color:white; padding:15px; border-radius:10px; border-left:8px solid #1e3a8a; box-shadow:2px 2px 5px rgba(0,0,0,0.05); margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
-                            <b style="font-size:1.1rem;">🛠️ {p_name}</b>
-                            <span style="color:#ef4444; font-family:monospace; font-size:1.6rem; font-weight:bold;">{t_str}</span>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    
+        # 3. 監控看板 (使用 JS 計時，畫面不閃爍)
+        if active_timers:
+            for db_id, task in active_timers.items():
+                o_id = task.get("製令")
+                p_name = task.get("工序")
+                status = task.get("status")
+                acc = task.get("accumulated", 0)
+                start = task.get("start_time", 0)
+
+                # 建立顯示區塊
+                with st.expander(f"📦 {o_id} - {p_name}", expanded=True):
+                    # --- JavaScript 計時器核心 ---
+                    timer_html = f"""
+                    <div style="background:white; padding:15px; border-radius:10px; border-left:8px solid #1e3a8a; display:flex; justify-content:space-between; align-items:center;">
+                        <b style="font-size:1.1rem;">🛠️ {p_name}</b>
+                        <div id="timer_{db_id}" style="color:#ef4444; font-family:monospace; font-size:1.8rem; font-weight:bold;">00:00:00</div>
+                    </div>
+                    <script>
+                        (function() {{
+                            var acc = {acc};
+                            var start = {start};
+                            var status = '{status}';
+                            var display = document.getElementById('timer_{db_id}');
+                            
+                            function update() {{
+                                var total = acc;
+                                if (status === 'running') {{
+                                    total += (Date.now() / 1000) - start;
+                                }}
+                                var h = Math.floor(total / 3600).toString().padStart(2, '0');
+                                var m = Math.floor((total % 3600) / 60).toString().padStart(2, '0');
+                                var s = Math.floor(total % 60).toString().padStart(2, '0');
+                                display.innerText = h + ":" + m + ":" + s;
+                            }}
+                            setInterval(update, 1000);
+                            update();
+                        }})();
+                    </script>
+                    """
+                    st.components.v1.html(timer_html, height=100)
+
                     # 按鈕控制
-                    b1, b2, b3 = st.columns([1, 1, 1])
-                    u_key = f"timer_{o_id}_{p_name}".replace("-","_").replace(" ","_")
-                    
+                    b1, b2, b3 = st.columns(3)
                     with b1:
-                        if task['status'] != 'running':
-                            if st.button(f"▶️ 開始", key=f"start_{u_key}", use_container_width=True):
-                                task['status'] = 'running'
-                                task['start_time'] = time.time() # 紀錄這一刻
+                        if status != 'running':
+                            if st.button("▶️ 開始", key=f"s_{db_id}"):
+                                requests.patch(f"{TIMER_DB_URL}/{db_id}.json", data=json.dumps({
+                                    "status": "running", "start_time": time.time()
+                                }))
                                 st.rerun()
                         else:
-                            if st.button(f"⏸️ 暫停", key=f"pause_{u_key}", use_container_width=True):
-                                # 暫停時，把剛剛跑的秒數存進累計裡
-                                task['accumulated'] += (time.time() - task['start_time'])
-                                task['status'] = 'paused'
-                                task['start_time'] = None
+                            if st.button("⏸️ 暫停", key=f"p_{db_id}"):
+                                new_acc = acc + (time.time() - start)
+                                requests.patch(f"{TIMER_DB_URL}/{db_id}.json", data=json.dumps({
+                                    "status": "paused", "accumulated": new_acc, "start_time": 0
+                                }))
                                 st.rerun()
                     with b2:
-                        if st.button(f"⏹️ 結束", key=f"stop_{u_key}", use_container_width=True):
-                            f_v = task['accumulated']
-                            if task['status'] == 'running':
-                                f_v += (time.time() - task['start_time'])
-                            st.session_state.timer_logs.append({'製令': o_id, '工序': p_name, '秒數': f_v})
-                            del st.session_state.timer_tasks[k]
+                        if st.button("⏹️ 結束", key=f"e_{db_id}"):
+                            final_sec = acc + (time.time() - start if status == 'running' else 0)
+                            # 存入完工紀錄
+                            log_data = {"製令": o_id, "工序": p_name, "秒數": final_sec, "完工時間": get_now_str()}
+                            requests.post(f"{FINISH_URL}.json", data=json.dumps(log_data))
+                            requests.delete(f"{TIMER_DB_URL}/{db_id}.json")
                             st.rerun()
                     with b3:
-                        if st.button(f"🗑️ 刪除", key=f"del_{u_key}", use_container_width=True):
-                            del st.session_state.timer_tasks[k]
+                        if st.button("🗑️ 刪除", key=f"d_{db_id}"):
+                            requests.delete(f"{TIMER_DB_URL}/{db_id}.json")
                             st.rerun()
-
-        # 4. 【核心修復】自動刷新：放在最後確保所有邏輯處理完再跑
-        if any(t['status'] == 'running' for t in st.session_state.timer_tasks.values()):
-            time.sleep(1)
-            st.rerun()
-
-        # 5. 報表區
-        st.divider()
-        if st.session_state.timer_logs:
-            st.subheader("📊 工時累計報表")
-            df_log = pd.DataFrame(st.session_state.timer_logs)
-            summary = df_log.groupby(['製令', '工序'])['秒數'].sum().reset_index()
-            summary['累計分鐘'] = (summary['秒數'] / 60).round(2)
-            st.dataframe(summary[['製令', '工序', '累計分鐘']], use_container_width=True)
-            if st.button("🧹 清空統計", key="clear_timer_final"):
-                st.session_state.timer_logs = []
-                st.rerun()
+        else:
+            st.info("💡 目前無進行中任務。")
 
     # --- 📜 完工紀錄查詢 ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
