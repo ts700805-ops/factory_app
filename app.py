@@ -223,14 +223,13 @@ else:
 為了最精準地對接你的主程式結構，請將 # --- 📈 工時統計分析 --- 這一整段替換成以下程式碼，這段程式碼會直接讀取你主程式開頭定義好的 order_list 變數：
 
 Python
-    # --- 📈 工時統計分析 (精準對接版) ---
+  # --- 📈 工時統計分析 (精準對接版) ---
     elif st.session_state.menu_selection == "📈 工時統計分析":
         import time 
         
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">⏱️ 生產工時管理系統</h1>', unsafe_allow_html=True)
         
         # 1. 直接使用主程式已經從資料庫抓好的 order_list
-        # 確保格式正確（去除空白、排序）
         if order_list:
             order_options = sorted([str(o).strip() for o in order_list if str(o).strip()])
         else:
@@ -247,7 +246,7 @@ Python
                     st.warning("⚠️ 設定管理內無製令資料")
                     t_oid = st.text_input("📦 手動錄入製令", key="t_oid_manual")
             with c2:
-                # 工序也直接對接你設定管理內的 process_list
+                # 工序直接對接設定管理內的 process_list
                 t_proc = st.selectbox("🛠️ 選擇執行工序", process_list if process_list else ["預設工序"], key="t_proc_final_input")
             with c3:
                 st.write(" ")
