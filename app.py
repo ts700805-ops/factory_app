@@ -324,25 +324,65 @@ else:
         else:
             st.info("💡 目前無進行中任務。")
 
-    # --- 📜 完工紀錄查詢 ---
+    # --- 📜 完工紀錄查詢 (優化版：製令自動合併顯示) ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
-        st.title("📜 歷史完工紀錄")
-        try:
-            r = requests.get(f"{FINISH_URL}.json").json()
-            if r:
-                f_df = pd.DataFrame([dict(v, db_id=k) for k, v in r.items() if v]).fillna("NA")
-                f_df = f_df.sort_values("完工時間", ascending=False)
-                keyword = st.text_input("🔍 搜尋 (製令、工序、人員)", key="instant_search").strip()
-                display_df = f_df if not keyword else f_df[f_df.astype(str).apply(lambda x: x.str.contains(keyword, case=False)).any(axis=1)]
-                for o_id in display_df["製令"].unique():
-                    order_records = display_df[display_df["製令"] == o_id]
-                    with st.expander(f"📦 製令：{o_id} (已完工 {len(order_records)} 項)"):
-                        st.dataframe(order_records.drop(columns=['db_id'], errors='ignore'), use_container_width=True)
-                        for _, row in order_records.iterrows():
-                            if st.button(f"🗑️ 刪除: {row['製造工序']}", key=f"del_{row['db_id']}"):
-                                requests.delete(f"{FINISH_URL}/{row['db_id']}.json"); st.rerun()
-            else: st.info("目前無完工紀錄")
-        except: st.error("資料讀取錯誤")
+        st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📜 歷史完工紀錄</h1>', unsafe_allow_html=True)
+        
+        # 1. 抓取所有完工資料
+        all_logs = requests.get(f"{FINISH_URL}.json").json()
+        
+        if all_logs:
+            # 轉換為清單並補上 Firebase 的 key (db_id)
+            log_list = []
+            for db_id, val in all_logs.items():
+                val['db_id'] = db_id
+                log_list.append(val)
+            
+            df = pd.DataFrame(log_list)
+            
+            # 2. 搜尋功能 (製令、工序、人員)
+            search_q = st.text_input("🔍 搜尋 (輸入製令、工序或人員名稱)", placeholder="輸入關鍵字...")
+            if search_q:
+                # 模糊搜尋包含關鍵字的行
+                df = df[df.astype(str).apply(lambda x: x.str.contains(search_q, case=False)).any(axis=1)]
+
+            # 3. 按「製令」分組顯示
+            if not df.empty:
+                grouped = df.groupby("製令")
+                
+                for o_id, group in grouped:
+                    item_count = len(group)
+                    # 計算該製令總秒數
+                    total_s = group['秒數'].sum() if '秒數' in group.columns else 0
+                    total_m = round(total_s / 60, 2)
+                    
+                    with st.expander(f"📦 製令：{o_id} (已完工 {item_count} 項，共 {total_m} 分鐘)", expanded=False):
+                        # 整理顯示的表格內容
+                        display_df = group.copy()
+                        
+                        # 格式化顯示：將秒數轉為分鐘，並處理時間格式
+                        if '秒數' in display_df.columns:
+                            display_df['工時(分)'] = (display_df['秒數'] / 60).round(2)
+                        
+                        # 挑選要顯示的欄位 (根據你資料庫有的欄位調整)
+                        cols_to_show = ["工序", "完工時間", "工時(分)"]
+                        existing_cols = [c for c in cols_to_show if c in display_df.columns]
+                        
+                        st.table(display_df[existing_cols])
+                        
+                        # 刪除功能 (逐筆刪除)
+                        st.write("---")
+                        c_del_1, c_del_2 = st.columns([3, 1])
+                        with c_del_2:
+                            if st.button(f"🗑️ 刪除整個製令紀錄", key=f"del_group_{o_id}"):
+                                for d_id in group['db_id']:
+                                    requests.delete(f"{FINISH_URL}/{d_id}.json")
+                                st.success(f"製令 {o_id} 已刪除")
+                                st.rerun()
+            else:
+                st.warning("查無符合條件的紀錄。")
+        else:
+            st.info("💡 目前尚無任何完工紀錄。")
 
     # --- 📝 任務派發 ---
     elif st.session_state.menu_selection == "📝 任務派發":
