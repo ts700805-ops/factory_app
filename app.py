@@ -216,31 +216,36 @@ else:
                         st.markdown('</div>', unsafe_allow_html=True)
         except: st.warning("目前系統資料緩衝中。")
 
-# --- 📈 工時統計分析 (增強版：自動匹配設定欄位) ---
+# --- 📈 工時統計分析 (強力抓取版：解決下拉選單空白問題) ---
     elif st.session_state.menu_selection == "📈 工時統計分析":
         import time 
         
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">⏱️ 生產工時管理系統</h1>', unsafe_allow_html=True)
         
-        # 1. 取得設定管理內的製令 (全自動掃描所有欄位)
-        ORDERS_DB_URL = f"{DB_BASE_URL}/settings/orders" 
+        # 1. 深度掃描設定管理內的製令
         order_options = []
         try:
-            orders_data = requests.get(f"{ORDERS_DB_URL}.json").json()
-            if orders_data:
+            # 掃描 settings 下的所有子路徑 (包括 orders, order_list 等)
+            all_settings = requests.get(f"{DB_BASE_URL}/settings.json").json()
+            if all_settings:
                 temp_list = []
-                for v in orders_data.values():
-                    # 掃描該筆資料下所有的數值
-                    for key, val in v.items():
-                        if isinstance(val, str) and val.strip():
-                            # 只要字串內有逗號，或是看起來像製令的字串
-                            # 統一將全形逗號轉半形並拆分
-                            parts = val.replace("，", ",").split(",")
-                            for p in parts:
-                                if p.strip():
-                                    temp_list.append(p.strip())
-                # 去重並排序
-                order_options = sorted(list(set(temp_list)))
+                # 第一層可能是 'orders', 'user_settings' 等
+                for category in all_settings.values():
+                    if isinstance(category, dict):
+                        # 第二層才是具體的格子內容
+                        for item in category.values():
+                            if isinstance(item, dict):
+                                for key, val in item.items():
+                                    if isinstance(val, str) and ("," in val or "，" in val or "-" in val):
+                                        # 只要字串包含逗號或橫槓(製令特徵)，就嘗試拆解
+                                        parts = val.replace("，", ",").split(",")
+                                        temp_list.extend([p.strip() for p in parts if p.strip()])
+                            elif isinstance(item, str):
+                                parts = item.replace("，", ",").split(",")
+                                temp_list.extend([p.strip() for p in parts if p.strip()])
+                
+                # 去重、排序，並過濾掉太短的無效字串
+                order_options = sorted(list(set([o for o in temp_list if len(o) > 2])))
         except:
             order_options = []
 
@@ -249,13 +254,15 @@ else:
             st.markdown('<div style="background-color:#f8f9fa; padding:20px; border-radius:15px; border:1px solid #dee2e6; margin-bottom:20px;">', unsafe_allow_html=True)
             c1, c2, c3 = st.columns([2, 2, 1])
             with c1:
+                # 檢查是否真的有抓到選項
                 if order_options:
                     t_oid = st.selectbox("📦 選擇製令編號", order_options, key="t_oid_final_select")
                 else:
-                    # 這是保底方案：如果抓不到設定，允許手動輸入
-                    t_oid = st.text_input("📦 手動錄入製令", placeholder="抓不到設定時請手動輸入", key="t_oid_manual_input")
-                    st.caption("💡 提示：若要在下拉選單看到，請確認『設定管理』已填寫製令。")
+                    # 如果深度掃描還是失敗，顯示這個提示幫助除錯
+                    st.error("⚠️ 依舊抓不到設定！請確認『設定管理』中該欄位的標題。")
+                    t_oid = st.text_input("📦 手動輸入 (保底)", placeholder="25M0051-07", key="t_oid_manual_fix")
             with c2:
+                # 這裡的工序如果你也想從「設定管理」抓，邏輯是一樣的，目前先維持手動選單
                 t_proc = st.selectbox("🛠️ 選擇執行工序", ["骨架作業", "前置作業", "配電作業", "模組作業", "通電作業", "IPQC查檢"], key="t_proc_final_input")
             with c3:
                 st.write(" ")
@@ -270,7 +277,7 @@ else:
                         st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
-        # 3. 監控看板 (其餘計時邏輯維持不變...)
+        # 3. 監控看板 (使用 JS 計時，維持不吃資源且資料持久化)
         TIMER_DB_URL = f"{DB_BASE_URL}/active_timers"
         active_timers = requests.get(f"{TIMER_DB_URL}.json").json() or {}
 
@@ -327,6 +334,8 @@ else:
                         if st.button("🗑️ 刪除", key=f"d_{db_id}"):
                             requests.delete(f"{TIMER_DB_URL}/{db_id}.json")
                             st.rerun()
+        else:
+            st.info("💡 目前無進行中任務。")
 
     # --- 📜 完工紀錄查詢 (優化版：製令自動合併顯示) ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
