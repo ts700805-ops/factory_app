@@ -216,34 +216,42 @@ else:
                         st.markdown('</div>', unsafe_allow_html=True)
         except: st.warning("目前系統資料緩衝中。")
 
- # --- 📈 工時統計分析 (高效穩定版：JS計時 + Firebase存檔) ---
+# --- 📈 工時統計分析 (優化版：下拉式製令選單 + JS計時) ---
     elif st.session_state.menu_selection == "📈 工時統計分析":
+        import time 
+        
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">⏱️ 生產工時管理系統</h1>', unsafe_allow_html=True)
         
-        # 1. 從 Firebase 讀取現有任務 (確保資料重開不消失)
-        TIMER_DB_URL = f"{DB_BASE_URL}/active_timers"
-        
-        def get_active_timers():
-            try:
-                r = requests.get(f"{TIMER_DB_URL}.json").json()
-                return r if r else {}
-            except: return {}
-
-        active_timers = get_active_timers()
+        # 1. 取得設定管理內的製令清單 (從 Firebase 抓取)
+        ORDERS_DB_URL = f"{DB_BASE_URL}/settings/orders"
+        try:
+            orders_data = requests.get(f"{ORDERS_DB_URL}.json").json()
+            if orders_data:
+                # 提取製令編號並過濾掉空白，轉成清單
+                order_options = [str(v.get("製令編號")) for v in orders_data.values() if v.get("製令編號")]
+            else:
+                order_options = []
+        except:
+            order_options = []
 
         # 2. 任務輸入區
         with st.container():
             st.markdown('<div style="background-color:#f8f9fa; padding:20px; border-radius:15px; border:1px solid #dee2e6; margin-bottom:20px;">', unsafe_allow_html=True)
             c1, c2, c3 = st.columns([2, 2, 1])
             with c1:
-                t_oid = st.text_input("📦 錄入製令編號", placeholder="例如: 26M0103-01", key="t_oid_input")
+                # --- 修改重點：改為 selectbox 下拉選單 ---
+                if order_options:
+                    t_oid = st.selectbox("📦 選擇製令編號", order_options, key="t_oid_select")
+                else:
+                    st.warning("⚠️ 請先至『設定管理』新增製令")
+                    t_oid = None
             with c2:
                 t_proc = st.selectbox("🛠️ 選擇執行工序", ["骨架作業", "前置作業", "配電作業", "模組作業", "通電作業", "IPQC查檢"], key="t_proc_input")
             with c3:
                 st.write(" ")
                 if st.button("➕ 加入看板", type="primary", use_container_width=True):
                     if t_oid:
-                        # 初始資料存入 Firebase
+                        TIMER_DB_URL = f"{DB_BASE_URL}/active_timers"
                         new_timer = {
                             "製令": t_oid, "工序": t_proc, "status": "stop",
                             "accumulated": 0, "start_time": 0
@@ -252,7 +260,10 @@ else:
                         st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
-        # 3. 監控看板 (使用 JS 計時，畫面不閃爍)
+        # 3. 監控看板 (從 Firebase 讀取 active_timers)
+        TIMER_DB_URL = f"{DB_BASE_URL}/active_timers"
+        active_timers = requests.get(f"{TIMER_DB_URL}.json").json() or {}
+
         if active_timers:
             for db_id, task in active_timers.items():
                 o_id = task.get("製令")
@@ -261,9 +272,8 @@ else:
                 acc = task.get("accumulated", 0)
                 start = task.get("start_time", 0)
 
-                # 建立顯示區塊
                 with st.expander(f"📦 {o_id} - {p_name}", expanded=True):
-                    # --- JavaScript 計時器核心 ---
+                    # JavaScript 計時器 (保持不吃資源)
                     timer_html = f"""
                     <div style="background:white; padding:15px; border-radius:10px; border-left:8px solid #1e3a8a; display:flex; justify-content:space-between; align-items:center;">
                         <b style="font-size:1.1rem;">🛠️ {p_name}</b>
@@ -275,7 +285,6 @@ else:
                             var start = {start};
                             var status = '{status}';
                             var display = document.getElementById('timer_{db_id}');
-                            
                             function update() {{
                                 var total = acc;
                                 if (status === 'running') {{
@@ -286,8 +295,7 @@ else:
                                 var s = Math.floor(total % 60).toString().padStart(2, '0');
                                 display.innerText = h + ":" + m + ":" + s;
                             }}
-                            setInterval(update, 1000);
-                            update();
+                            setInterval(update, 1000); update();
                         }})();
                     </script>
                     """
@@ -312,7 +320,6 @@ else:
                     with b2:
                         if st.button("⏹️ 結束", key=f"e_{db_id}"):
                             final_sec = acc + (time.time() - start if status == 'running' else 0)
-                            # 存入完工紀錄
                             log_data = {"製令": o_id, "工序": p_name, "秒數": final_sec, "完工時間": get_now_str()}
                             requests.post(f"{FINISH_URL}.json", data=json.dumps(log_data))
                             requests.delete(f"{TIMER_DB_URL}/{db_id}.json")
