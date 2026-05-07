@@ -216,35 +216,110 @@ else:
                         st.markdown('</div>', unsafe_allow_html=True)
         except: st.warning("目前系統資料緩衝中。")
 
-    # --- 📈 工時統計分析 (新功能區塊) ---
+   # --- 📈 工時統計分析 (計時器版本：只動這一區，其餘不動) ---
     elif st.session_state.menu_selection == "📈 工時統計分析":
-        st.title("📈 工時與產能分析")
-        try:
-            r = requests.get(f"{FINISH_URL}.json").json()
-            if r:
-                df = pd.DataFrame([v for k, v in r.items() if v]).fillna("NA")
-                
-                # 簡單計算每個人出現的次數 (因為目前資料結構人員分散在5個欄位)
-                st.subheader("👥 人員完工貢獻統計 (次數)")
-                all_working_staff = []
-                for i in range(1, 6):
-                    all_working_staff.extend(df[f"人員{i}"].tolist())
-                staff_counts = pd.Series([s for s in all_working_staff if s != "NA"]).value_counts()
-                st.bar_chart(staff_counts)
+        st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">⏱️ 生產工時管理系統</h1>', unsafe_allow_html=True)
+        
+        # 1. 初始化計時器專用的 Session State (不連動外部資料庫)
+        if 'timer_tasks' not in st.session_state:
+            st.session_state.timer_tasks = {} 
+        if 'timer_logs' not in st.session_state:
+            st.session_state.timer_logs = [] 
 
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.subheader("🛠️ 各工序完成數量")
-                    proc_counts = df["製造工序"].value_counts()
-                    st.dataframe(proc_counts, use_container_width=True)
-                with col2:
-                    st.subheader("📦 各製令完工進度")
-                    order_counts = df["製令"].value_counts()
-                    st.pie_chart(order_counts)
-            else:
-                st.info("尚無完工紀錄可供分析")
-        except:
-            st.error("讀取統計資料時出錯")
+        # 2. 任務輸入區
+        with st.container():
+            st.markdown('<div style="background-color:#f8f9fa; padding:20px; border-radius:15px; border:1px solid #dee2e6; margin-bottom:20px;">', unsafe_allow_html=True)
+            c1, c2, c3 = st.columns([2, 2, 1])
+            with c1:
+                t_oid = st.text_input("📦 錄入製令編號", placeholder="例如: 26M0103-01", key="t_input_oid")
+            with c2:
+                t_proc = st.selectbox("🛠️ 選擇執行工序", ["骨架作業", "前置作業", "配電作業", "模組作業", "通電作業", "IPQC查檢"], key="t_input_proc")
+            with c3:
+                st.write(" ") 
+                if st.button("➕ 加入看板", type="primary", use_container_width=True, key="t_add_btn"):
+                    if t_oid:
+                        tk = (t_oid, t_proc)
+                        if tk not in st.session_state.timer_tasks:
+                            st.session_state.timer_tasks[tk] = {'status': 'stop', 'accumulated': 0, 'start_time': None}
+                            st.rerun()
+                    else:
+                        st.error("請輸入製令編號")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        # 3. 自動刷新邏輯 (讓時間動起來)
+        if any(t['status'] == 'running' for t in st.session_state.timer_tasks.values()):
+            time.sleep(1)
+            st.rerun()
+
+        # 4. 監控看板
+        st.subheader("📅 目前執行看板")
+        u_orders = sorted(list(set([k[0] for k in st.session_state.timer_tasks.keys()])))
+        
+        if not u_orders:
+            st.info("💡 目前無計時任務，請先新增任務並點擊「加入看板」。")
+        
+        for o_id in u_orders:
+            with st.expander(f"📦 製令：{o_id}", expanded=True):
+                procs = [k for k in st.session_state.timer_tasks.keys() if k[0] == o_id]
+                for k in procs:
+                    p_name = k[1]
+                    task = st.session_state.timer_tasks[k]
+                    
+                    # 計算目前時間
+                    cur_sec = task['accumulated']
+                    if task['status'] == 'running':
+                        cur_sec += time.time() - task['start_time']
+                    
+                    t_str = time.strftime("%H:%M:%S", time.gmtime(cur_sec))
+                    
+                    # 顯示介面卡片
+                    st.markdown(f"""
+                        <div style="background-color:white; padding:15px; border-radius:10px; border-left:8px solid #1e3a8a; box-shadow:2px 2px 5px rgba(0,0,0,0.05); margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+                            <b style="font-size:1.1rem;">🛠️ {p_name}</b>
+                            <span style="color:#ef4444; font-family:monospace; font-size:1.6rem; font-weight:bold;">{t_str}</span>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # 控制按鈕 (唯一 Key 防止報錯)
+                    b1, b2, b3, b4 = st.columns(4)
+                    u_key = f"{o_id}_{p_name}".replace("-","_").replace(" ","_")
+                    
+                    with b1:
+                        if task['status'] != 'running' and st.button(f"▶️ 開始", key=f"start_{u_key}"):
+                            task['status'] = 'running'; task['start_time'] = time.time(); st.rerun()
+                    with b2:
+                        if task['status'] == 'running' and st.button(f"⏸️ 暫停", key=f"pause_{u_key}"):
+                            task['accumulated'] += time.time() - task['start_time']
+                            task['status'] = 'paused'; st.rerun()
+                    with b3:
+                        if st.button(f"⏹️ 結束", key=f"stop_{u_key}"):
+                            final_v = task['accumulated'] + (time.time() - task['start_time'] if task['status'] == 'running' else 0)
+                            st.session_state.timer_logs.append({'製令': o_id, '工序': p_name, '秒數': final_v})
+                            del st.session_state.timer_tasks[k]; st.rerun()
+                    with b4:
+                        if st.button(f"🗑️ 刪除", key=f"del_{u_key}"):
+                            del st.session_state.timer_tasks[k]; st.rerun()
+
+        # 5. 累加報表區
+        st.divider()
+        st.subheader("📊 工時累計報表")
+        
+        if st.session_state.timer_logs:
+            df_log = pd.DataFrame(st.session_state.timer_logs)
+            # 同製令、同工序進行累加
+            summary = df_log.groupby(['製令', '工序'])['秒數'].sum().reset_index()
+            summary['累計分鐘'] = (summary['秒數'] / 60).round(2)
+            
+            c_l, c_r = st.columns([1, 1])
+            with c_l:
+                st.dataframe(summary[['製令', '工序', '累計分鐘']], use_container_width=True)
+            with c_r:
+                st.bar_chart(data=summary, x="工序", y="累計分鐘", color="製令")
+            
+            if st.button("🧹 清空累計統計", key="clear_timer_logs"):
+                st.session_state.timer_logs = []; st.rerun()
+        else:
+            st.info("尚無數據。任務按下「結束」後會在此累加顯示。")
 
     # --- 📜 完工紀錄查詢 ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
