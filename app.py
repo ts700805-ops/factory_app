@@ -426,7 +426,7 @@ else:
                 st.download_button("📄 匯出全廠資產清單", data=csv_ast, file_name=f"全廠資產表_{get_now_str()}.csv")
             else:
                 st.info("💡 目前資產庫中沒有任何資料。")
-# --- ⚙️ 編輯手工具清單 (完整修復版：含一般工具編輯 + 資產管理人下拉) ---
+# --- ⚙️ 編輯手工具清單 (精簡優化版) ---
     elif st.session_state.menu_selection == "⚙️ 編輯手工具清單":
         st.markdown('<h1 style="text-align:center; color:#db2777; font-weight:900; font-size:2.5rem;">✨ 手工具管理中心</h1>', unsafe_allow_html=True)
         
@@ -435,7 +435,7 @@ else:
         tool_types = tool_settings.get("tool_types", [])
         asset_tools_raw = requests.get(f"{DB_URL}/asset_tools.json").json() or {}
         
-        # 準備人員清單 (用於下拉選單)
+        # 準備人員清單
         current_user = st.session_state.user
         my_team = staff_map.get(current_user, [])
         staff_options = sorted(list(set(my_team))) if my_team else sorted(list(all_staff))
@@ -448,10 +448,8 @@ else:
                 if pwd == "0000":
                     if action_type == "add_asset":
                         payload = {
-                            "name": kwargs['a_name'], 
-                            "no": kwargs['a_no'], 
-                            "管理人員": kwargs['a_admin'], 
-                            "建立時間": get_now_str()
+                            "name": kwargs['a_name'], "no": kwargs['a_no'], 
+                            "管理人員": kwargs['a_admin'], "建立時間": get_now_str()
                         }
                         requests.post(f"{DB_URL}/asset_tools.json", data=json.dumps(payload))
                         st.success("資產已建立"); time.sleep(0.5); st.rerun()
@@ -468,48 +466,43 @@ else:
 
         col1, col2 = st.columns(2)
         
-        # --- 左側：資產與一般工具清單編輯 ---
+        # --- 左側：編輯區 ---
         with col1:
-            # A. 編輯資產手工具 (新增管理人下拉選單)
+            # A. 編輯資產清單 (移除管理人顯示，精簡版面)
             st.markdown('<div class="pink-card" style="border-color: #f472b6;">', unsafe_allow_html=True)
-            st.subheader("📋 編輯資產手工具清單")
-            a_name = st.text_input("資產名稱 (如: 扭力板手)")
-            a_no = st.text_input("資產編號 (如: 001)")
-            a_admin = st.selectbox("指定管理人員", staff_options, key="select_asset_admin")
+            st.subheader("📋 編輯資產手工具")
+            c_a1, c_a2 = st.columns(2)
+            a_name = c_a1.text_input("資產名稱")
+            a_no = c_a2.text_input("資產編號")
+            a_admin = st.selectbox("指定管理人", staff_options)
             
-            if st.button("➕ 申請新增資產", use_container_width=True):
+            if st.button("➕ 新增資產", use_container_width=True):
                 if a_name and a_no:
                     admin_verify_dialog("add_asset", a_name=a_name, a_no=a_no, a_admin=a_admin)
-                else: st.warning("請填寫完整資訊")
+                else: st.warning("請填寫名稱與編號")
             
             if asset_tools_raw:
                 st.write("---")
+                # 僅顯示編號與名稱，點擊圖標刪除
                 for k, v in asset_tools_raw.items():
-                    c_a, c_b = st.columns([4, 1])
-                    c_a.markdown(f"📍 **{v['no']}** - {v['name']}\n<br><small>管理人: {v.get('管理人員','-')}</small>", unsafe_allow_html=True)
-                    if c_b.button("🗑️", key=f"del_ast_{k}"):
+                    c_t1, c_t2 = st.columns([5, 1])
+                    c_t1.markdown(f"📍 **{v['no']}** - {v['name']}") # 移除管理人顯示
+                    if c_t2.button("🗑️", key=f"del_ast_{k}"):
                         admin_verify_dialog("delete_asset", db_id=k)
             st.markdown('</div>', unsafe_allow_html=True)
 
-            # B. 編輯一般工具下拉選單 (補回遺失的功能)
+            # B. 編輯一般工具 (使用逗號分隔編輯方式)
             st.markdown('<div class="pink-card" style="margin-top:20px; border-color: #6366f1;">', unsafe_allow_html=True)
             st.subheader("🛠️ 編輯一般工具清單")
-            new_tool_name = st.text_input("新增一般工具名稱")
-            if st.button("➕ 加入下拉選單", use_container_width=True):
-                if new_tool_name and new_tool_name not in tool_types:
-                    updated_list = tool_types + [new_tool_name]
-                    admin_verify_dialog("update_tool_list", new_list=updated_list)
-                else: st.warning("名稱無效或已存在")
+            # 將現有清單轉成逗號字串
+            current_tools_str = "，".join(tool_types)
+            new_tools_input = st.text_area("工具清單 (請用逗號分隔)", value=current_tools_str, help="例如: 尖嘴鉗,斜口鉗,三用電表", height=150)
             
-            if tool_types:
-                st.write("已存在的工具：")
-                # 這裡用標籤顯示，並提供刪除選項
-                for i, t in enumerate(tool_types):
-                    c_t1, c_t2 = st.columns([4, 1])
-                    c_t1.write(f"• {t}")
-                    if c_t2.button("❌", key=f"del_t_{i}"):
-                        updated_list = [x for x in tool_types if x != t]
-                        admin_verify_dialog("update_tool_list", new_list=updated_list)
+            if st.button("💾 儲存工具清單", use_container_width=True):
+                # 處理輸入：統一用逗號切割、去除空格、去除空白項
+                import re
+                new_list = [t.strip() for t in re.split(r'[，,]', new_tools_input) if t.strip()]
+                admin_verify_dialog("update_tool_list", new_list=new_list)
             st.markdown('</div>', unsafe_allow_html=True)
 
         # --- 右側：新增領用紀錄 ---
@@ -521,7 +514,7 @@ else:
             
             with st.form("user_tool_form"):
                 t_staff = st.selectbox("選擇成員", staff_options)
-                t_name = st.selectbox("選擇工具 (含資產與一般)", final_tool_options)
+                t_name = st.selectbox("選擇工具", final_tool_options)
                 t_qty = st.number_input("數量", min_value=1, value=1)
                 if st.form_submit_button("🎉 確認新增紀錄", use_container_width=True):
                     tool_payload = {
@@ -532,7 +525,7 @@ else:
                         "登記人": current_user
                     }
                     requests.post(f"{USER_TOOLS_URL}.json", data=json.dumps(tool_payload))
-                    st.success(f"已幫 {t_staff} 紀錄完成！"); time.sleep(0.5); st.rerun()
+                    st.success(f"已紀錄！"); time.sleep(0.5); st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
     # --- 📝 任務派發 ---
     elif st.session_state.menu_selection == "📝 任務派發":
