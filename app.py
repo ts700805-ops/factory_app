@@ -351,7 +351,7 @@ else:
                 else: st.error("驗證碼錯誤")
 
         # 3. 建立分頁
-        tab1, tab2 = st.tabs(["👥 人員領用紀錄", "🛡️ 全廠資產總覽"])
+        tab1, tab2 = st.tabs(["👥 人員手工具紀錄", "🛡️ 製造固定資產總覽"])
 
         with tab1:
             if user_tool_raw:
