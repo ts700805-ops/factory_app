@@ -318,7 +318,7 @@ else:
 # --- 🔧 人員手工具紀錄表 (完整合併資產總覽版) ---
     elif st.session_state.menu_selection == "🔧 固資&手工具紀錄表":
         import io
-        st.markdown('<h1 style="text-align:center; color:#db2777; font-weight:900; font-size:2.5rem;">🌸 固資&手工具紀錄表</h1>', unsafe_allow_html=True)
+        st.markdown('<h1 style="text-align:center; color:#db2777; font-weight:900; font-size:2.5rem;">🌸 超慧固資&手工具紀錄表</h1>', unsafe_allow_html=True)
         
         # 1. 讀取資料
         user_tool_raw = requests.get(f"{USER_TOOLS_URL}.json").json() or {}
@@ -449,7 +449,7 @@ else:
             </style>
         """, unsafe_allow_html=True)
 
-        st.markdown('<h1 style="text-align:center; color:#db2777; font-weight:900; font-size:2.5rem;">✨ 手工具管理中心</h1>', unsafe_allow_html=True)
+        st.markdown('<h1 style="text-align:center; color:#db2777; font-weight:900; font-size:2.5rem;">✨ 超慧資產管理中心</h1>', unsafe_allow_html=True)
         
         # 2. 讀取資料
         tool_settings = requests.get(f"{TOOL_LIST_URL}.json").json() or {"tool_types": []}
