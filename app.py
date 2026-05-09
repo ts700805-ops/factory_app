@@ -316,7 +316,7 @@ else:
         else: st.info("💡 目前尚無紀錄。")
 
 # --- 🔧 人員手工具紀錄表 (完整合併資產總覽版) ---
-    elif st.session_state.menu_selection == "🔧 人員手工具紀錄表":
+    elif st.session_state.menu_selection == "🔧 固資&手工具紀錄表":
         import io
         st.markdown('<h1 style="text-align:center; color:#db2777; font-weight:900; font-size:2.5rem;">🌸 人員手工具紀錄表</h1>', unsafe_allow_html=True)
         
