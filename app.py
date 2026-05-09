@@ -10,7 +10,6 @@ DB_BASE_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
 DB_URL = f"{DB_BASE_URL}/work_logs"
 FINISH_URL = f"{DB_BASE_URL}/completed_logs"
 SETTING_URL = f"{DB_BASE_URL}/settings"
-TIMER_DB_URL = f"{DB_BASE_URL}/active_timers"
 
 def get_now_str():
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
@@ -68,7 +67,7 @@ staff_map = settings.get("staff_map", {})
 if "menu_selection" not in st.session_state:
     st.session_state.menu_selection = "📊 製造部派工專區"
 
-# --- 4. 登入邏輯 ---
+# --- 4. 登入介面 ---
 if "user" not in st.session_state:
     st.markdown('<div style="height:100px;"></div>', unsafe_allow_html=True)
     st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-size:3rem; font-weight:900;">⚓ 超慧科技系統</h1>', unsafe_allow_html=True)
@@ -79,7 +78,7 @@ if "user" not in st.session_state:
                 st.session_state.user = u
                 st.rerun()
 else:
-    # 側邊欄導航
+    # 側邊欄導航 (新增「工時統計分析」選項)
     st.sidebar.markdown(f"### 👤 當前人員：**{st.session_state.user}**")
     nav = st.sidebar.radio("功能導航", ["📊 製造部派工專區", "📈 工時統計分析", "📜 完工紀錄查詢", "📝 任務派發", "⚙️ 設定管理"])
     
@@ -134,9 +133,10 @@ else:
                 st.success("✅ 日期已更新")
                 time.sleep(0.5); st.rerun()
 
-        # 篩選列
+        # --- 頁面篩選列 ---
         my_procs = process_map.get(st.session_state.user, process_list)
         my_team_for_filter = staff_map.get(st.session_state.user, all_staff)
+        
         f_cols = st.columns([1, 1, 1])
         with f_cols[0]: s_order = st.selectbox("🔍 篩選製令", ["全部"] + sorted(list(set(order_list))))
         with f_cols[1]: s_staff = st.selectbox("👤 篩選人員", ["全部"] + sorted(my_team_for_filter))
@@ -145,12 +145,14 @@ else:
             r_work_raw = requests.get(f"{DB_URL}.json").json()
             r_work = r_work_raw if r_work_raw and isinstance(r_work_raw, dict) else {}
             df_work = pd.DataFrame([dict(v, db_id=k) for k, v in r_work.items()]).fillna("NA") if r_work else pd.DataFrame()
+            
             r_finish_raw = requests.get(f"{FINISH_URL}.json").json()
             r_finish = r_finish_raw if r_finish_raw and isinstance(r_finish_raw, dict) else {}
             df_finish = pd.DataFrame([v for k, v in r_finish.items()]).fillna("NA") if r_finish else pd.DataFrame()
 
             base_orders = [str(o) for o in order_list]
             if s_order != "全部": base_orders = [str(s_order)]
+
             final_display_orders = []
             for o_id in base_orders:
                 o_df = df_work[df_work["製令"] == str(o_id)] if not df_work.empty else pd.DataFrame()
@@ -214,39 +216,68 @@ else:
                         st.markdown('</div>', unsafe_allow_html=True)
         except: st.warning("目前系統資料緩衝中。")
 
-    # --- 📈 工時統計分析 ---
+
+ # --- 📈 工時統計分析 (同製令分組看板版) ---
     elif st.session_state.menu_selection == "📈 工時統計分析":
+        import time 
+        
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">⏱️ 生產工時管理系統</h1>', unsafe_allow_html=True)
+        
+        # 1. 任務輸入區
         with st.container():
             st.markdown('<div style="background-color:#f8f9fa; padding:20px; border-radius:15px; border:1px solid #dee2e6; margin-bottom:20px;">', unsafe_allow_html=True)
             c1, c2, c3 = st.columns([2, 2, 1])
             with c1:
-                t_oid = st.selectbox("📦 選擇製令編號", sorted([str(o).strip() for o in order_list]), key="t_oid_select") if order_list else st.text_input("📦 手動輸入製令")
+                if order_list:
+                    t_oid = st.selectbox("📦 選擇製令編號", sorted([str(o).strip() for o in order_list]), key="t_oid_select")
+                else:
+                    t_oid = st.text_input("📦 手動輸入製令", key="t_oid_manual")
             with c2:
                 t_proc = st.selectbox("🛠️ 選擇執行工序", process_list if process_list else ["預設工序"], key="t_proc_input")
             with c3:
                 st.write(" ")
                 if st.button("➕ 加入看板", type="primary", use_container_width=True):
                     if t_oid:
+                        TIMER_DB_URL = f"{DB_BASE_URL}/active_timers"
                         new_timer = {"製令": t_oid, "工序": t_proc, "status": "stop", "accumulated": 0, "start_time": 0}
                         requests.post(f"{TIMER_DB_URL}.json", data=json.dumps(new_timer))
                         st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
+        # 2. 獲取進行中的計時器資料
+        TIMER_DB_URL = f"{DB_BASE_URL}/active_timers"
         active_timers = requests.get(f"{TIMER_DB_URL}.json").json() or {}
+
         if active_timers:
+            # --- 邏輯核心：將計時任務按「製令」分組 ---
             grouped_timers = {}
             for db_id, task in active_timers.items():
                 oid = task.get("製令", "未知製令")
-                if oid not in grouped_timers: grouped_timers[oid] = []
+                if oid not in grouped_timers:
+                    grouped_timers[oid] = []
+                # 存入資料並保留 db_id 方便後續操作
                 task['db_id'] = db_id
                 grouped_timers[oid].append(task)
 
+            # 3. 按照分組顯示看板
             for oid in sorted(grouped_timers.keys()):
-                st.markdown(f'<div style="background:#1e3a8a; color:white; padding:8px 15px; border-radius:10px 10px 0 0; font-weight:bold; margin-top:20px;">📦 製令編號：{oid}</div>', unsafe_allow_html=True)
+                # 為每個製令建立一個大外框
+                st.markdown(f"""
+                    <div style="background:#1e3a8a; color:white; padding:8px 15px; border-radius:10px 10px 0 0; font-weight:bold; margin-top:20px;">
+                        📦 製令編號：{oid}
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                # 內層顯示該製令下的所有工序計時器
                 with st.container(border=True):
                     for task in grouped_timers[oid]:
-                        db_id, p_name, status, acc, start = task['db_id'], task.get("工序"), task.get("status"), task.get("accumulated", 0), task.get("start_time", 0)
+                        db_id = task['db_id']
+                        p_name = task.get("工序")
+                        status = task.get("status")
+                        acc = task.get("accumulated", 0)
+                        start = task.get("start_time", 0)
+
+                        # 計時器 UI 與 JS 邏輯
                         timer_html = f"""
                         <div style="background:#f1f5f9; padding:10px; border-radius:8px; margin-bottom:10px; border-left:5px solid #3b82f6; display:flex; justify-content:space-between; align-items:center;">
                             <div style="font-weight:bold; color:#0f172a;">🛠️ {p_name}</div>
@@ -269,6 +300,8 @@ else:
                         </script>
                         """
                         st.components.v1.html(timer_html, height=70)
+
+                        # 控制按鈕
                         b1, b2, b3 = st.columns([1, 1, 1])
                         with b1:
                             if status != 'running':
@@ -284,41 +317,74 @@ else:
                                 final_sec = acc + (time.time() - start if status == 'running' else 0)
                                 log_data = {"製令": oid, "工序": p_name, "秒數": final_sec, "完工時間": get_now_str(), "人員1": st.session_state.user}
                                 requests.post(f"{FINISH_URL}.json", data=json.dumps(log_data))
-                                requests.delete(f"{TIMER_DB_URL}/{db_id}.json"); st.rerun()
+                                requests.delete(f"{TIMER_DB_URL}/{db_id}.json")
+                                st.rerun()
                         with b3:
                             if st.button("🗑️ 刪除", key=f"d_{db_id}"):
-                                requests.delete(f"{TIMER_DB_URL}/{db_id}.json"); st.rerun()
+                                requests.delete(f"{TIMER_DB_URL}/{db_id}.json")
+                                st.rerun()
                         st.write("---")
         else:
             st.info("💡 目前無進行中任務。請從上方選擇製令與工序並點擊「加入看板」。")
-
-    # --- 📜 完工紀錄查詢 ---
+    # --- 📜 完工紀錄查詢 (優化版：製令自動合併顯示) ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📜 歷史完工紀錄</h1>', unsafe_allow_html=True)
+        
+        # 1. 抓取所有完工資料
         all_logs = requests.get(f"{FINISH_URL}.json").json()
+        
         if all_logs:
+            # 轉換為清單並補上 Firebase 的 key (db_id)
             log_list = []
             for db_id, val in all_logs.items():
                 val['db_id'] = db_id
                 log_list.append(val)
+            
             df = pd.DataFrame(log_list)
-            search_q = st.text_input("🔍 搜尋 (製令、工序或人員)")
+            
+            # 2. 搜尋功能 (製令、工序、人員)
+            search_q = st.text_input("🔍 搜尋 (輸入製令、工序或人員名稱)", placeholder="輸入關鍵字...")
             if search_q:
+                # 模糊搜尋包含關鍵字的行
                 df = df[df.astype(str).apply(lambda x: x.str.contains(search_q, case=False)).any(axis=1)]
+
+            # 3. 按「製令」分組顯示
             if not df.empty:
                 grouped = df.groupby("製令")
+                
                 for o_id, group in grouped:
-                    total_m = round(group['秒數'].sum() / 60, 2) if '秒數' in group.columns else 0
-                    with st.expander(f"📦 製令：{o_id} (共 {total_m} 分鐘)"):
+                    item_count = len(group)
+                    # 計算該製令總秒數
+                    total_s = group['秒數'].sum() if '秒數' in group.columns else 0
+                    total_m = round(total_s / 60, 2)
+                    
+                    with st.expander(f"📦 製令：{o_id} (已完工 {item_count} 項，共 {total_m} 分鐘)", expanded=False):
+                        # 整理顯示的表格內容
                         display_df = group.copy()
-                        if '秒數' in display_df.columns: display_df['工時(分)'] = (display_df['秒數'] / 60).round(2)
-                        cols = [c for c in ["工序", "完工時間", "工時(分)"] if c in display_df.columns]
-                        st.table(display_df[cols])
-                        if st.button(f"🗑️ 刪除整個製令紀錄", key=f"del_group_{o_id}"):
-                            for d_id in group['db_id']: requests.delete(f"{FINISH_URL}/{d_id}.json")
-                            st.rerun()
-            else: st.warning("查無紀錄。")
-        else: st.info("💡 目前尚無紀錄。")
+                        
+                        # 格式化顯示：將秒數轉為分鐘，並處理時間格式
+                        if '秒數' in display_df.columns:
+                            display_df['工時(分)'] = (display_df['秒數'] / 60).round(2)
+                        
+                        # 挑選要顯示的欄位 (根據你資料庫有的欄位調整)
+                        cols_to_show = ["工序", "完工時間", "工時(分)"]
+                        existing_cols = [c for c in cols_to_show if c in display_df.columns]
+                        
+                        st.table(display_df[existing_cols])
+                        
+                        # 刪除功能 (逐筆刪除)
+                        st.write("---")
+                        c_del_1, c_del_2 = st.columns([3, 1])
+                        with c_del_2:
+                            if st.button(f"🗑️ 刪除整個製令紀錄", key=f"del_group_{o_id}"):
+                                for d_id in group['db_id']:
+                                    requests.delete(f"{FINISH_URL}/{d_id}.json")
+                                st.success(f"製令 {o_id} 已刪除")
+                                st.rerun()
+            else:
+                st.warning("查無符合條件的紀錄。")
+        else:
+            st.info("💡 目前尚無任何完工紀錄。")
 
     # --- 📝 任務派發 ---
     elif st.session_state.menu_selection == "📝 任務派發":
