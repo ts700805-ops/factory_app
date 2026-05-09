@@ -369,13 +369,20 @@ else:
         else:
             st.info("💡 尚未有任何手工具領用紀錄。")
 
-    # --- ⚙️ 編輯手工具清單 (新功能 2) ---
+   # --- ⚙️ 編輯手工具清單 (修改版：僅顯示該組長所屬人員) ---
     elif st.session_state.menu_selection == "⚙️ 編輯手工具清單":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">⚙️ 手工具管理中心</h1>', unsafe_allow_html=True)
         
         # 讀取現有工具種類設定
         tool_settings = requests.get(f"{TOOL_LIST_URL}.json").json() or {"tool_types": ["電鑽", "起子", "扳手"]}
         tool_types = tool_settings.get("tool_types", [])
+
+        # 獲取當前組長的組員
+        current_leader = st.session_state.user
+        my_team = staff_map.get(current_leader, []) # 從設定中讀取該組長的組員清單
+        
+        # 如果設定中找不到該組長的人員，則預設顯示全部人員 (避免選單變空)
+        display_staff = sorted(list(set(my_team))) if my_team else sorted(all_staff)
 
         col1, col2 = st.columns(2)
         
@@ -392,7 +399,8 @@ else:
         with col2:
             st.subheader("2️⃣ 人員手工具登入表")
             with st.form("user_tool_form"):
-                t_staff = st.selectbox("選擇人員", sorted(all_staff))
+                # 這裡已修改：僅顯示該組長所屬的人員名稱
+                t_staff = st.selectbox("選擇人員", display_staff)
                 t_name = st.selectbox("選擇手工具", tool_types)
                 t_qty = st.number_input("數量", min_value=1, value=1)
                 if st.form_submit_button("➕ 新增領用紀錄"):
@@ -400,7 +408,8 @@ else:
                         "人員": t_staff,
                         "手工具名稱": t_name,
                         "數量": int(t_qty),
-                        "登記時間": get_now_str()
+                        "登記時間": get_now_str(),
+                        "登記人": current_leader # 額外紀錄是由哪位組長登記的
                     }
                     requests.post(f"{USER_TOOLS_URL}.json", data=json.dumps(tool_payload))
                     st.success(f"已新增：{t_staff} - {t_name}")
