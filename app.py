@@ -88,7 +88,7 @@ else:
         "📈 工時統計分析", 
         "📜 完工紀錄查詢", 
         "🔧 固資&手工具紀錄表",
-        "⚙️ 編輯手工具清單",
+        "⚙️ 資產編輯清單",
         "📝 任務派發", 
         "⚙️ 設定管理"
     ])
@@ -427,7 +427,7 @@ else:
             else:
                 st.info("💡 目前資產庫中沒有任何資料。")
 # --- ⚙️ 編輯手工具清單 (修正 Duplicate ID 版本) ---
-    elif st.session_state.menu_selection == "⚙️ 編輯手工具清單":
+    elif st.session_state.menu_selection == "⚙️ 資產編輯清單":
         # 1. 補回關鍵的粉紅色 CSS 樣式
         st.markdown("""
             <style>
