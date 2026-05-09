@@ -426,14 +426,19 @@ else:
                 st.download_button("📄 匯出全廠資產清單", data=csv_ast, file_name=f"全廠資產表_{get_now_str()}.csv")
             else:
                 st.info("💡 目前資產庫中沒有任何資料。")
-# --- ⚙️ 編輯手工具清單 (管理人員記錄 + 密碼保護版) ---
+# --- ⚙️ 編輯手工具清單 (修正版) ---
     elif st.session_state.menu_selection == "⚙️ 編輯手工具清單":
         st.markdown('<h1 style="text-align:center; color:#db2777; font-weight:900; font-size:2.5rem;">✨ 手工具管理中心</h1>', unsafe_allow_html=True)
         
-        # 讀取資料
+        # 1. 讀取資料
         tool_settings = requests.get(f"{TOOL_LIST_URL}.json").json() or {"tool_types": []}
         tool_types = tool_settings.get("tool_types", [])
         current_admin = st.session_state.user  # 獲取管理人員名稱
+        
+        # --- 修正重點：定義人員清單變數 ---
+        my_team = staff_map.get(current_admin, [])
+        # 如果是組長就顯示組員，否則顯示全廠人員
+        display_staff = sorted(list(set(my_team))) if my_team else sorted(list(all_staff))
         
         # --- 密碼驗證 Dialog ---
         @st.dialog("🔒 執行確認")
@@ -456,7 +461,6 @@ else:
             st.markdown('<div class="pink-card" style="border-color: #f472b6;">', unsafe_allow_html=True)
             st.subheader("📋 編輯資產手工具清單")
             
-            # 新增資產 (不直接寫入，先叫出密碼視窗)
             a_name = st.text_input("資產名稱")
             a_no = st.text_input("資產編號")
             if st.button("➕ 申請新增資產", use_container_width=True):
@@ -464,7 +468,6 @@ else:
                     admin_verify_dialog("add_asset", a_name=a_name, a_no=a_no)
                 else: st.warning("請填寫完整資訊")
 
-            # 顯示現有資產與刪除
             asset_tools_raw = requests.get(f"{DB_URL}/asset_tools.json").json() or {}
             if asset_tools_raw:
                 st.write("---")
@@ -476,13 +479,13 @@ else:
             st.markdown('</div>', unsafe_allow_html=True)
 
         with col2:
-            # --- 區域 C: 領用紀錄 (合併一般與資產) ---
             st.markdown('<div class="pink-card">', unsafe_allow_html=True)
             st.subheader("📝 新增領用紀錄")
             asset_options = [f"【資產】{v['name']} ({v['no']})" for k, v in asset_tools_raw.items()]
             final_tool_options = tool_types + asset_options
             
             with st.form("user_tool_form"):
+                # 使用剛剛定義好的 display_staff
                 t_staff = st.selectbox("選擇成員", display_staff)
                 t_name = st.selectbox("選擇工具 (含資產工具)", final_tool_options)
                 t_qty = st.number_input("數量", min_value=1, value=1)
@@ -492,7 +495,7 @@ else:
                         "手工具名稱": t_name,
                         "數量": int(t_qty),
                         "登記時間": get_now_str(),
-                        "登記人": current_leader
+                        "登記人": current_admin
                     }
                     requests.post(f"{USER_TOOLS_URL}.json", data=json.dumps(tool_payload))
                     st.success(f"已幫 {t_staff} 紀錄完成！"); time.sleep(0.5); st.rerun()
