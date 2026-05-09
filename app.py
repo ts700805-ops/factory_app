@@ -426,7 +426,7 @@ else:
                 st.download_button("📄 匯出全廠資產清單", data=csv_ast, file_name=f"全廠資產表_{get_now_str()}.csv")
             else:
                 st.info("💡 目前資產庫中沒有任何資料。")
-# --- ⚙️ 編輯手工具清單 (位置對調 + 快速編輯版) ---
+# --- ⚙️ 編輯手工具清單 (領用選單僅限一般工具版) ---
     elif st.session_state.menu_selection == "⚙️ 編輯手工具清單":
         st.markdown('<h1 style="text-align:center; color:#db2777; font-weight:900; font-size:2.5rem;">✨ 手工具管理中心</h1>', unsafe_allow_html=True)
         
@@ -460,7 +460,7 @@ else:
         
         # --- 左側：管理區 ---
         with col1:
-            # A. 🛠️ 編輯一般工具 (移到上方，不需密碼)
+            # A. 🛠️ 編輯一般工具 (不需密碼)
             st.markdown('<div class="pink-card" style="border-color: #6366f1;">', unsafe_allow_html=True)
             st.subheader("🛠️ 編輯一般工具清單")
             current_tools_str = "，".join(tool_types)
@@ -473,7 +473,7 @@ else:
                 st.success("工具清單已更新"); time.sleep(0.5); st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
-            # B. 📋 編輯資產手工具 (移到下方，不需密碼)
+            # B. 📋 編輯資產手工具 (不需密碼)
             st.markdown('<div class="pink-card" style="margin-top:20px; border-color: #f472b6;">', unsafe_allow_html=True)
             st.subheader("📋 編輯資產手工具")
             c_a1, c_a2 = st.columns(2)
@@ -500,16 +500,17 @@ else:
                         st.success("已刪除"); time.sleep(0.5); st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
-        # --- 右側：新增領用紀錄 ---
+        # --- 右側：新增領用紀錄 (僅顯示一般工具) ---
         with col2:
             st.markdown('<div class="pink-card">', unsafe_allow_html=True)
             st.subheader("📝 新增領用紀錄")
-            asset_options = [f"【資產】{v['name']} ({v['no']})" for k, v in asset_tools_raw.items()]
-            final_tool_options = tool_types + asset_options
+            
+            # 修改處：這裡只帶入一般工具 (tool_types)，排除了資產工具
+            final_tool_options = tool_types 
             
             with st.form("user_tool_form"):
                 t_staff = st.selectbox("選擇成員", staff_options)
-                t_name = st.selectbox("選擇工具", final_tool_options)
+                t_name = st.selectbox("選擇工具", final_tool_options) # 此下拉選單現在只會有一般工具
                 t_qty = st.number_input("數量", min_value=1, value=1)
                 if st.form_submit_button("🎉 確認新增紀錄", use_container_width=True):
                     tool_payload = {
@@ -520,7 +521,7 @@ else:
                         "登記人": current_user
                     }
                     requests.post(f"{USER_TOOLS_URL}.json", data=json.dumps(tool_payload))
-                    st.success(f"已幫 {t_staff} 紀錄完成！"); time.sleep(0.5); st.rerun()
+                    st.success(f"已紀錄！"); time.sleep(0.5); st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
     # --- 📝 任務派發 ---
     elif st.session_state.menu_selection == "📝 任務派發":
