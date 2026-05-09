@@ -315,11 +315,13 @@ else:
             else: st.warning("查無紀錄。")
         else: st.info("💡 目前尚無紀錄。")
 
-# --- 🔧 人員手工具紀錄表 (安全保護 + 下拉編輯 + 匯出版) ---
+# --- 🔧 人員手工具紀錄表 (修正 NameError: io 版) ---
     elif st.session_state.menu_selection == "🔧 人員手工具紀錄表":
+        import io  # 確保在這裡也有匯入 io 模組
+        
         st.markdown('<h1 style="text-align:center; color:#db2777; font-weight:900; font-size:2.5rem;">🌸 人員手工具紀錄表</h1>', unsafe_allow_html=True)
         
-        # 讀取必要資料 (工具清單、領用紀錄、組長成員)
+        # 讀取必要資料
         tool_settings = requests.get(f"{TOOL_LIST_URL}.json").json() or {"tool_types": []}
         all_tool_types = tool_settings.get("tool_types", [])
         user_tool_raw = requests.get(f"{USER_TOOLS_URL}.json").json()
@@ -330,10 +332,8 @@ else:
         @st.dialog("🔒 安全驗證與修改")
         def edit_record_dialog(db_id, current_name, current_qty, person):
             st.markdown(f"**正在修改 {person} 的紀錄**")
-            # 密碼輸入 (介面無提示 0000)
             pwd = st.text_input("請輸入驗證碼", type="password")
             st.divider()
-            # 這裡改為下拉式選單
             new_name = st.selectbox("修改工具名稱", all_tool_types, index=all_tool_types.index(current_name) if current_name in all_tool_types else 0)
             new_qty = st.number_input("修改數量", min_value=1, value=int(current_qty))
             
@@ -372,24 +372,31 @@ else:
             with c1:
                 search_staff = st.selectbox("👤 選擇要查看的人員", ["全部人員"] + sorted(my_team))
             
+            # 過濾邏輯
             if search_staff != "全部人員":
-                tool_df = tool_df[tool_df["人員"] == search_staff]
+                display_df = tool_df[tool_df["人員"] == search_staff]
             else:
-                tool_df = tool_df[tool_df["人員"].isin(my_team)]
+                display_df = tool_df[tool_df["人員"].isin(my_team)]
 
             with c3:
-                # 匯出 Excel 功能
                 st.markdown("<div style='height:28px;'></div>", unsafe_allow_html=True)
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    tool_df.to_excel(writer, index=False, sheet_name='工具紀錄')
-                st.download_button(label="📊 匯出 Excel", data=output.getvalue(), file_name=f"工具紀錄_{get_now_str()}.xlsx", mime="application/vnd.ms-excel")
+                if not display_df.empty:
+                    output = io.BytesIO()
+                    # 使用 ExcelWriter 匯出
+                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                        display_df.to_excel(writer, index=False, sheet_name='工具紀錄')
+                    st.download_button(
+                        label="📊 匯出 Excel", 
+                        data=output.getvalue(), 
+                        file_name=f"工具紀錄_{get_now_str()}.xlsx", 
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
 
-            # --- 顯示列表 ---
+            # --- 顯示列表樣式 ---
             st.markdown("""<style> .stExpander { border: 2px solid #fbcfe8 !important; border-radius: 15px !important; background-color: #fff1f2 !important; } .tool-row { background-color: white; padding: 10px; border-radius: 10px; border-left: 8px solid #f472b6; color: #831843; font-weight: bold; font-size: 1.1rem; } </style>""", unsafe_allow_html=True)
 
-            if not tool_df.empty:
-                for person, group in tool_df.groupby("人員"):
+            if not display_df.empty:
+                for person, group in display_df.groupby("人員"):
                     with st.expander(f"👩‍🔧 {person} 的工具袋 (共 {len(group)} 項)", expanded=True):
                         for _, row in group.iterrows():
                             st.markdown(f'''<div class="tool-row">{row["手工具名稱"]} (數量: {row["數量"]}) <br> <span style="font-size:0.8rem; color:#9d174d;">登記時間: {row["登記時間"]}</span></div>''', unsafe_allow_html=True)
