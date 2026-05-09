@@ -315,105 +315,115 @@ else:
             else: st.warning("查無紀錄。")
         else: st.info("💡 目前尚無紀錄。")
 
-   # --- 🔧 人員手工具紀錄表 (修改版：支援單筆刪除) ---
+  # --- 🔧 人員手工具紀錄表 (粉色系列) ---
     elif st.session_state.menu_selection == "🔧 人員手工具紀錄表":
-        st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">🔧 人員手工具紀錄表清單</h1>', unsafe_allow_html=True)
+        st.markdown('<h1 style="text-align:center; color:#db2777; font-weight:900; font-size:2.5rem;">🌸 人員手工具紀錄表</h1>', unsafe_allow_html=True)
         
         user_tool_raw = requests.get(f"{USER_TOOLS_URL}.json").json()
         if user_tool_raw:
-            # 轉換為 DataFrame 並確保有 db_id
             tool_data_list = []
             for k, v in user_tool_raw.items():
                 item = v.copy()
                 item['db_id'] = k
                 tool_data_list.append(item)
-            
             tool_df = pd.DataFrame(tool_data_list)
             
-            # 1. 人員篩選下拉選單
-            search_staff = st.selectbox("👤 篩選人員名稱", ["全部合並顯示"] + sorted(all_staff))
-            if search_staff != "全部合並顯示":
+            # 樣式設定
+            st.markdown("""
+                <style>
+                .stExpander { border: 2px solid #fbcfe8 !important; border-radius: 15px !important; background-color: #fff1f2 !important; }
+                .tool-row { background-color: white; padding: 15px; border-radius: 10px; margin-bottom: 10px; border-left: 8px solid #f472b6; font-size: 1.2rem; font-weight: 600; color: #831843; }
+                </style>
+            """, unsafe_allow_html=True)
+
+            search_staff = st.selectbox("💖 選擇要查看的成員", ["全部顯示"] + sorted(all_staff))
+            if search_staff != "全部顯示":
                 tool_df = tool_df[tool_df["人員"] == search_staff]
             
             if not tool_df.empty:
-                # 按人員分組顯示
                 for person, group in tool_df.groupby("人員"):
-                    with st.expander(f"👤 人員：{person} (目前領用 {len(group)} 項工具)", expanded=True):
-                        # 建立表頭
+                    with st.expander(f"👩‍🔧 {person} 的工具袋 (共 {len(group)} 項)", expanded=True):
                         h_cols = st.columns([3, 2, 3, 1])
-                        h_cols[0].markdown("**手工具名稱**")
-                        h_cols[1].markdown("**數量**")
-                        h_cols[2].markdown("**登記時間**")
-                        h_cols[3].markdown("**操作**")
-                        st.markdown("---")
+                        h_cols[0].markdown("<b style='font-size:1.3rem; color:#be185d;'>工具名稱</b>", unsafe_allow_html=True)
+                        h_cols[1].markdown("<b style='font-size:1.3rem; color:#be185d;'>數量</b>", unsafe_allow_html=True)
+                        h_cols[2].markdown("<b style='font-size:1.3rem; color:#be185d;'>登記時間</b>", unsafe_allow_html=True)
+                        st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
                         
-                        # 逐行顯示工具，並加入刪除按鈕
                         for _, row in group.iterrows():
+                            st.markdown(f'''
+                                <div class="tool-row">
+                                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                                        <div style="flex:3;">{row["手工具名稱"]}</div>
+                                        <div style="flex:2;">{row["數量"]}</div>
+                                        <div style="flex:3; font-size:1rem; color:#9d174d;">{row["登記時間"]}</div>
+                                        <div style="flex:1; text-align:right;"></div>
+                                    </div>
+                                </div>
+                            ''', unsafe_allow_html=True)
+                            # 為了按鈕功能，按鈕必須獨立放在 columns 中
                             r_cols = st.columns([3, 2, 3, 1])
-                            r_cols[0].write(row["手工具名稱"])
-                            r_cols[1].write(row["數量"])
-                            r_cols[2].write(row["登記時間"])
-                            
-                            # 單個工具刪除按鈕
                             if r_cols[3].button("🗑️", key=f"del_single_{row['db_id']}"):
-                                delete_url = f"{USER_TOOLS_URL}/{row['db_id']}.json"
-                                res = requests.delete(delete_url)
-                                if res.status_code == 200:
-                                    st.toast(f"已刪除 {person} 的 {row['手工具名稱']}")
-                                    time.sleep(0.5)
-                                    st.rerun()
-                                else:
-                                    st.error("刪除失敗，請稍後再試")
+                                requests.delete(f"{USER_TOOLS_URL}/{row['db_id']}.json")
+                                st.toast("已移除工具項目")
+                                time.sleep(0.5); st.rerun()
             else:
-                st.info("💡 該人員目前無領用紀錄。")
+                st.info("目前還沒有領用資料喔！")
         else:
-            st.info("💡 尚未有任何手工具領用紀錄。")
-
-   # --- ⚙️ 編輯手工具清單 (修改版：僅顯示該組長所屬人員) ---
+            st.info("系統裡空空如也，快去新增工具吧！")
+   # --- ⚙️ 編輯手工具清單 (粉色系列) ---
     elif st.session_state.menu_selection == "⚙️ 編輯手工具清單":
-        st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">⚙️ 手工具管理中心</h1>', unsafe_allow_html=True)
+        st.markdown('<h1 style="text-align:center; color:#db2777; font-weight:900; font-size:2.5rem;">✨ 手工具管理中心</h1>', unsafe_allow_html=True)
         
-        # 讀取現有工具種類設定
         tool_settings = requests.get(f"{TOOL_LIST_URL}.json").json() or {"tool_types": ["電鑽", "起子", "扳手"]}
         tool_types = tool_settings.get("tool_types", [])
-
-        # 獲取當前組長的組員
         current_leader = st.session_state.user
-        my_team = staff_map.get(current_leader, []) # 從設定中讀取該組長的組員清單
-        
-        # 如果設定中找不到該組長的人員，則預設顯示全部人員 (避免選單變空)
+        my_team = staff_map.get(current_leader, [])
         display_staff = sorted(list(set(my_team))) if my_team else sorted(all_staff)
+
+        # 頁面背景修飾
+        st.markdown("""
+            <style>
+            .pink-card { background-color: #ffffff; border: 3px solid #fce7f3; padding: 25px; border-radius: 20px; box-shadow: 0 10px 15px -3px rgba(244, 114, 182, 0.2); }
+            .stButton>button { background-color: #f472b6 !important; color: white !important; font-size: 1.2rem !important; border-radius: 10px !important; height: 3em !important; border: none !important; }
+            .stButton>button:hover { background-color: #db2777 !important; border: none !important; }
+            label { font-size: 1.4rem !important; color: #9d174d !important; font-weight: bold !important; }
+            </style>
+        """, unsafe_allow_html=True)
 
         col1, col2 = st.columns(2)
         
         with col1:
-            st.subheader("1️⃣ 編輯下拉選單內容")
+            st.markdown('<div class="pink-card">', unsafe_allow_html=True)
+            st.subheader("🎀 編輯下拉選單內容")
             with st.form("edit_tool_types_form"):
-                new_types_str = st.text_area("手工具種類 (以逗號隔開)", ",".join(tool_types))
-                if st.form_submit_button("💾 儲存工具種類"):
+                new_types_str = st.text_area("請輸入工具種類 (用逗號分開)", ",".join(tool_types), height=150)
+                if st.form_submit_button("💗 儲存新清單", use_container_width=True):
                     updated_types = [x.strip() for x in new_types_str.split(",") if x.strip()]
                     requests.put(f"{TOOL_LIST_URL}.json", data=json.dumps({"tool_types": updated_types}))
-                    st.success("工具清單已更新！")
+                    st.success("清單更新成功！")
                     time.sleep(0.5); st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
 
         with col2:
-            st.subheader("2️⃣ 人員手工具登入表")
+            st.markdown('<div class="pink-card">', unsafe_allow_html=True)
+            st.subheader("📝 新增領用紀錄")
             with st.form("user_tool_form"):
-                # 這裡已修改：僅顯示該組長所屬的人員名稱
-                t_staff = st.selectbox("選擇人員", display_staff)
-                t_name = st.selectbox("選擇手工具", tool_types)
+                t_staff = st.selectbox("選擇可愛的成員", display_staff)
+                t_name = st.selectbox("選擇工具", tool_types)
                 t_qty = st.number_input("數量", min_value=1, value=1)
-                if st.form_submit_button("➕ 新增領用紀錄"):
+                st.markdown("<div style='height:20px;'></div>", unsafe_allow_html=True)
+                if st.form_submit_button("🎉 確認新增紀錄", use_container_width=True):
                     tool_payload = {
                         "人員": t_staff,
                         "手工具名稱": t_name,
                         "數量": int(t_qty),
                         "登記時間": get_now_str(),
-                        "登記人": current_leader # 額外紀錄是由哪位組長登記的
+                        "登記人": current_leader
                     }
                     requests.post(f"{USER_TOOLS_URL}.json", data=json.dumps(tool_payload))
-                    st.success(f"已新增：{t_staff} - {t_name}")
+                    st.success(f"已幫 {t_staff} 紀錄好囉！")
                     time.sleep(0.5); st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
 
     # --- 📝 任務派發 ---
     elif st.session_state.menu_selection == "📝 任務派發":
