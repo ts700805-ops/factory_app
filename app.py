@@ -315,11 +315,30 @@ else:
             else: st.warning("查無紀錄。")
         else: st.info("💡 目前尚無紀錄。")
 
-  # --- 🔧 人員手工具紀錄表 (粉色系列) ---
+ # --- 🔧 人員手工具紀錄表 (粉色進階版：組員過濾 + 編輯功能) ---
     elif st.session_state.menu_selection == "🔧 人員手工具紀錄表":
         st.markdown('<h1 style="text-align:center; color:#db2777; font-weight:900; font-size:2.5rem;">🌸 人員手工具紀錄表</h1>', unsafe_allow_html=True)
         
+        # 獲取當前組長的組員清單
+        current_leader = st.session_state.user
+        my_team = staff_map.get(current_leader, [])
+        
+        # 讀取資料
         user_tool_raw = requests.get(f"{USER_TOOLS_URL}.json").json()
+        
+        # 定義編輯視窗的邏輯
+        @st.dialog("✏️ 修改領用紀錄")
+        def edit_record(db_id, current_name, current_qty, person):
+            st.markdown(f"正在編輯 **{person}** 的紀錄")
+            new_name = st.text_input("工具名稱", value=current_name)
+            new_qty = st.number_input("數量", min_value=1, value=int(current_qty))
+            if st.button("💖 確認修改", use_container_width=True):
+                update_data = {"手工具名稱": new_name, "數量": new_qty}
+                requests.patch(f"{USER_TOOLS_URL}/{db_id}.json", data=json.dumps(update_data))
+                st.success("修改成功！")
+                time.sleep(0.5)
+                st.rerun()
+
         if user_tool_raw:
             tool_data_list = []
             for k, v in user_tool_raw.items():
@@ -327,49 +346,61 @@ else:
                 item['db_id'] = k
                 tool_data_list.append(item)
             tool_df = pd.DataFrame(tool_data_list)
-            
+
             # 樣式設定
             st.markdown("""
                 <style>
                 .stExpander { border: 2px solid #fbcfe8 !important; border-radius: 15px !important; background-color: #fff1f2 !important; }
-                .tool-row { background-color: white; padding: 15px; border-radius: 10px; margin-bottom: 10px; border-left: 8px solid #f472b6; font-size: 1.2rem; font-weight: 600; color: #831843; }
+                .tool-row { background-color: white; padding: 12px; border-radius: 10px; margin-bottom: 5px; border-left: 8px solid #f472b6; color: #831843; }
+                .label-text { font-size: 1.2rem; font-weight: bold; color: #be185d; }
                 </style>
             """, unsafe_allow_html=True)
 
-            search_staff = st.selectbox("💖 選擇要查看的成員", ["全部顯示"] + sorted(all_staff))
-            if search_staff != "全部顯示":
-                tool_df = tool_df[tool_df["人員"] == search_staff]
+            # 下拉選單：預設顯示「我的組員」，也可以切換看「全部」
+            view_mode = st.radio("顯示範圍", ["僅顯示我的組員", "顯示全部人員"], horizontal=True)
             
+            if view_mode == "僅顯示我的組員":
+                tool_df = tool_df[tool_df["人員"].isin(my_team)]
+                display_label = "我的組員"
+            else:
+                display_label = "全體人員"
+
             if not tool_df.empty:
                 for person, group in tool_df.groupby("人員"):
-                    with st.expander(f"👩‍🔧 {person} 的工具袋 (共 {len(group)} 項)", expanded=True):
-                        h_cols = st.columns([3, 2, 3, 1])
-                        h_cols[0].markdown("<b style='font-size:1.3rem; color:#be185d;'>工具名稱</b>", unsafe_allow_html=True)
-                        h_cols[1].markdown("<b style='font-size:1.3rem; color:#be185d;'>數量</b>", unsafe_allow_html=True)
-                        h_cols[2].markdown("<b style='font-size:1.3rem; color:#be185d;'>登記時間</b>", unsafe_allow_html=True)
-                        st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
+                    with st.expander(f"👩‍🔧 {person} 的工具清單 (共 {len(group)} 項)", expanded=True):
+                        # 表頭
+                        h_cols = st.columns([3, 1, 3, 2])
+                        h_cols[0].markdown("<p class='label-text'>工具名稱</p>", unsafe_allow_html=True)
+                        h_cols[1].markdown("<p class='label-text'>數量</p>", unsafe_allow_html=True)
+                        h_cols[2].markdown("<p class='label-text'>登記時間</p>", unsafe_allow_html=True)
+                        h_cols[3].markdown("<p class='label-text'>操作</p>", unsafe_allow_html=True)
                         
                         for _, row in group.iterrows():
                             st.markdown(f'''
                                 <div class="tool-row">
-                                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                                        <div style="flex:3;">{row["手工具名稱"]}</div>
-                                        <div style="flex:2;">{row["數量"]}</div>
-                                        <div style="flex:3; font-size:1rem; color:#9d174d;">{row["登記時間"]}</div>
-                                        <div style="flex:1; text-align:right;"></div>
+                                    <div style="display:flex; align-items:center;">
+                                        <div style="flex:3; font-weight:600;">{row["手工具名稱"]}</div>
+                                        <div style="flex:1;">{row["數量"]}</div>
+                                        <div style="flex:3; font-size:0.9rem;">{row["登記時間"]}</div>
+                                        <div style="flex:2;"></div>
                                     </div>
                                 </div>
                             ''', unsafe_allow_html=True)
-                            # 為了按鈕功能，按鈕必須獨立放在 columns 中
-                            r_cols = st.columns([3, 2, 3, 1])
-                            if r_cols[3].button("🗑️", key=f"del_single_{row['db_id']}"):
+                            
+                            # 按鈕列
+                            btn_cols = st.columns([3, 1, 3, 1, 1])
+                            if btn_cols[3].button("✏️", key=f"edit_{row['db_id']}"):
+                                edit_record(row['db_id'], row['手工具名稱'], row['數量'], person)
+                                
+                            if btn_cols[4].button("🗑️", key=f"del_{row['db_id']}"):
                                 requests.delete(f"{USER_TOOLS_URL}/{row['db_id']}.json")
-                                st.toast("已移除工具項目")
-                                time.sleep(0.5); st.rerun()
+                                st.toast(f"已刪除 {row['手工具名稱']}")
+                                time.sleep(0.5)
+                                st.rerun()
             else:
-                st.info("目前還沒有領用資料喔！")
+                st.info(f"💡 目前{display_label}中沒有任何領用紀錄。")
         else:
-            st.info("系統裡空空如也，快去新增工具吧！")
+            st.info("🌸 系統目前沒有任何紀錄喔！")
    # --- ⚙️ 編輯手工具清單 (粉色系列) ---
     elif st.session_state.menu_selection == "⚙️ 編輯手工具清單":
         st.markdown('<h1 style="text-align:center; color:#db2777; font-weight:900; font-size:2.5rem;">✨ 手工具管理中心</h1>', unsafe_allow_html=True)
