@@ -315,10 +315,8 @@ else:
             else: st.warning("查無紀錄。")
         else: st.info("💡 目前尚無紀錄。")
 
-# --- 🔧 人員手工具紀錄表 (修正 NameError: io 版) ---
+# --- 🔧 人員手工具紀錄表 (CSV 匯出版) ---
     elif st.session_state.menu_selection == "🔧 人員手工具紀錄表":
-        import io  # 確保在這裡也有匯入 io 模組
-        
         st.markdown('<h1 style="text-align:center; color:#db2777; font-weight:900; font-size:2.5rem;">🌸 人員手工具紀錄表</h1>', unsafe_allow_html=True)
         
         # 讀取必要資料
@@ -381,15 +379,13 @@ else:
             with c3:
                 st.markdown("<div style='height:28px;'></div>", unsafe_allow_html=True)
                 if not display_df.empty:
-                    output = io.BytesIO()
-                    # 使用 ExcelWriter 匯出
-                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                        display_df.to_excel(writer, index=False, sheet_name='工具紀錄')
+                    # 轉成 CSV 格式 (加上 utf-8-sig 確保 Excel 開啟不亂碼)
+                    csv_data = display_df.to_csv(index=False).encode('utf-8-sig')
                     st.download_button(
-                        label="📊 匯出 Excel", 
-                        data=output.getvalue(), 
-                        file_name=f"工具紀錄_{get_now_str()}.xlsx", 
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        label="📄 匯出 CSV", 
+                        data=csv_data, 
+                        file_name=f"工具紀錄_{get_now_str()}.csv", 
+                        mime="text/csv"
                     )
 
             # --- 顯示列表樣式 ---
