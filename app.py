@@ -426,7 +426,7 @@ else:
                 st.download_button("📄 匯出全廠資產清單", data=csv_ast, file_name=f"全廠資產表_{get_now_str()}.csv")
             else:
                 st.info("💡 目前資產庫中沒有任何資料。")
-# --- ⚙️ 編輯手工具清單 (精簡優化版) ---
+# --- ⚙️ 編輯手工具清單 (位置對調 + 快速編輯版) ---
     elif st.session_state.menu_selection == "⚙️ 編輯手工具清單":
         st.markdown('<h1 style="text-align:center; color:#db2777; font-weight:900; font-size:2.5rem;">✨ 手工具管理中心</h1>', unsafe_allow_html=True)
         
@@ -435,41 +435,46 @@ else:
         tool_types = tool_settings.get("tool_types", [])
         asset_tools_raw = requests.get(f"{DB_URL}/asset_tools.json").json() or {}
         
-        # 準備人員清單
         current_user = st.session_state.user
         my_team = staff_map.get(current_user, [])
         staff_options = sorted(list(set(my_team))) if my_team else sorted(list(all_staff))
 
-        # 2. 密碼驗證 Dialog
-        @st.dialog("🔒 執行確認")
-        def admin_verify_dialog(action_type, **kwargs):
-            pwd = st.text_input("請輸入驗證碼", type="password")
-            if st.button("確認執行", use_container_width=True):
-                if pwd == "0000":
-                    if action_type == "add_asset":
-                        payload = {
-                            "name": kwargs['a_name'], "no": kwargs['a_no'], 
-                            "管理人員": kwargs['a_admin'], "建立時間": get_now_str()
-                        }
-                        requests.post(f"{DB_URL}/asset_tools.json", data=json.dumps(payload))
-                        st.success("資產已建立"); time.sleep(0.5); st.rerun()
-                    
-                    elif action_type == "delete_asset":
-                        requests.delete(f"{DB_URL}/asset_tools/{kwargs['db_id']}.json")
-                        st.success("資產已刪除"); time.sleep(0.5); st.rerun()
-                    
-                    elif action_type == "update_tool_list":
-                        requests.put(f"{TOOL_LIST_URL}.json", data=json.dumps({"tool_types": kwargs['new_list']}))
-                        st.success("工具清單已更新"); time.sleep(0.5); st.rerun()
-                else:
-                    st.error("驗證碼錯誤")
+        # --- 資產編輯 Dialog ---
+        @st.dialog("✏️ 修改資產內容")
+        def edit_asset_dialog(db_id, current_val):
+            new_n = st.text_input("修改名稱", value=current_val.get('name', ''))
+            new_no = st.text_input("修改編號", value=current_val.get('no', ''))
+            new_adm = st.selectbox("修改管理人", staff_options, index=staff_options.index(current_val.get('管理人員')) if current_val.get('管理人員') in staff_options else 0)
+            
+            if st.button("💾 儲存修改", use_container_width=True):
+                updated_payload = {
+                    "name": new_n,
+                    "no": new_no,
+                    "管理人員": new_adm,
+                    "建立時間": current_val.get('建立時間', get_now_str())
+                }
+                requests.put(f"{DB_URL}/asset_tools/{db_id}.json", data=json.dumps(updated_payload))
+                st.success("修改成功！"); time.sleep(0.5); st.rerun()
 
         col1, col2 = st.columns(2)
         
-        # --- 左側：編輯區 ---
+        # --- 左側：管理區 ---
         with col1:
-            # A. 編輯資產清單 (移除管理人顯示，精簡版面)
-            st.markdown('<div class="pink-card" style="border-color: #f472b6;">', unsafe_allow_html=True)
+            # A. 🛠️ 編輯一般工具 (移到上方，不需密碼)
+            st.markdown('<div class="pink-card" style="border-color: #6366f1;">', unsafe_allow_html=True)
+            st.subheader("🛠️ 編輯一般工具清單")
+            current_tools_str = "，".join(tool_types)
+            new_tools_input = st.text_area("工具清單 (逗號分隔)", value=current_tools_str, height=120)
+            
+            if st.button("💾 儲存工具清單", use_container_width=True):
+                import re
+                new_list = [t.strip() for t in re.split(r'[，,]', new_tools_input) if t.strip()]
+                requests.put(f"{TOOL_LIST_URL}.json", data=json.dumps({"tool_types": new_list}))
+                st.success("工具清單已更新"); time.sleep(0.5); st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            # B. 📋 編輯資產手工具 (移到下方，不需密碼)
+            st.markdown('<div class="pink-card" style="margin-top:20px; border-color: #f472b6;">', unsafe_allow_html=True)
             st.subheader("📋 編輯資產手工具")
             c_a1, c_a2 = st.columns(2)
             a_name = c_a1.text_input("資產名稱")
@@ -478,31 +483,21 @@ else:
             
             if st.button("➕ 新增資產", use_container_width=True):
                 if a_name and a_no:
-                    admin_verify_dialog("add_asset", a_name=a_name, a_no=a_no, a_admin=a_admin)
-                else: st.warning("請填寫名稱與編號")
+                    payload = {"name": a_name, "no": a_no, "管理人員": a_admin, "建立時間": get_now_str()}
+                    requests.post(f"{DB_URL}/asset_tools.json", data=json.dumps(payload))
+                    st.success("資產已建立"); time.sleep(0.5); st.rerun()
+                else: st.warning("請填寫完整資訊")
             
             if asset_tools_raw:
                 st.write("---")
-                # 僅顯示編號與名稱，點擊圖標刪除
                 for k, v in asset_tools_raw.items():
-                    c_t1, c_t2 = st.columns([5, 1])
-                    c_t1.markdown(f"📍 **{v['no']}** - {v['name']}") # 移除管理人顯示
-                    if c_t2.button("🗑️", key=f"del_ast_{k}"):
-                        admin_verify_dialog("delete_asset", db_id=k)
-            st.markdown('</div>', unsafe_allow_html=True)
-
-            # B. 編輯一般工具 (使用逗號分隔編輯方式)
-            st.markdown('<div class="pink-card" style="margin-top:20px; border-color: #6366f1;">', unsafe_allow_html=True)
-            st.subheader("🛠️ 編輯一般工具清單")
-            # 將現有清單轉成逗號字串
-            current_tools_str = "，".join(tool_types)
-            new_tools_input = st.text_area("工具清單 (請用逗號分隔)", value=current_tools_str, help="例如: 尖嘴鉗,斜口鉗,三用電表", height=150)
-            
-            if st.button("💾 儲存工具清單", use_container_width=True):
-                # 處理輸入：統一用逗號切割、去除空格、去除空白項
-                import re
-                new_list = [t.strip() for t in re.split(r'[，,]', new_tools_input) if t.strip()]
-                admin_verify_dialog("update_tool_list", new_list=new_list)
+                    c_t1, c_t2, c_t3 = st.columns([4, 1, 1])
+                    c_t1.markdown(f"📍 **{v['no']}** - {v['name']}")
+                    if c_t2.button("✏️", key=f"edit_ast_{k}"):
+                        edit_asset_dialog(k, v)
+                    if c_t3.button("🗑️", key=f"del_ast_{k}"):
+                        requests.delete(f"{DB_URL}/asset_tools/{k}.json")
+                        st.success("已刪除"); time.sleep(0.5); st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
         # --- 右側：新增領用紀錄 ---
@@ -525,7 +520,7 @@ else:
                         "登記人": current_user
                     }
                     requests.post(f"{USER_TOOLS_URL}.json", data=json.dumps(tool_payload))
-                    st.success(f"已紀錄！"); time.sleep(0.5); st.rerun()
+                    st.success(f"已幫 {t_staff} 紀錄完成！"); time.sleep(0.5); st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
     # --- 📝 任務派發 ---
     elif st.session_state.menu_selection == "📝 任務派發":
