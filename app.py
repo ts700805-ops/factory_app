@@ -315,28 +315,57 @@ else:
             else: st.warning("查無紀錄。")
         else: st.info("💡 目前尚無紀錄。")
 
-    # --- 🔧 人員手工具紀錄表 (新功能 1) ---
+   # --- 🔧 人員手工具紀錄表 (修改版：支援單筆刪除) ---
     elif st.session_state.menu_selection == "🔧 人員手工具紀錄表":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">🔧 人員手工具紀錄表清單</h1>', unsafe_allow_html=True)
         
         user_tool_raw = requests.get(f"{USER_TOOLS_URL}.json").json()
         if user_tool_raw:
-            tool_df = pd.DataFrame([dict(v, db_id=k) for k, v in user_tool_raw.items()])
+            # 轉換為 DataFrame 並確保有 db_id
+            tool_data_list = []
+            for k, v in user_tool_raw.items():
+                item = v.copy()
+                item['db_id'] = k
+                tool_data_list.append(item)
             
-            # 搜尋/篩選人員
-            search_staff = st.selectbox("👤 篩選人員", ["全部"] + sorted(all_staff))
-            if search_staff != "全部":
+            tool_df = pd.DataFrame(tool_data_list)
+            
+            # 1. 人員篩選下拉選單
+            search_staff = st.selectbox("👤 篩選人員名稱", ["全部合並顯示"] + sorted(all_staff))
+            if search_staff != "全部合並顯示":
                 tool_df = tool_df[tool_df["人員"] == search_staff]
             
             if not tool_df.empty:
+                # 按人員分組顯示
                 for person, group in tool_df.groupby("人員"):
-                    with st.expander(f"👤 人員：{person} (共 {len(group)} 項工具)", expanded=True):
-                        st.table(group[["手工具名稱", "數量", "登記時間"]])
-                        if st.button(f"🗑️ 清除 {person} 的所有紀錄", key=f"del_tools_{person}"):
-                            for d_id in group['db_id']: requests.delete(f"{USER_TOOLS_URL}/{d_id}.json")
-                            st.rerun()
+                    with st.expander(f"👤 人員：{person} (目前領用 {len(group)} 項工具)", expanded=True):
+                        # 建立表頭
+                        h_cols = st.columns([3, 2, 3, 1])
+                        h_cols[0].markdown("**手工具名稱**")
+                        h_cols[1].markdown("**數量**")
+                        h_cols[2].markdown("**登記時間**")
+                        h_cols[3].markdown("**操作**")
+                        st.markdown("---")
+                        
+                        # 逐行顯示工具，並加入刪除按鈕
+                        for _, row in group.iterrows():
+                            r_cols = st.columns([3, 2, 3, 1])
+                            r_cols[0].write(row["手工具名稱"])
+                            r_cols[1].write(row["數量"])
+                            r_cols[2].write(row["登記時間"])
+                            
+                            # 單個工具刪除按鈕
+                            if r_cols[3].button("🗑️", key=f"del_single_{row['db_id']}"):
+                                delete_url = f"{USER_TOOLS_URL}/{row['db_id']}.json"
+                                res = requests.delete(delete_url)
+                                if res.status_code == 200:
+                                    st.toast(f"已刪除 {person} 的 {row['手工具名稱']}")
+                                    time.sleep(0.5)
+                                    st.rerun()
+                                else:
+                                    st.error("刪除失敗，請稍後再試")
             else:
-                st.info("💡 目前無任何領用紀錄。")
+                st.info("💡 該人員目前無領用紀錄。")
         else:
             st.info("💡 尚未有任何手工具領用紀錄。")
 
