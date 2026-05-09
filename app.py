@@ -315,52 +315,30 @@ else:
             else: st.warning("查無紀錄。")
         else: st.info("💡 目前尚無紀錄。")
 
-# --- 🔧 人員手工具紀錄表 (優化匯出版 + 全員篩選) ---
+# --- 🔧 人員手工具紀錄表 (資產聯動版) ---
     elif st.session_state.menu_selection == "🔧 人員手工具紀錄表":
         import io
         st.markdown('<h1 style="text-align:center; color:#db2777; font-weight:900; font-size:2.5rem;">🌸 人員手工具紀錄表</h1>', unsafe_allow_html=True)
         
-        # 讀取必要資料
-        tool_settings = requests.get(f"{TOOL_LIST_URL}.json").json() or {"tool_types": []}
-        all_tool_types = tool_settings.get("tool_types", [])
         user_tool_raw = requests.get(f"{USER_TOOLS_URL}.json").json()
         current_leader = st.session_state.user
         my_team = staff_map.get(current_leader, [])
 
-        # --- 彈出式視窗邏輯 (編輯/刪除) ---
-        @st.dialog("🔒 安全驗證與修改")
-        def edit_record_dialog(db_id, current_name, current_qty, person):
-            st.markdown(f"**正在修改 {person} 的紀錄**")
-            pwd = st.text_input("請輸入驗證碼", type="password")
-            st.divider()
-            new_name = st.selectbox("修改工具名稱", all_tool_types, index=all_tool_types.index(current_name) if current_name in all_tool_types else 0)
-            new_qty = st.number_input("修改數量", min_value=1, value=int(current_qty))
-            if st.button("💗 確認修改紀錄", use_container_width=True):
-                if pwd == "0000":
-                    requests.patch(f"{USER_TOOLS_URL}/{db_id}.json", data=json.dumps({"手工具名稱": new_name, "數量": new_qty}))
-                    st.success("修改成功！"); time.sleep(0.5); st.rerun()
-                else: st.error("驗證碼錯誤！")
-
-        @st.dialog("🔒 刪除紀錄確認")
-        def delete_record_dialog(db_id, tool_name):
-            st.warning(f"確定要刪除「{tool_name}」嗎？")
-            pwd = st.text_input("請輸入驗證碼進行刪除", type="password")
-            if st.button("❌ 確定刪除", use_container_width=True):
-                if pwd == "0000":
-                    requests.delete(f"{USER_TOOLS_URL}/{db_id}.json")
-                    st.success("已刪除！"); time.sleep(0.5); st.rerun()
-                else: st.error("驗證碼錯誤！")
+        # 安全修改/刪除的 Dialog (沿用先前邏輯)
+        # ... (此處省略 edit_record_dialog 與 delete_record_dialog 函式內容，請保留您原本的程式)
 
         if user_tool_raw:
             tool_data_list = []
             for k, v in user_tool_raw.items():
                 item = v.copy()
                 item['db_id'] = k
+                # 自動判斷是否為資產
+                item['類型'] = "資產工具" if "【資產】" in v['手工具名稱'] else "一般工具"
                 tool_data_list.append(item)
             tool_df = pd.DataFrame(tool_data_list)
 
-            # --- 篩選控制項 ---
-            st.markdown("### 🔍 查詢條件設定")
+            # --- 篩選控制 ---
+            st.markdown("### 🔍 查詢與清點")
             c1, c2 = st.columns(2)
             with c1:
                 filter_type = st.radio("篩選範圍", ["我的組員", "全廠人員搜尋"], horizontal=True)
@@ -372,74 +350,101 @@ else:
                     search_staff = st.selectbox("🌍 選擇全廠人員", ["顯示全部"] + sorted(list(all_staff)))
                     display_df = tool_df if search_staff == "顯示全部" else tool_df[tool_df["人員"] == search_staff]
 
-            # --- 匯出功能 (隱藏 db_id, 新增清點數量) ---
+            # --- 匯出 CSV (優化欄位) ---
             if not display_df.empty:
                 export_df = display_df.copy()
-                if 'db_id' in export_df.columns:
-                    export_df = export_df.drop(columns=['db_id']) # 移除不需要的 ID 欄位
-                export_df["清點數量"] = "" # 新增空白欄位供手寫清點
+                # 重新排列欄位順序，讓類型顯示出來
+                export_cols = ['人員', '類型', '手工具名稱', '數量', '登記時間']
+                export_df = export_df[export_cols]
+                export_df["清點數量"] = "" 
                 
                 csv_data = export_df.to_csv(index=False).encode('utf-8-sig')
-                st.download_button(label="📄 匯出清點用 CSV", data=csv_data, file_name=f"工具清點表_{get_now_str()}.csv", mime="text/csv")
+                st.download_button(label="📄 匯出含資產之清點表", data=csv_data, file_name=f"工具清點_{get_now_str()}.csv", mime="text/csv")
 
-            # --- 顯示列表 ---
-            st.markdown("""<style> .stExpander { border: 2px solid #fbcfe8 !important; border-radius: 15px !important; background-color: #fff1f2 !important; } .tool-row { background-color: white; padding: 10px; border-radius: 10px; border-left: 8px solid #f472b6; color: #831843; font-weight: bold; } </style>""", unsafe_allow_html=True)
+            # --- 顯示列表 (資產項目會變色提醒) ---
+            st.markdown("""<style>.asset-row { border-left: 8px solid #8b5cf6 !important; background-color: #f5f3ff !important; }</style>""", unsafe_allow_html=True)
 
             if not display_df.empty:
                 for person, group in display_df.groupby("人員"):
                     with st.expander(f"👩‍🔧 {person} 的工具袋 (共 {len(group)} 項)", expanded=True):
                         for _, row in group.iterrows():
-                            st.markdown(f'''<div class="tool-row">{row["手工具名稱"]} (數量: {row["數量"]}) <br> <span style="font-size:0.8rem; color:#9d174d;">時間: {row["登記時間"]}</span></div>''', unsafe_allow_html=True)
+                            is_asset = "asset-row" if row['類型'] == "資產工具" else ""
+                            st.markdown(f'''
+                                <div class="tool-row {is_asset}">
+                                    <span style="color:#6d28d9;">[{row['類型']}]</span> {row["手工具名稱"]} (數量: {row["數量"]}) <br> 
+                                    <span style="font-size:0.8rem; color:#9d174d;">登記人: {row.get('登記人','-')} | 時間: {row["登記時間"]}</span>
+                                </div>
+                            ''', unsafe_allow_html=True)
+                            # 編輯/刪除按鈕
                             b_c1, b_c2, b_c3 = st.columns([6, 1, 1])
                             if b_c2.button("✏️", key=f"e_{row['db_id']}"): edit_record_dialog(row['db_id'], row['手工具名稱'], row['數量'], person)
                             if b_c3.button("🗑️", key=f"d_{row['db_id']}"): delete_record_dialog(row['db_id'], row['手工具名稱'])
                             st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
-            else:
-                st.info("💡 目前沒有領用紀錄。")
-        else:
-            st.info("🌸 系統目前空空如也。")
-   # --- ⚙️ 編輯手工具清單 (粉色系列) ---
+  # --- ⚙️ 編輯手工具清單 (新增資產工具版) ---
     elif st.session_state.menu_selection == "⚙️ 編輯手工具清單":
         st.markdown('<h1 style="text-align:center; color:#db2777; font-weight:900; font-size:2.5rem;">✨ 手工具管理中心</h1>', unsafe_allow_html=True)
         
-        tool_settings = requests.get(f"{TOOL_LIST_URL}.json").json() or {"tool_types": ["電鑽", "起子", "扳手"]}
+        # 讀取一般工具清單與資產紀錄
+        tool_settings = requests.get(f"{TOOL_LIST_URL}.json").json() or {"tool_types": []}
         tool_types = tool_settings.get("tool_types", [])
+        
         current_leader = st.session_state.user
         my_team = staff_map.get(current_leader, [])
         display_staff = sorted(list(set(my_team))) if my_team else sorted(all_staff)
 
-        # 頁面背景修飾
-        st.markdown("""
-            <style>
-            .pink-card { background-color: #ffffff; border: 3px solid #fce7f3; padding: 25px; border-radius: 20px; box-shadow: 0 10px 15px -3px rgba(244, 114, 182, 0.2); }
-            .stButton>button { background-color: #f472b6 !important; color: white !important; font-size: 1.2rem !important; border-radius: 10px !important; height: 3em !important; border: none !important; }
-            .stButton>button:hover { background-color: #db2777 !important; border: none !important; }
-            label { font-size: 1.4rem !important; color: #9d174d !important; font-weight: bold !important; }
-            </style>
-        """, unsafe_allow_html=True)
+        st.markdown("""<style>.pink-card { background-color: #ffffff; border: 3px solid #fce7f3; padding: 20px; border-radius: 15px; margin-bottom: 20px; } label { font-size: 1.1rem !important; color: #9d174d !important; font-weight: bold !important; }</style>""", unsafe_allow_html=True)
 
         col1, col2 = st.columns(2)
         
         with col1:
+            # --- 區域 A: 一般下拉選單編輯 ---
             st.markdown('<div class="pink-card">', unsafe_allow_html=True)
             st.subheader("🎀 編輯下拉選單內容")
-            with st.form("edit_tool_types_form"):
-                new_types_str = st.text_area("請輸入工具種類 (用逗號分開)", ",".join(tool_types), height=150)
+            with st.form("edit_general_tools"):
+                new_types_str = st.text_area("一般工具種類 (用逗號分開)", ",".join(tool_types), height=100)
                 if st.form_submit_button("💗 儲存新清單", use_container_width=True):
-                    updated_types = [x.strip() for x in new_types_str.split(",") if x.strip()]
-                    requests.put(f"{TOOL_LIST_URL}.json", data=json.dumps({"tool_types": updated_types}))
-                    st.success("清單更新成功！")
-                    time.sleep(0.5); st.rerun()
+                    updated = [x.strip() for x in new_types_str.split(",") if x.strip()]
+                    requests.put(f"{TOOL_LIST_URL}.json", data=json.dumps({"tool_types": updated}))
+                    st.success("一般工具清單已更新"); time.sleep(0.5); st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            # --- 區域 B: 編輯資產手工具 (照片紅色框框位置) ---
+            st.markdown('<div class="pink-card" style="border-color: #f472b6;">', unsafe_allow_html=True)
+            st.subheader("📋 編輯資產手工具清單")
+            asset_tools_raw = requests.get(f"{DB_URL}/asset_tools.json").json() or {}
+            
+            with st.form("add_asset_tool"):
+                st.info("在此新增具有「資產編號」的高單價共用工具")
+                a_name = st.text_input("資產名稱 (例如: 數位扭力扳手)")
+                a_no = st.text_input("資產編號 (例如: ASSET-2026-001)")
+                if st.form_submit_button("➕ 新增至資產庫", use_container_width=True):
+                    if a_name and a_no:
+                        requests.post(f"{DB_URL}/asset_tools.json", data=json.dumps({"name": a_name, "no": a_no}))
+                        st.success(f"已加入資產: {a_name}"); time.sleep(0.5); st.rerun()
+                    else: st.warning("名稱與編號不可空白")
+            
+            # 顯示現有資產提供刪除
+            if asset_tools_raw:
+                st.write("---")
+                for k, v in asset_tools_raw.items():
+                    c_a, c_b = st.columns([4, 1])
+                    c_a.text(f"📍 {v['no']} - {v['name']}")
+                    if c_b.button("🗑️", key=f"del_ast_{k}"):
+                        requests.delete(f"{DB_URL}/asset_tools/{k}.json")
+                        st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
         with col2:
+            # --- 區域 C: 領用紀錄 (合併一般與資產) ---
             st.markdown('<div class="pink-card">', unsafe_allow_html=True)
             st.subheader("📝 新增領用紀錄")
+            asset_options = [f"【資產】{v['name']} ({v['no']})" for k, v in asset_tools_raw.items()]
+            final_tool_options = tool_types + asset_options
+            
             with st.form("user_tool_form"):
-                t_staff = st.selectbox("選擇可愛的成員", display_staff)
-                t_name = st.selectbox("選擇工具", tool_types)
+                t_staff = st.selectbox("選擇成員", display_staff)
+                t_name = st.selectbox("選擇工具 (含資產工具)", final_tool_options)
                 t_qty = st.number_input("數量", min_value=1, value=1)
-                st.markdown("<div style='height:20px;'></div>", unsafe_allow_html=True)
                 if st.form_submit_button("🎉 確認新增紀錄", use_container_width=True):
                     tool_payload = {
                         "人員": t_staff,
@@ -449,10 +454,8 @@ else:
                         "登記人": current_leader
                     }
                     requests.post(f"{USER_TOOLS_URL}.json", data=json.dumps(tool_payload))
-                    st.success(f"已幫 {t_staff} 紀錄好囉！")
-                    time.sleep(0.5); st.rerun()
+                    st.success(f"已幫 {t_staff} 紀錄完成！"); time.sleep(0.5); st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
-
     # --- 📝 任務派發 ---
     elif st.session_state.menu_selection == "📝 任務派發":
         st.title("📝 任務指派與編輯")
