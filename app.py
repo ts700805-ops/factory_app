@@ -355,6 +355,7 @@ else:
 # --- 🔧 人員手工具紀錄表 (完整合併資產總覽版) ---
     elif st.session_state.menu_selection == "🔧 固資&手工具紀錄表":
         import io
+        # 修正 IndentationError：確保 st.markdown 與 elif 對齊
         st.markdown('<h1 style="text-align:center; color:#db2777; font-weight:900; font-size:2.5rem;">🌸 超慧固資&手工具紀錄表</h1>', unsafe_allow_html=True)
         
         # 1. 讀取資料
@@ -363,37 +364,34 @@ else:
         current_leader = st.session_state.user
         my_team = staff_map.get(current_leader, [])
 
-        # 2. 安全修改/刪除的 Dialog
+        # 2. 安全修改/刪除的 Dialog (加強 Key 唯一性防止 DuplicateElementKey)
         @st.dialog("🔒 安全驗證與修改")
         def edit_record_dialog(db_id, current_name, current_qty, person):
-            # 💡 在彈窗內即時抓取最新工具清單
             try:
                 t_res = requests.get(f"{TOOL_LIST_URL}.json").json() or {}
                 all_tools = t_res.get("tool_types", [])
             except:
                 all_tools = []
             
-            # 如果目前紀錄的工具不在清單內，自動加入避免報錯
             if current_name and current_name not in all_tools:
                 all_tools.append(current_name)
 
             st.markdown(f"**正在修改 {person} 的紀錄**")
-            pwd = st.text_input("請輸入驗證碼", type="password", key=f"edit_pwd_{db_id}")
+            # 💡 增加 prefix 防止與頁面其他元件衝突
+            pwd = st.text_input("請輸入驗證碼", type="password", key=f"dlg_edit_pwd_{db_id}")
             st.divider()
 
-            # --- 新增：可以修改工具名稱 ---
             new_name = st.selectbox(
                 "修改工具名稱", 
                 options=all_tools, 
                 index=all_tools.index(current_name) if current_name in all_tools else 0,
-                key=f"edit_name_{db_id}"
+                key=f"dlg_edit_name_{db_id}"
             )
 
-            new_qty = st.number_input("修改數量", min_value=1, value=int(current_qty), key=f"edit_qty_{db_id}")
+            new_qty = st.number_input("修改數量", min_value=1, value=int(current_qty), key=f"dlg_edit_qty_{db_id}")
             
-            if st.button("💗 確認修改", use_container_width=True, key=f"save_btn_{db_id}"):
+            if st.button("💗 確認修改", use_container_width=True, key=f"dlg_save_btn_{db_id}"):
                 if pwd == "0000":
-                    # 使用 patch 只更新需要修改的欄位
                     payload = {"手工具名稱": new_name, "數量": int(new_qty)}
                     requests.patch(f"{USER_TOOLS_URL}/{db_id}.json", data=json.dumps(payload))
                     st.success("修改成功！")
@@ -405,8 +403,10 @@ else:
         @st.dialog("🔒 刪除紀錄確認")
         def delete_record_dialog(db_id, tool_name):
             st.warning(f"確定要刪除「{tool_name}」嗎？")
-            pwd = st.text_input("請輸入驗證碼", type="password", key=f"del_pwd_{db_id}")
-            if st.button("❌ 確定刪除", use_container_width=True, key=f"del_btn_{db_id}"):
+            # 💡 這裡的 key 加入 'dlg_del' 前綴，確保絕對不會重複
+            pwd = st.text_input("請輸入驗證碼", type="password", key=f"dlg_del_pwd_{db_id}")
+            
+            if st.button("❌ 確定刪除", use_container_width=True, key=f"dlg_del_confirm_{db_id}"):
                 if pwd == "0000":
                     requests.delete(f"{USER_TOOLS_URL}/{db_id}.json")
                     st.success("已刪除！")
@@ -415,6 +415,10 @@ else:
                 else:
                     st.error("驗證碼錯誤")
 
+        # --- 頁面剩餘顯示邏輯 (請確保這之後的刪除按鈕呼叫方式如下) ---
+        # 範例呼叫方式（需放在您的顯示循環中）：
+        # if st.button("🗑️", key=f"main_del_{db_id}"):
+        #     delete_record_dialog(db_id, tool_name)
         # 3. 建立分頁
         tab1, tab2 = st.tabs(["👥 人員手工具紀錄", "🛡️ 製造固定資產總覽"])
 
