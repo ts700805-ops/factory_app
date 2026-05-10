@@ -363,7 +363,7 @@ else:
         current_leader = st.session_state.user
         my_team = staff_map.get(current_leader, [])
 
-        # 2. 安全修改的 Dialog
+        # 2. 安全修改/刪除的 Dialog (確保 Key 唯一)
         @st.dialog("🔒 安全驗證與修改")
         def edit_record_dialog(db_id, current_name, current_qty, person):
             try:
@@ -371,22 +371,14 @@ else:
                 all_tools = t_res.get("tool_types", [])
             except:
                 all_tools = []
-            
             if current_name and current_name not in all_tools:
                 all_tools.append(current_name)
 
             st.markdown(f"**正在修改 {person} 的紀錄**")
             pwd = st.text_input("請輸入驗證碼", type="password", key=f"dlg_edit_pwd_{db_id}")
             st.divider()
-
-            new_name = st.selectbox(
-                "修改工具名稱", 
-                options=all_tools, 
-                index=all_tools.index(current_name) if current_name in all_tools else 0,
-                key=f"dlg_edit_name_{db_id}"
-            )
+            new_name = st.selectbox("修改工具名稱", options=all_tools, index=all_tools.index(current_name) if current_name in all_tools else 0, key=f"dlg_edit_name_{db_id}")
             new_qty = st.number_input("修改數量", min_value=1, value=int(current_qty), key=f"dlg_edit_qty_{db_id}")
-            
             if st.button("💗 確認修改", use_container_width=True, key=f"dlg_save_btn_{db_id}"):
                 if pwd == "0000":
                     payload = {"手工具名稱": new_name, "數量": int(new_qty)}
@@ -395,7 +387,6 @@ else:
                 else:
                     st.error("驗證碼錯誤")
 
-        # 3. 安全刪除的 Dialog
         @st.dialog("🔒 刪除紀錄確認")
         def delete_record_dialog(db_id, tool_name):
             st.warning(f"確定要刪除「{tool_name}」嗎？")
@@ -407,6 +398,92 @@ else:
                 else:
                     st.error("驗證碼錯誤")
 
+        # 3. 建立分頁
+        tab1, tab2 = st.tabs(["👥 人員手工具紀錄", "🛡️ 製造固定資產總覽"])
+
+        with tab1:
+            # --- 頂部篩選與查詢區 (只保留這一個) ---
+            st.markdown("### 🔍 查詢與清點")
+            c1, c2 = st.columns(2)
+            with c1:
+                filter_type = st.radio("篩選範圍", ["我的組員", "全廠人員搜尋"], horizontal=True, key="tool_scope")
+            with c2:
+                if filter_type == "我的組員":
+                    search_staff = st.selectbox("👤 選擇組員", ["顯示全組"] + sorted(my_team), key="select_my_team")
+                else:
+                    search_staff = st.selectbox("🌍 選擇全廠人員", ["顯示全部"] + sorted(list(all_staff)), key="select_all_factory")
+
+            # 資料處理
+            if user_tool_raw:
+                tool_data_list = []
+                for k, v in user_tool_raw.items():
+                    item = v.copy()
+                    item['db_id'] = k
+                    item['類型'] = "資產工具" if "【資產】" in str(v.get('手工具名稱','')) else "一般工具"
+                    tool_data_list.append(item)
+                tool_df = pd.DataFrame(tool_data_list)
+
+                # 執行篩選
+                if filter_type == "我的組員":
+                    display_df = tool_df[tool_df["人員"].isin(my_team)] if search_staff == "顯示全組" else tool_df[tool_df["人員"] == search_staff]
+                else:
+                    display_df = tool_df if search_staff == "顯示全部" else tool_df[tool_df["人員"] == search_staff]
+
+                if not display_df.empty:
+                    # 匯出按鈕
+                    csv_data = display_df.to_csv(index=False).encode('utf-8-sig')
+                    st.download_button(label="📄 匯出含資產之清點表", data=csv_data, file_name=f"工具清點_{get_now_str()}.csv", mime="text/csv")
+
+                    # --- 列表顯示樣式 ---
+                    st.markdown("""
+                        <style>
+                            .tool-card {
+                                background-color: #ffffff; border-radius: 12px; padding: 12px;
+                                margin-bottom: 8px; border: 1px solid #fce7f3;
+                                box-shadow: 1px 1px 3px rgba(0,0,0,0.03);
+                            }
+                            .asset-card { border-left: 8px solid #8b5cf6 !important; background-color: #f5f3ff !important; }
+                            .tool-name { color: #1f2937; font-weight: 800; font-size: 1rem; }
+                            .tool-qty { color: #db2777; font-weight: 700; margin-left: 8px; }
+                            .tool-info { color: #9ca3af; font-size: 0.8rem; margin-top: 4px; }
+                        </style>
+                    """, unsafe_allow_html=True)
+
+                    for person, group in display_df.groupby("人員"):
+                        with st.expander(f"👩‍🔧 {person} 的工具袋 (共 {len(group)} 項)", expanded=True):
+                            for _, row in group.iterrows():
+                                db_id = row['db_id']
+                                is_asset = "asset-card" if row['類型'] == "資產工具" else ""
+                                
+                                # 卡片開始 (移除上方多餘間距)
+                                st.markdown(f'<div class="tool-card {is_asset}">', unsafe_allow_html=True)
+                                info_col, btn_col = st.columns([7.5, 2.5])
+                                
+                                with info_col:
+                                    st.markdown(f"""
+                                        <div class="tool-name">🛠️ {row['手工具名稱']} <span class="tool-qty">x {row['數量']}</span></div>
+                                        <div class="tool-info">登記人: {row.get('登記人','-')} | {row["登記時間"]}</div>
+                                    """, unsafe_allow_html=True)
+                                
+                                with btn_col:
+                                    b1, b2 = st.columns(2)
+                                    with b1:
+                                        if st.button("✏️", key=f"edit_{db_id}"):
+                                            edit_record_dialog(db_id, row['手工具名稱'], row['數量'], person)
+                                    with b2:
+                                        if st.button("🗑️", key=f"del_{db_id}"):
+                                            delete_record_dialog(db_id, row['手工具名稱'])
+                                st.markdown('</div>', unsafe_allow_html=True)
+                else:
+                    st.info("💡 目前沒有領用紀錄。")
+            else:
+                st.info("🌸 系統目前沒有任何數據。")
+
+        with tab2:
+            st.markdown("### 🏢 全廠資產清冊總覽")
+            if asset_tools_raw:
+                ast_df = pd.DataFrame([{"資產編號": v.get("no"), "資產名稱": v.get("name"), "管理人員": v.get("管理人員", "系統"), "建立時間": v.get("建立時間", "-")} for v in asset_tools_raw.values()])
+                st.dataframe(ast_df, use_container_width=True, hide_index=True)
         # 4. 建立分頁
         tab1, tab2 = st.tabs(["👥 人員手工具紀錄", "🛡️ 製造固定資產總覽"])
 
