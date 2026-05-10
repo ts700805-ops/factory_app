@@ -268,27 +268,31 @@ else:
     elif st.session_state.menu_selection == "📈 工時統計分析":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">⏱️ 生產工時管理系統</h1>', unsafe_allow_html=True)
         
-        # --- 修正：確保使用正確的 URL 變數並處理人員名單 ---
-        # 這裡根據您的系統環境，BASE_URL 可能需要改為 DB_BASE_URL
+        # 1. 取得當前組長與所有組員對照表
+        current_leader = st.session_state.user # 取得當前登入者
+        
         try:
-            # 嘗試抓取人員名單
-            staff_res = requests.get(f"{DB_BASE_URL}/settings/all_staff.json")
-            staff_data = staff_res.json() if staff_res.status_code == 200 else []
+            # 抓取 staff_map (格式通常是 {"組員名": "組長名", ...})
+            staff_map_res = requests.get(f"{DB_BASE_URL}/settings/staff_map.json")
+            staff_map = staff_map_res.json() if staff_map_res.status_code == 200 else {}
+            
+            if staff_map:
+                # --- 關鍵修改：只顯示該組長的成員 ---
+                my_staff = [staff for staff, leader in staff_map.items() if leader == current_leader]
+                
+                # 如果該組長下沒人，至少顯示自己
+                if not my_staff:
+                    my_staff = [current_leader]
+            else:
+                my_staff = [current_leader]
         except:
-            staff_data = []
+            my_staff = [current_leader]
 
-        # 轉換名單格式
-        if isinstance(staff_data, dict):
-            staff_list = list(staff_data.values())
-        elif isinstance(staff_data, list):
-            staff_list = staff_data
-        else:
-            staff_list = ["未設定人員"]
-
-        # 1. 人員選擇選單
-        selected_worker = st.selectbox("👤 請選擇操作人員 (顯示誰按的工時)", sorted(staff_list), key="active_worker_select")
+        # 2. 顯示過濾後的人員選單
+        selected_worker = st.selectbox("👤 請選擇操作人員 (僅顯示您的組員)", sorted(my_staff), key="active_worker_select")
         st.divider()
 
+        # --- 加入看板區域 ---
         with st.container():
             st.markdown('<div style="background-color:#f8f9fa; padding:20px; border-radius:15px; border:1px solid #dee2e6; margin-bottom:20px;">', unsafe_allow_html=True)
             c1, c2, c3 = st.columns([2, 2, 1])
@@ -300,8 +304,14 @@ else:
                 st.write(" ")
                 if st.button("➕ 加入看板", type="primary", use_container_width=True):
                     TIMER_DB_URL = f"{DB_BASE_URL}/active_timers"
-                    # 存入時就把人員帶進去
-                    new_timer = {"製令": t_oid, "工序": t_proc, "status": "stop", "accumulated": 0, "start_time": 0, "人員1": selected_worker}
+                    new_timer = {
+                        "製令": t_oid, 
+                        "工序": t_proc, 
+                        "status": "stop", 
+                        "accumulated": 0, 
+                        "start_time": 0, 
+                        "人員1": selected_worker # 存入選中的組員
+                    }
                     requests.post(f"{TIMER_DB_URL}.json", data=json.dumps(new_timer))
                     st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
@@ -327,7 +337,7 @@ else:
                         status = task.get("status")
                         acc = task.get("accumulated", 0)
                         start = task.get("start_time", 0)
-                        worker_name = task.get("人員1", selected_worker) # 顯示是誰的任務
+                        worker_name = task.get("人員1", "未指定")
 
                         st.components.v1.html(f"""
                             <div style="background:#f1f5f9; padding:10px; border-radius:8px; margin-bottom:10px; border-left:5px solid #3b82f6; display:flex; justify-content:space-between; align-items:center;">
@@ -363,7 +373,6 @@ else:
                         with b2:
                             if st.button("⏹️ 結束", key=f"e_{db_id}"):
                                 final_sec = acc + (time.time() - start if status == 'running' else 0)
-                                # 結束時將「人員1」寫入完工資料庫
                                 requests.post(f"{FINISH_URL}.json", data=json.dumps({
                                     "製令": oid, "工序": p_name, "秒數": final_sec, 
                                     "完工時間": get_now_str(), "人員1": worker_name
@@ -376,7 +385,6 @@ else:
                                 st.rerun()
         else:
             st.info("💡 目前無進行中任務。")
-
 # --- 📜 完工紀錄查詢 ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📜 歷史完工紀錄</h1>', unsafe_allow_html=True)
