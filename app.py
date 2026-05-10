@@ -336,41 +336,61 @@ else:
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📜 歷史完工紀錄</h1>', unsafe_allow_html=True)
         
+        # 1. 取得資料與組員名單
         all_logs = requests.get(f"{FINISH_URL}.json").json()
+        staff_data = requests.get(f"{BASE_URL}/settings/all_staff.json").json() or []
+        
         if all_logs:
             df = pd.DataFrame([dict(v, db_id=k) for k, v in all_logs.items()])
-            search_q = st.text_input("🔍 搜尋紀錄")
+            
+            # 2. 【新增功能】組員下拉式選單
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                staff_list = ["全部"] + (staff_data if isinstance(staff_data, list) else list(staff_data.values()))
+                selected_staff = st.selectbox("👤 篩選組員 (顯示誰按的)", staff_list)
+            
+            with col2:
+                search_q = st.text_input("🔍 搜尋紀錄 (製令或工序)")
+
+            # 3. 執行篩選
+            if selected_staff != "全部":
+                # 這裡對應您資料庫中的「人員1」或「登記人」欄位
+                target_col = "人員1" if "人員1" in df.columns else "登記人"
+                if target_col in df.columns:
+                    df = df[df[target_col] == selected_staff]
+            
             if search_q: 
                 df = df[df.astype(str).apply(lambda x: x.str.contains(search_q, case=False)).any(axis=1)]
             
+            # 4. 顯示結果
             if not df.empty:
                 for o_id, group in df.groupby("製令"):
                     display_df = group.copy()
                     
-                    # 1. 計算工時(分)與總秒數
+                    # 計算各項工時與總秒數
                     total_all_seconds = 0
                     if '秒數' in display_df.columns:
                         display_df['工時(分)'] = (display_df['秒數'] / 60).round(2)
-                        total_all_seconds = int(display_df['秒數'].sum()) # 取得該製令總秒數
+                        total_all_seconds = int(display_df['秒數'].sum())
                         
-                        # 2. 逆推開始時間
+                        # 逆推開始時間
                         try:
                             temp_finish = pd.to_datetime(display_df['完工時間'])
                             display_df['開始時間'] = (temp_finish - pd.to_timedelta(display_df['秒數'], unit='s')).dt.strftime('%Y-%m-%d %H:%M:%S')
                         except:
                             display_df['開始時間'] = "計算失敗"
 
-                    # 3. 將總秒數轉換為「xx小時 xx分 xx秒」
+                    # 格式化總工時：xx小時 xx分 xx秒
                     hrs = total_all_seconds // 3600
                     mins = (total_all_seconds % 3600) // 60
                     secs = total_all_seconds % 60
                     time_str = f"{hrs}小時 {mins}分 {secs}秒"
 
-                    # 4. 在標題顯示 (包含您紅框要求的總工時，格式改為時分秒)
+                    # 標題顯示總計 (您要求的紅框位置)
                     with st.expander(f"📦 製令：{o_id} ({len(group)} 項 | 總工時：{time_str})"):
                         
-                        # 設定表格順序
-                        cols = ["工序", "開始時間", "完工時間", "工時(分)"]
+                        # 設定表格顯示順序，包含「人員1」讓您看是誰按的
+                        cols = ["工序", "開始時間", "完工時間", "工時(分)", "人員1"]
                         existing_cols = [c for c in cols if c in display_df.columns]
                         
                         st.table(display_df[existing_cols])
@@ -378,8 +398,10 @@ else:
                         if st.button(f"🗑️ 刪除紀錄", key=f"del_{o_id}"):
                             for d_id in group['db_id']: requests.delete(f"{FINISH_URL}/{d_id}.json")
                             st.rerun()
-            else: st.warning("查無紀錄。")
-        else: st.info("💡 目前尚無紀錄。")
+            else:
+                st.warning(f"查無 {selected_staff if selected_staff != '全部' else ''} 的紀錄。")
+        else:
+            st.info("💡 目前尚無紀錄。")
 # --- 🔧 人員手工具紀錄表 (修正版：恢復資產匯出 + 移除重複) ---
     elif st.session_state.menu_selection == "🔧 固資&手工具紀錄表":
         import io
