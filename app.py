@@ -317,78 +317,38 @@ else:
 
 # --- 🔧 人員手工具紀錄表 (完整合併資產總覽版) ---
     elif st.session_state.menu_selection == "🔧 固資&手工具紀錄表":
-        import io
-        st.markdown('<h1 style="text-align:center; color:#db2777; font-weight:900; font-size:2.5rem;">🌸 超慧固資&手工具紀錄表</h1>', unsafe_allow_html=True)
+       import io
+        st.markdown('<h1 style="text-align:center; color:#db2777; font-weight:900; font-size:2.5rem;">🌸 人員手工具紀錄表</h1>', unsafe_allow_html=True)
         
-        # 1. 讀取主頁資料 (紀錄與資產)
+        # 1. 讀取資料
         user_tool_raw = requests.get(f"{USER_TOOLS_URL}.json").json() or {}
         asset_tools_raw = requests.get(f"{DB_URL}/asset_tools.json").json() or {}
-        
         current_leader = st.session_state.user
         my_team = staff_map.get(current_leader, [])
 
-        # --- 📝 編輯領用紀錄的彈窗 (修正變數找不到的錯誤) ---
+        # 2. 安全修改/刪除的 Dialog (隱藏密碼提示)
         @st.dialog("🔒 安全驗證與修改")
-        def edit_record_dialog(record_id, current_val):
-            # 💡 這裡最關鍵：直接在裡面抓一次最新的選單清單
-            try:
-                res = requests.get(f"{TOOL_LIST_URL}.json").json()
-                menu_options = res.get("tool_types", []) if res else []
-            except:
-                menu_options = []
-
-            st.write(f"正在修改 **{current_val.get('人員')}** 的紀錄")
-            
-            # 1. 驗證碼 (key 加入 record_id 避免重複)
-            pwd = st.text_input("請輸入驗證碼", type="password", key=f"pwd_dialog_{record_id}")
-            
-            st.write("---")
-            
-            # 2. 修改工具名稱
-            # 取得這筆紀錄原本的工具名稱
-            original_tool = current_val.get('手工具名稱', '')
-            
-            # 安全檢查：如果選單裡沒有原本這個工具，就把它塞進選單防止程式當掉
-            final_options = list(menu_options)
-            if original_tool and original_tool not in final_options:
-                final_options.append(original_tool)
-
-            new_tool_name = st.selectbox(
-                "修改工具名稱", 
-                options=final_options, 
-                index=final_options.index(original_tool) if original_tool in final_options else 0,
-                key=f"edit_tool_name_{record_id}"
-            )
-            
-            # 3. 修改數量
-            new_qty = st.number_input(
-                "修改數量", 
-                min_value=1, 
-                value=int(current_val.get('數量', 1)),
-                key=f"edit_tool_qty_{record_id}"
-            )
-            
-            if st.button("❤️ 確認修改", use_container_width=True, key=f"submit_modify_{record_id}"):
+        def edit_record_dialog(db_id, current_name, current_qty, person):
+            st.markdown(f"**正在修改 {person} 的紀錄**")
+            pwd = st.text_input("請輸入驗證碼", type="password") # 不提示 0000
+            st.divider()
+            # 這裡建議保留您原本有的工具下拉清單變數，若無則暫用 text_input
+            new_qty = st.number_input("修改數量", min_value=1, value=int(current_qty))
+            if st.button("💗 確認修改", use_container_width=True):
                 if pwd == "0000":
-                    updated_payload = {
-                        "人員": current_val.get('人員'),
-                        "手工具名稱": new_tool_name, 
-                        "數量": int(new_qty),      
-                        "登記時間": current_val.get('登記時間'), 
-                        "登記人": st.session_state.user
-                    }
-                    # 執行資料庫更新 (PUT)
-                    requests.put(f"{USER_TOOLS_URL}/{record_id}.json", data=json.dumps(updated_payload))
-                    st.success("紀錄已修改！")
-                    time.sleep(0.5)
-                    st.rerun()
-                else:
-                    st.error("驗證碼錯誤")
+                    requests.patch(f"{USER_TOOLS_URL}/{db_id}.json", data=json.dumps({"數量": new_qty}))
+                    st.success("修改成功！"); time.sleep(0.5); st.rerun()
+                else: st.error("驗證碼錯誤")
 
-        # --- 這裡往下是您原本顯示表格或清單的程式碼 ---
-        # 記得在產生 ✏️ 按鈕時，要這樣寫：
-        # if st.button("✏️", key=f"edit_btn_{k}"):
-        #     edit_record_dialog(k, v)
+        @st.dialog("🔒 刪除紀錄確認")
+        def delete_record_dialog(db_id, tool_name):
+            st.warning(f"確定要刪除「{tool_name}」嗎？")
+            pwd = st.text_input("請輸入驗證碼", type="password")
+            if st.button("❌ 確定刪除", use_container_width=True):
+                if pwd == "0000":
+                    requests.delete(f"{USER_TOOLS_URL}/{db_id}.json")
+                    st.success("已刪除！"); time.sleep(0.5); st.rerun()
+                else: st.error("驗證碼錯誤")
         # 3. 建立分頁
         tab1, tab2 = st.tabs(["👥 人員手工具紀錄", "🛡️ 製造固定資產總覽"])
 
