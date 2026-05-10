@@ -268,26 +268,25 @@ else:
     elif st.session_state.menu_selection == "📈 工時統計分析":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">⏱️ 生產工時管理系統</h1>', unsafe_allow_html=True)
         
-        # 1. 取得當前登入者 (組長)
+        # 1. 取得當前組長名字
         current_leader = st.session_state.user 
         
-        # 2. 從 staff_map 篩選出屬於該組長的成員
+        # 2. 從資料庫 staff_map 篩選該組長的成員
         try:
-            # 抓取對照表 (假設格式為 {"組員": "組長", ...})
-            staff_map_res = requests.get(f"{DB_BASE_URL}/settings/staff_map.json")
-            staff_map = staff_map_res.json() if staff_map_res.status_code == 200 else {}
+            # 讀取組員與組長對照表
+            map_res = requests.get(f"{DB_BASE_URL}/settings/staff_map.json")
+            staff_map = map_res.json() if map_res.status_code == 200 else {}
             
-            # --- 核心邏輯：找出誰的組長是我 ---
-            my_staff_list = [member for member, leader in staff_map.items() if leader == current_leader]
+            # --- 核心修正：找出誰的組長是目前登入的人 ---
+            my_team = [member for member, leader in staff_map.items() if leader == current_leader]
             
-            # 如果名單是空的，至少把組長自己放進去，避免選單壞掉
-            if not my_staff_list:
-                my_staff_list = [current_leader]
+            # 如果沒找到組員，則顯示組長自己作為保險
+            display_list = sorted(my_team) if my_team else [current_leader]
         except:
-            my_staff_list = [current_leader]
+            display_list = [current_leader]
 
-        # 3. 顯示下拉選單 (只顯示該組長的成員)
-        selected_worker = st.selectbox("👤 選擇執行組員 (您的組員)", sorted(my_staff_list), key="active_worker_select")
+        # 3. 顯示下拉選單
+        selected_worker = st.selectbox("👤 選擇執行組員 (您的成員)", display_list, key="active_worker_select")
         st.divider()
 
         with st.container():
@@ -301,20 +300,15 @@ else:
                 st.write(" ")
                 if st.button("➕ 加入看板", type="primary", use_container_width=True):
                     TIMER_DB_URL = f"{DB_BASE_URL}/active_timers"
-                    # 加入看板時，存入選中的組員姓名
                     new_timer = {
-                        "製令": t_oid, 
-                        "工序": t_proc, 
-                        "status": "stop", 
-                        "accumulated": 0, 
-                        "start_time": 0, 
-                        "人員1": selected_worker 
+                        "製令": t_oid, "工序": t_proc, "status": "stop", 
+                        "accumulated": 0, "start_time": 0, "人員1": selected_worker 
                     }
                     requests.post(f"{TIMER_DB_URL}.json", data=json.dumps(new_timer))
                     st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
-        # --- 顯示計時看板 ---
+        # --- 顯示計時看板 (加大人員字體) ---
         TIMER_DB_URL = f"{DB_BASE_URL}/active_timers"
         active_timers = requests.get(f"{TIMER_DB_URL}.json").json() or {}
         
@@ -335,15 +329,16 @@ else:
                         status = task.get("status")
                         acc = task.get("accumulated", 0)
                         start = task.get("start_time", 0)
-                        worker_name = task.get("人員1", "未指定") # 這裡會顯示是哪位組員
+                        worker_name = task.get("人員1", "未指定")
 
+                        # --- 修正：HTML 內的執行人員名字放大 ---
                         st.components.v1.html(f"""
                             <div style="background:#f1f5f9; padding:10px; border-radius:8px; margin-bottom:10px; border-left:5px solid #3b82f6; display:flex; justify-content:space-between; align-items:center;">
                                 <div>
-                                    <div style="font-weight:bold; color:#0f172a;">🛠️ {p_name}</div>
-                                    <div style="font-size:0.8rem; color:#64748b;">👤 執行人員: {worker_name}</div>
+                                    <div style="font-weight:bold; color:#0f172a; font-size:1.1rem;">🛠️ {p_name}</div>
+                                    <div style="font-size:1.3rem; color:#1e40af; font-weight:900; margin-top:5px;">👤 執行人員: {worker_name}</div>
                                 </div>
-                                <div id="timer_{db_id}" style="color:#ef4444; font-family:monospace; font-size:1.5rem; font-weight:bold;">00:00:00</div>
+                                <div id="timer_{db_id}" style="color:#ef4444; font-family:monospace; font-size:1.8rem; font-weight:bold;">00:00:00</div>
                             </div>
                             <script>
                                 (function() {{
@@ -356,7 +351,7 @@ else:
                                     setInterval(update, 1000); update();
                                 }})();
                             </script>
-                        """, height=85)
+                        """, height=100)
                         
                         b1, b2, b3 = st.columns([1, 1, 1])
                         with b1:
@@ -381,8 +376,6 @@ else:
                             if st.button("🗑️ 刪除", key=f"d_{db_id}"):
                                 requests.delete(f"{TIMER_DB_URL}/{db_id}.json")
                                 st.rerun()
-        else:
-            st.info("💡 目前無進行中任務。")
 # --- 📜 完工紀錄查詢 ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📜 歷史完工紀錄</h1>', unsafe_allow_html=True)
