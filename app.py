@@ -332,38 +332,43 @@ else:
                             if st.button("🗑️ 刪除", key=f"d_{db_id}"): requests.delete(f"{TIMER_DB_URL}/{db_id}.json"); st.rerun()
         else: st.info("💡 目前無進行中任務。")
 
-   # --- 📜 完工紀錄查詢 ---
+# --- 📜 完工紀錄查詢 ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📜 歷史完工紀錄</h1>', unsafe_allow_html=True)
         all_logs = requests.get(f"{FINISH_URL}.json").json()
         if all_logs:
+            # 將資料轉為 DataFrame
             df = pd.DataFrame([dict(v, db_id=k) for k, v in all_logs.items()])
+            
             search_q = st.text_input("🔍 搜尋 (輸入製令、工序或人員名稱)")
-            if search_q: df = df[df.astype(str).apply(lambda x: x.str.contains(search_q, case=False)).any(axis=1)]
+            if search_q: 
+                df = df[df.astype(str).apply(lambda x: x.str.contains(search_q, case=False)).any(axis=1)]
             
             if not df.empty:
                 for o_id, group in df.groupby("製令"):
                     with st.expander(f"📦 製令：{o_id} (已完工 {len(group)} 項)"):
                         display_df = group.copy()
                         
-                        # 計算工時(分)
+                        # 1. 計算工時(分)
                         if '秒數' in display_df.columns: 
                             display_df['工時(分)'] = (display_df['秒數'] / 60).round(2)
                         
-                        # 定義要顯示的欄位 (新增了 "開始時間")
-                        cols_to_show = ["工序", "開始時間", "完工時間", "工時(分)"]
+                        # 2. 設定要顯示的欄位順序 (加入 開始時間)
+                        # 我們同時檢查 "開始時間" 或 "啟動時間"，看您的資料庫是用哪一個
+                        potential_cols = ["工序", "開始時間", "啟動時間", "完工時間", "工時(分)"]
+                        existing_cols = [c for c in potential_cols if c in display_df.columns]
                         
-                        # 安全檢查：確保欄位存在於資料中，不存在的自動剔除
-                        existing_cols = [c for c in cols_to_show if c in display_df.columns]
-                        
-                        # 顯示表格
+                        # 3. 顯示表格 (若找不到對應欄位則顯示全部)
                         st.table(display_df[existing_cols] if existing_cols else display_df)
                         
                         if st.button(f"🗑️ 刪除整個製令紀錄", key=f"del_group_{o_id}"):
-                            for d_id in group['db_id']: requests.delete(f"{FINISH_URL}/{d_id}.json")
-                            st.rerun()
-            else: st.warning("查無紀錄。")
-        else: st.info("💡 目前尚無紀錄。")
+                            for d_id in group['db_id']: 
+                                requests.delete(f"{FINISH_URL}/{d_id}.json")
+                            st.success(f"製令 {o_id} 紀錄已刪除"); time.sleep(0.5); st.rerun()
+            else: 
+                st.warning("查無紀錄。")
+        else: 
+            st.info("💡 目前尚無紀錄。")
 # --- 🔧 人員手工具紀錄表 (修正版：恢復資產匯出 + 移除重複) ---
     elif st.session_state.menu_selection == "🔧 固資&手工具紀錄表":
         import io
