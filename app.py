@@ -347,21 +347,27 @@ else:
                 for o_id, group in df.groupby("製令"):
                     display_df = group.copy()
                     
-                    # 1. 找回並計算工時(分)
-                    total_min = 0.0
+                    # 1. 計算工時(分)與總秒數
+                    total_all_seconds = 0
                     if '秒數' in display_df.columns:
                         display_df['工時(分)'] = (display_df['秒數'] / 60).round(2)
-                        total_min = display_df['工時(分)'].sum().round(2) # 加總總工時
+                        total_all_seconds = int(display_df['秒數'].sum()) # 取得該製令總秒數
                         
-                        # 2. 逆推開始時間 (避免資料庫沒欄位)
+                        # 2. 逆推開始時間
                         try:
                             temp_finish = pd.to_datetime(display_df['完工時間'])
                             display_df['開始時間'] = (temp_finish - pd.to_timedelta(display_df['秒數'], unit='s')).dt.strftime('%Y-%m-%d %H:%M:%S')
                         except:
                             display_df['開始時間'] = "計算失敗"
 
-                    # 3. 在標題顯示總計工時 (您紅框要求的功能)
-                    with st.expander(f"📦 製令：{o_id} (已完工 {len(group)} 項 | 總工時：{total_min} 分)"):
+                    # 3. 將總秒數轉換為「xx小時 xx分 xx秒」
+                    hrs = total_all_seconds // 3600
+                    mins = (total_all_seconds % 3600) // 60
+                    secs = total_all_seconds % 60
+                    time_str = f"{hrs}小時 {mins}分 {secs}秒"
+
+                    # 4. 在標題顯示 (包含您紅框要求的總工時，格式改為時分秒)
+                    with st.expander(f"📦 製令：{o_id} ({len(group)} 項 | 總工時：{time_str})"):
                         
                         # 設定表格順序
                         cols = ["工序", "開始時間", "完工時間", "工時(分)"]
