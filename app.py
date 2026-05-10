@@ -268,27 +268,34 @@ else:
     elif st.session_state.menu_selection == "📈 工時統計分析":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">⏱️ 生產工時管理系統</h1>', unsafe_allow_html=True)
         
-        # 1. 取得當前組長名字
+        # 1. 取得當前組長名字 (例如: 陳德文)
         current_leader = st.session_state.user 
         
-        # 2. 從資料庫 staff_map 篩選該組長的成員
+        # 2. 強化版組員抓取邏輯
+        display_list = []
         try:
-            # 讀取組員與組長對照表
+            # 直接抓取 staff_map.json
             map_res = requests.get(f"{DB_BASE_URL}/settings/staff_map.json")
-            staff_map = map_res.json() if map_res.status_code == 200 else {}
-            
-            # --- 核心修正：找出誰的組長是目前登入的人 ---
-            my_team = [member for member, leader in staff_map.items() if leader == current_leader]
-            
-            # 如果沒找到組員，則顯示組長自己作為保險
-            display_list = sorted(my_team) if my_team else [current_leader]
-        except:
+            if map_res.status_code == 200:
+                staff_data = map_res.json()
+                
+                # 確保我們處理的是字典格式 {"組員": "組長"}
+                if isinstance(staff_data, dict):
+                    # 核心過濾：找出所有組長是目前登入者的組員
+                    display_list = [member for member, leader in staff_data.items() if str(leader).strip() == str(current_leader).strip()]
+                
+            # 如果抓完還是空的，放個保險，至少讓組長能選自己
+            if not display_list:
+                display_list = [current_leader]
+        except Exception as e:
+            st.error(f"連線對照表失敗: {e}")
             display_list = [current_leader]
 
-        # 3. 顯示下拉選單
-        selected_worker = st.selectbox("👤 選擇執行組員 (您的成員)", display_list, key="active_worker_select")
+        # 3. 顯示下拉選單 (這裡就是您的組員名單)
+        selected_worker = st.selectbox("👤 請選擇執行組員 (您的成員)", sorted(display_list), key="active_worker_select")
         st.divider()
 
+        # --- 加入看板區域 ---
         with st.container():
             st.markdown('<div style="background-color:#f8f9fa; padding:20px; border-radius:15px; border:1px solid #dee2e6; margin-bottom:20px;">', unsafe_allow_html=True)
             c1, c2, c3 = st.columns([2, 2, 1])
@@ -308,74 +315,70 @@ else:
                     st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
-        # --- 顯示計時看板 (加大人員字體) ---
+        # --- 顯示計時看板 (重點：放大執行人員字體) ---
         TIMER_DB_URL = f"{DB_BASE_URL}/active_timers"
         active_timers = requests.get(f"{TIMER_DB_URL}.json").json() or {}
         
         if active_timers:
-            grouped_timers = {}
             for db_id, task in active_timers.items():
-                oid = task.get("製令", "未知製令")
-                if oid not in grouped_timers: grouped_timers[oid] = []
-                task['db_id'] = db_id
-                grouped_timers[oid].append(task)
+                oid = task.get("製令", "未知")
+                p_name = task.get("工序", "未知")
+                status = task.get("status")
+                acc = task.get("accumulated", 0)
+                start = task.get("start_time", 0)
+                worker_name = task.get("人員1", "未指定")
 
-            for oid in sorted(grouped_timers.keys()):
-                st.markdown(f'<div style="background:#1e3a8a; color:white; padding:8px 15px; border-radius:10px 10px 0 0; font-weight:bold; margin-top:20px;">📦 製令編號：{oid}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="background:#1e3a8a; color:white; padding:8px 15px; border-radius:10px 10px 0 0; font-weight:bold;">📦 製令：{oid}</div>', unsafe_allow_html=True)
                 with st.container(border=True):
-                    for task in grouped_timers[oid]:
-                        db_id = task['db_id']
-                        p_name = task.get("工序")
-                        status = task.get("status")
-                        acc = task.get("accumulated", 0)
-                        start = task.get("start_time", 0)
-                        worker_name = task.get("人員1", "未指定")
-
-                        # --- 修正：HTML 內的執行人員名字放大 ---
-                        st.components.v1.html(f"""
-                            <div style="background:#f1f5f9; padding:10px; border-radius:8px; margin-bottom:10px; border-left:5px solid #3b82f6; display:flex; justify-content:space-between; align-items:center;">
-                                <div>
-                                    <div style="font-weight:bold; color:#0f172a; font-size:1.1rem;">🛠️ {p_name}</div>
-                                    <div style="font-size:1.3rem; color:#1e40af; font-weight:900; margin-top:5px;">👤 執行人員: {worker_name}</div>
-                                </div>
-                                <div id="timer_{db_id}" style="color:#ef4444; font-family:monospace; font-size:1.8rem; font-weight:bold;">00:00:00</div>
+                    # --- HTML 區塊：顯著放大執行人員與計時器 ---
+                    st.components.v1.html(f"""
+                        <div style="background:#f1f5f9; padding:15px; border-radius:8px; border-left:8px solid #3b82f6; display:flex; justify-content:space-between; align-items:center; font-family: sans-serif;">
+                            <div>
+                                <div style="font-weight:bold; color:#0f172a; font-size:1rem;">🛠️ {p_name}</div>
+                                <div style="font-size:1.6rem; color:#1e40af; font-weight:900; margin-top:8px;">👤 執行人員: {worker_name}</div>
                             </div>
-                            <script>
-                                (function() {{
-                                    var acc = {acc}, start = {start}, status = '{status}', display = document.getElementById('timer_{db_id}');
-                                    function update() {{
-                                        var total = acc + (status === 'running' ? (Date.now() / 1000) - start : 0);
-                                        var h = Math.floor(total / 3600).toString().padStart(2, '0'), m = Math.floor((total % 3600) / 60).toString().padStart(2, '0'), s = Math.floor(total % 60).toString().padStart(2, '0');
-                                        display.innerText = h + ":" + m + ":" + s;
-                                    }}
-                                    setInterval(update, 1000); update();
-                                }})();
-                            </script>
-                        """, height=100)
-                        
-                        b1, b2, b3 = st.columns([1, 1, 1])
-                        with b1:
-                            if status != 'running':
-                                if st.button("▶️ 開始", key=f"s_{db_id}"):
-                                    requests.patch(f"{TIMER_DB_URL}/{db_id}.json", data=json.dumps({"status": "running", "start_time": time.time()}))
-                                    st.rerun()
-                            else:
-                                if st.button("⏸️ 暫停", key=f"p_{db_id}"):
-                                    requests.patch(f"{TIMER_DB_URL}/{db_id}.json", data=json.dumps({"status": "paused", "accumulated": acc + (time.time() - start), "start_time": 0}))
-                                    st.rerun()
-                        with b2:
-                            if st.button("⏹️ 結束", key=f"e_{db_id}"):
-                                final_sec = acc + (time.time() - start if status == 'running' else 0)
-                                requests.post(f"{FINISH_URL}.json", data=json.dumps({
-                                    "製令": oid, "工序": p_name, "秒數": final_sec, 
-                                    "完工時間": get_now_str(), "人員1": worker_name
-                                }))
-                                requests.delete(f"{TIMER_DB_URL}/{db_id}.json")
+                            <div id="timer_{db_id}" style="color:#ef4444; font-family:monospace; font-size:2.2rem; font-weight:bold; background:white; padding:5px 15px; border-radius:10px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);">00:00:00</div>
+                        </div>
+                        <script>
+                            (function() {{
+                                var acc = {acc}, start = {start}, status = '{status}', display = document.getElementById('timer_{db_id}');
+                                function update() {{
+                                    var total = acc + (status === 'running' ? (Date.now() / 1000) - start : 0);
+                                    var h = Math.floor(total / 3600).toString().padStart(2, '0');
+                                    var m = Math.floor((total % 3600) / 60).toString().padStart(2, '0');
+                                    var s = Math.floor(total % 60).toString().padStart(2, '0');
+                                    display.innerText = h + ":" + m + ":" + s;
+                                }}
+                                setInterval(update, 1000); update();
+                            }})();
+                        </script>
+                    """, height=120)
+                    
+                    b1, b2, b3 = st.columns([1, 1, 1])
+                    with b1:
+                        if status != 'running':
+                            if st.button("▶️ 開始", key=f"s_{db_id}", use_container_width=True):
+                                requests.patch(f"{TIMER_DB_URL}/{db_id}.json", data=json.dumps({"status": "running", "start_time": time.time()}))
                                 st.rerun()
-                        with b3:
-                            if st.button("🗑️ 刪除", key=f"d_{db_id}"):
-                                requests.delete(f"{TIMER_DB_URL}/{db_id}.json")
+                        else:
+                            if st.button("⏸️ 暫停", key=f"p_{db_id}", use_container_width=True):
+                                requests.patch(f"{TIMER_DB_URL}/{db_id}.json", data=json.dumps({"status": "paused", "accumulated": acc + (time.time() - start), "start_time": 0}))
                                 st.rerun()
+                    with b2:
+                        if st.button("⏹️ 結束", key=f"e_{db_id}", use_container_width=True, type="primary"):
+                            final_sec = acc + (time.time() - start if status == 'running' else 0)
+                            requests.post(f"{FINISH_URL}.json", data=json.dumps({
+                                "製令": oid, "工序": p_name, "秒數": final_sec, 
+                                "完工時間": get_now_str(), "人員1": worker_name
+                            }))
+                            requests.delete(f"{TIMER_DB_URL}/{db_id}.json")
+                            st.rerun()
+                    with b3:
+                        if st.button("🗑️ 刪除", key=f"d_{db_id}", use_container_width=True):
+                            requests.delete(f"{TIMER_DB_URL}/{db_id}.json")
+                            st.rerun()
+        else:
+            st.info("💡 目前無進行中任務。")
 # --- 📜 完工紀錄查詢 ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📜 歷史完工紀錄</h1>', unsafe_allow_html=True)
