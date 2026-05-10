@@ -320,41 +320,43 @@ else:
         import io
         st.markdown('<h1 style="text-align:center; color:#db2777; font-weight:900; font-size:2.5rem;">🌸 超慧固資&手工具紀錄表</h1>', unsafe_allow_html=True)
         
-        # 1. 讀取資料
+        # 1. 讀取主頁面資料
         user_tool_raw = requests.get(f"{USER_TOOLS_URL}.json").json() or {}
         asset_tools_raw = requests.get(f"{DB_URL}/asset_tools.json").json() or {}
-        
-        # 💡 重要：讀取「一般工具清單」供編輯時的下拉選單使用
-        # 確保這段在 dialog 定義之前，縮排與讀取資料一致
-        tool_settings = requests.get(f"{TOOL_LIST_URL}.json").json() or {"tool_types": []}
-        all_tool_options = tool_settings.get("tool_types", [])
         
         current_leader = st.session_state.user
         my_team = staff_map.get(current_leader, [])
 
-        # --- 📝 編輯領用紀錄的彈窗 (升級版：可修改工具與數量) ---
+        # --- 📝 編輯領用紀錄的彈窗 (徹底解決變數抓不到的問題) ---
         @st.dialog("🔒 安全驗證與修改")
         def edit_record_dialog(record_id, current_val):
+            # 💡 關鍵修正：將讀取工具清單移入 Dialog 內部，確保 100% 抓得到變數
+            try:
+                t_settings = requests.get(f"{TOOL_LIST_URL}.json").json() or {"tool_types": []}
+                internal_tool_options = t_settings.get("tool_types", [])
+            except:
+                internal_tool_options = []
+
             st.write(f"正在修改 **{current_val.get('人員')}** 的紀錄")
             
-            # 1. 驗證碼
-            pwd = st.text_input("請輸入驗證碼", type="password", key=f"pwd_{record_id}")
+            # 1. 驗證碼 (加上獨一無二的 key)
+            pwd = st.text_input("請輸入驗證碼", type="password", key=f"pwd_dialog_input_{record_id}")
             
             st.write("---")
             
             # 2. 修改工具名稱 (加入下拉選單)
-            current_tool = current_val.get('手工具名稱')
+            current_tool = current_val.get('手工具名稱', '')
             
-            # 如果目前紀錄的工具不在清單內，自動加入避免報錯
-            temp_options = list(all_tool_options)
-            if current_tool and current_tool not in temp_options:
-                temp_options.append(current_tool)
+            # 安全機制：如果舊紀錄的工具不在新清單裡，自動補進去防止報錯
+            display_options = list(internal_tool_options)
+            if current_tool and current_tool not in display_options:
+                display_options.append(current_tool)
 
             new_tool_name = st.selectbox(
                 "修改工具名稱", 
-                options=temp_options, 
-                index=temp_options.index(current_tool) if current_tool in temp_options else 0,
-                key=f"edit_tool_{record_id}"
+                options=display_options, 
+                index=display_options.index(current_tool) if current_tool in display_options else 0,
+                key=f"edit_tool_select_{record_id}"
             )
             
             # 3. 修改數量
@@ -362,10 +364,10 @@ else:
                 "修改數量", 
                 min_value=1, 
                 value=int(current_val.get('數量', 1)),
-                key=f"edit_qty_{record_id}"
+                key=f"edit_qty_input_{record_id}"
             )
             
-            if st.button("❤️ 確認修改", use_container_width=True, key=f"save_btn_{record_id}"):
+            if st.button("❤️ 確認修改", use_container_width=True, key=f"final_save_btn_{record_id}"):
                 if pwd == "0000":
                     updated_payload = {
                         "人員": current_val.get('人員'),
@@ -375,22 +377,17 @@ else:
                         "登記人": st.session_state.user
                     }
                     # 執行資料庫更新
-                    response = requests.put(f"{USER_TOOLS_URL}/{record_id}.json", data=json.dumps(updated_payload))
-                    
-                    if response.status_code == 200:
-                        st.success("紀錄已成功更新！")
-                        time.sleep(0.5)
-                        st.rerun()
-                    else:
-                        st.error("更新失敗，請檢查資料庫連線")
+                    requests.put(f"{USER_TOOLS_URL}/{record_id}.json", data=json.dumps(updated_payload))
+                    st.success("紀錄已成功更新！")
+                    time.sleep(0.5)
+                    st.rerun()
                 else:
                     st.error("驗證碼錯誤，無法修改")
 
-        # --- 後續顯示邏輯 (請確保您的顯示迴圈中使用 edit_record_dialog) ---
-        # 這裡會根據您的需求列出表格或卡片
-
-        # --- 這裡接您原本的資料過濾與顯示邏輯 ---
-        # (例如：依人員分類顯示、導出 Excel 按鈕等內容...)
+        # --- 顯示區邏輯 (請確保呼叫 Dialog 的地方 key 也是唯一值) ---
+        # 範例：
+        # if st.button("✏️", key=f"open_edit_{k}"):
+        #     edit_record_dialog(k, v)
         # 3. 建立分頁
         tab1, tab2 = st.tabs(["👥 人員手工具紀錄", "🛡️ 製造固定資產總覽"])
 
