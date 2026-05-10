@@ -351,7 +351,7 @@ else:
                             st.rerun()
             else: st.warning("查無紀錄。")
         else: st.info("💡 目前尚無紀錄。")
-# --- 🔧 人員手工具紀錄表 (修正版：移除重複與間距) ---
+# --- 🔧 人員手工具紀錄表 (修正版：恢復資產匯出 + 移除重複) ---
     elif st.session_state.menu_selection == "🔧 固資&手工具紀錄表":
         import io
         st.markdown('<h1 style="text-align:center; color:#db2777; font-weight:900; font-size:2.5rem;">🌸 超慧固資&手工具紀錄表</h1>', unsafe_allow_html=True)
@@ -395,7 +395,7 @@ else:
         tab1, tab2 = st.tabs(["👥 人員紀錄", "🛡️ 資產總覽"])
 
         with tab1:
-            # --- 全頁面唯一的篩選區 ---
+            # --- 唯一篩選區 ---
             st.markdown("### 🔍 查詢與清點")
             c1, c2 = st.columns(2)
             with c1:
@@ -407,43 +407,29 @@ else:
                     search_staff = st.selectbox("🌍 選擇全廠人員", ["顯示全部"] + sorted(list(all_staff)), key="unique_sel_all")
 
             if user_tool_raw:
-                # 整理資料
                 t_data = []
                 for k, v in user_tool_raw.items():
-                    item = v.copy()
-                    item['db_id'] = k
+                    item = v.copy(); item['db_id'] = k
                     item['類型'] = "資產工具" if "【資產】" in str(v.get('手工具名稱','')) else "一般工具"
                     t_data.append(item)
                 tool_df = pd.DataFrame(t_data)
 
-                # 執行過濾邏輯
                 if filter_type == "我的組員":
                     display_df = tool_df[tool_df["人員"].isin(my_team)] if search_staff == "顯示全組" else tool_df[tool_df["人員"] == search_staff]
                 else:
                     display_df = tool_df if search_staff == "顯示全部" else tool_df[tool_df["人員"] == search_staff]
 
                 if not display_df.empty:
-                    # 匯出按鈕
                     csv_data = display_df.to_csv(index=False).encode('utf-8-sig')
-                    st.download_button(label="📄 匯出清點表", data=csv_data, file_name=f"工具清點.csv", key="unique_csv_btn")
+                    st.download_button(label="📄 匯出人員清點表", data=csv_data, file_name="人員工具清點.csv", key="p_csv_btn")
 
-                    # CSS 樣式：移除多餘長方形間距
-                    st.markdown("""
-                        <style>
-                            .card { background: white; border-radius: 8px; padding: 10px; margin-bottom: 5px; border: 1px solid #fce7f3; }
-                            .asset-card { border-left: 8px solid #8b5cf6 !important; background: #f5f3ff !important; }
-                            .t-title { font-weight: 800; font-size: 1rem; color: #1f2937; }
-                            .t-qty { color: #db2777; margin-left: 5px; }
-                        </style>
-                    """, unsafe_allow_html=True)
+                    st.markdown("""<style>.card { background: white; border-radius: 8px; padding: 10px; margin-bottom: 5px; border: 1px solid #fce7f3; } .asset-card { border-left: 8px solid #8b5cf6 !important; background: #f5f3ff !important; } .t-title { font-weight: 800; color: #1f2937; } .t-qty { color: #db2777; margin-left: 5px; }</style>""", unsafe_allow_html=True)
 
                     for person, group in display_df.groupby("人員"):
                         with st.expander(f"👩‍🔧 {person} ({len(group)} 項)", expanded=True):
                             for _, row in group.iterrows():
                                 db_id = row['db_id']
                                 is_a = "asset-card" if row['類型'] == "資產工具" else ""
-                                
-                                # 顯示工具資訊
                                 st.markdown(f'<div class="card {is_a}">', unsafe_allow_html=True)
                                 col1, col2 = st.columns([7.5, 2.5])
                                 with col1:
@@ -451,20 +437,22 @@ else:
                                     st.markdown(f'<div style="color:gray; font-size:0.8rem;">登記人: {row.get("登記人","-")} | {row["登記時間"]}</div>', unsafe_allow_html=True)
                                 with col2:
                                     sc1, sc2 = st.columns(2)
-                                    with sc1:
-                                        if st.button("✏️", key=f"e_btn_{db_id}"): edit_record_dialog(db_id, row['手工具名稱'], row['數量'], person)
-                                    with sc2:
-                                        if st.button("🗑️", key=f"d_btn_{db_id}"): delete_record_dialog(db_id, row['手工具名稱'])
+                                    if sc1.button("✏️", key=f"e_{db_id}"): edit_record_dialog(db_id, row['手工具名稱'], row['數量'], person)
+                                    if sc2.button("🗑️", key=f"d_{db_id}"): delete_record_dialog(db_id, row['手工具名稱'])
                                 st.markdown('</div>', unsafe_allow_html=True)
-                else:
-                    st.info("💡 目前無紀錄")
-            else:
-                st.info("🌸 系統無領用紀錄")
+                else: st.info("💡 目前無紀錄")
+            else: st.info("🌸 系統無資料")
 
         with tab2:
-            st.markdown("### 🏢 全廠資產總覽")
+            st.markdown("### 🏢 全廠資產清冊")
             if asset_tools_raw:
-                st.dataframe(pd.DataFrame(list(asset_tools_raw.values())), use_container_width=True, hide_index=True)
+                asset_df = pd.DataFrame(list(asset_tools_raw.values()))
+                # 恢復資產匯出功能
+                csv_asset = asset_df.to_csv(index=False).encode('utf-8-sig')
+                st.download_button("📄 匯出全廠資產清單", data=csv_asset, file_name="全廠資產總表.csv", key="ast_csv_btn")
+                st.dataframe(asset_df, use_container_width=True, hide_index=True)
+            else:
+                st.info("💡 目前無資產資料")
         
 # --- ⚙️ 編輯手工具清單 (修正 Duplicate ID 版本) ---
     elif st.session_state.menu_selection == "⚙️ 資產編輯清單":
