@@ -264,17 +264,29 @@ else:
             st.error(f"系統偵測到錯誤：{str(e)}")
             st.warning("目前系統資料緩衝中，請稍後再試。")
 
-  # --- 📈 工時統計分析 ---
+# --- 📈 工時統計分析 ---
     elif st.session_state.menu_selection == "📈 工時統計分析":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">⏱️ 生產工時管理系統</h1>', unsafe_allow_html=True)
         
-        # --- 新增：人員選擇選單 ---
-        # 取得組員名單 (從您的資料庫或 staff_map 抓取)
-        staff_data = requests.get(f"{BASE_URL}/settings/all_staff.json").json() or []
-        staff_list = staff_data if isinstance(staff_data, list) else list(staff_data.values())
-        
-        # 讓使用者先選擇「誰在操作」
-        selected_worker = st.selectbox("👤 請選擇操作人員", sorted(staff_list), key="active_worker_select")
+        # --- 修正：確保使用正確的 URL 變數並處理人員名單 ---
+        # 這裡根據您的系統環境，BASE_URL 可能需要改為 DB_BASE_URL
+        try:
+            # 嘗試抓取人員名單
+            staff_res = requests.get(f"{DB_BASE_URL}/settings/all_staff.json")
+            staff_data = staff_res.json() if staff_res.status_code == 200 else []
+        except:
+            staff_data = []
+
+        # 轉換名單格式
+        if isinstance(staff_data, dict):
+            staff_list = list(staff_data.values())
+        elif isinstance(staff_data, list):
+            staff_list = staff_data
+        else:
+            staff_list = ["未設定人員"]
+
+        # 1. 人員選擇選單
+        selected_worker = st.selectbox("👤 請選擇操作人員 (顯示誰按的工時)", sorted(staff_list), key="active_worker_select")
         st.divider()
 
         with st.container():
@@ -288,14 +300,16 @@ else:
                 st.write(" ")
                 if st.button("➕ 加入看板", type="primary", use_container_width=True):
                     TIMER_DB_URL = f"{DB_BASE_URL}/active_timers"
-                    # 將選擇的人員存入計時器任務中
-                    new_timer = {"製令": t_oid, "工序": t_proc, "status": "stop", "accumulated": 0, "start_time": 0, "操作人員": selected_worker}
+                    # 存入時就把人員帶進去
+                    new_timer = {"製令": t_oid, "工序": t_proc, "status": "stop", "accumulated": 0, "start_time": 0, "人員1": selected_worker}
                     requests.post(f"{TIMER_DB_URL}.json", data=json.dumps(new_timer))
                     st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
+        # --- 顯示計時看板 ---
         TIMER_DB_URL = f"{DB_BASE_URL}/active_timers"
         active_timers = requests.get(f"{TIMER_DB_URL}.json").json() or {}
+        
         if active_timers:
             grouped_timers = {}
             for db_id, task in active_timers.items():
@@ -308,14 +322,18 @@ else:
                 st.markdown(f'<div style="background:#1e3a8a; color:white; padding:8px 15px; border-radius:10px 10px 0 0; font-weight:bold; margin-top:20px;">📦 製令編號：{oid}</div>', unsafe_allow_html=True)
                 with st.container(border=True):
                     for task in grouped_timers[oid]:
-                        db_id, p_name, status, acc, start = task['db_id'], task.get("工序"), task.get("status"), task.get("accumulated", 0), task.get("start_time", 0)
-                        worker_in_task = task.get("操作人員", selected_worker) # 抓取該任務當初設定的人員
-                        
+                        db_id = task['db_id']
+                        p_name = task.get("工序")
+                        status = task.get("status")
+                        acc = task.get("accumulated", 0)
+                        start = task.get("start_time", 0)
+                        worker_name = task.get("人員1", selected_worker) # 顯示是誰的任務
+
                         st.components.v1.html(f"""
                             <div style="background:#f1f5f9; padding:10px; border-radius:8px; margin-bottom:10px; border-left:5px solid #3b82f6; display:flex; justify-content:space-between; align-items:center;">
                                 <div>
                                     <div style="font-weight:bold; color:#0f172a;">🛠️ {p_name}</div>
-                                    <div style="font-size:0.8rem; color:#64748b;">👤 操作者: {worker_in_task}</div>
+                                    <div style="font-size:0.8rem; color:#64748b;">👤 執行人員: {worker_name}</div>
                                 </div>
                                 <div id="timer_{db_id}" style="color:#ef4444; font-family:monospace; font-size:1.5rem; font-weight:bold;">00:00:00</div>
                             </div>
@@ -336,22 +354,28 @@ else:
                         with b1:
                             if status != 'running':
                                 if st.button("▶️ 開始", key=f"s_{db_id}"):
-                                    requests.patch(f"{TIMER_DB_URL}/{db_id}.json", data=json.dumps({"status": "running", "start_time": time.time(), "操作人員": selected_worker})); st.rerun()
+                                    requests.patch(f"{TIMER_DB_URL}/{db_id}.json", data=json.dumps({"status": "running", "start_time": time.time()}))
+                                    st.rerun()
                             else:
                                 if st.button("⏸️ 暫停", key=f"p_{db_id}"):
-                                    requests.patch(f"{TIMER_DB_URL}/{db_id}.json", data=json.dumps({"status": "paused", "accumulated": acc + (time.time() - start), "start_time": 0})); st.rerun()
+                                    requests.patch(f"{TIMER_DB_URL}/{db_id}.json", data=json.dumps({"status": "paused", "accumulated": acc + (time.time() - start), "start_time": 0}))
+                                    st.rerun()
                         with b2:
                             if st.button("⏹️ 結束", key=f"e_{db_id}"):
                                 final_sec = acc + (time.time() - start if status == 'running' else 0)
-                                # 這裡的 "人員1" 會存入選單選中的人
+                                # 結束時將「人員1」寫入完工資料庫
                                 requests.post(f"{FINISH_URL}.json", data=json.dumps({
                                     "製令": oid, "工序": p_name, "秒數": final_sec, 
-                                    "完工時間": get_now_str(), "人員1": selected_worker
+                                    "完工時間": get_now_str(), "人員1": worker_name
                                 }))
-                                requests.delete(f"{TIMER_DB_URL}/{db_id}.json"); st.rerun()
+                                requests.delete(f"{TIMER_DB_URL}/{db_id}.json")
+                                st.rerun()
                         with b3:
-                            if st.button("🗑️ 刪除", key=f"d_{db_id}"): requests.delete(f"{TIMER_DB_URL}/{db_id}.json"); st.rerun()
-        else: st.info("💡 目前無進行中任務。")
+                            if st.button("🗑️ 刪除", key=f"d_{db_id}"):
+                                requests.delete(f"{TIMER_DB_URL}/{db_id}.json")
+                                st.rerun()
+        else:
+            st.info("💡 目前無進行中任務。")
 
 # --- 📜 完工紀錄查詢 ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
