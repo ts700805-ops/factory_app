@@ -332,7 +332,7 @@ else:
                             if st.button("🗑️ 刪除", key=f"d_{db_id}"): requests.delete(f"{TIMER_DB_URL}/{db_id}.json"); st.rerun()
         else: st.info("💡 目前無進行中任務。")
 
-# --- 📜 完工紀錄查詢 (計算逆推版) ---
+# --- 📜 完工紀錄查詢 ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📜 歷史完工紀錄</h1>', unsafe_allow_html=True)
         
@@ -345,26 +345,26 @@ else:
             
             if not df.empty:
                 for o_id, group in df.groupby("製令"):
-                    with st.expander(f"📦 製令：{o_id}"):
-                        display_df = group.copy()
+                    display_df = group.copy()
+                    
+                    # 1. 找回並計算工時(分)
+                    total_min = 0.0
+                    if '秒數' in display_df.columns:
+                        display_df['工時(分)'] = (display_df['秒數'] / 60).round(2)
+                        total_min = display_df['工時(分)'].sum().round(2) # 加總總工時
                         
-                        # 1. 找回工時(分)
-                        if '秒數' in display_df.columns:
-                            display_df['工時(分)'] = (display_df['秒數'] / 60).round(2)
-                            
-                            # 2. 【核心修正】既然資料庫沒存，我們用算的！
-                            # 邏輯：開始時間 = 完工時間 - 秒數
-                            try:
-                                # 將完工時間轉為時間格式
-                                temp_finish = pd.to_datetime(display_df['完工時間'])
-                                # 減去秒數，得到開始時間
-                                display_df['開始時間'] = (temp_finish - pd.to_timedelta(display_df['秒數'], unit='s')).dt.strftime('%Y-%m-%d %H:%M:%S')
-                            except:
-                                display_df['開始時間'] = "計算失敗"
+                        # 2. 逆推開始時間 (避免資料庫沒欄位)
+                        try:
+                            temp_finish = pd.to_datetime(display_df['完工時間'])
+                            display_df['開始時間'] = (temp_finish - pd.to_timedelta(display_df['秒數'], unit='s')).dt.strftime('%Y-%m-%d %H:%M:%S')
+                        except:
+                            display_df['開始時間'] = "計算失敗"
 
-                        # 3. 設定顯示順序
+                    # 3. 在標題顯示總計工時 (您紅框要求的功能)
+                    with st.expander(f"📦 製令：{o_id} (已完工 {len(group)} 項 | 總工時：{total_min} 分)"):
+                        
+                        # 設定表格順序
                         cols = ["工序", "開始時間", "完工時間", "工時(分)"]
-                        # 只顯示存在的欄位
                         existing_cols = [c for c in cols if c in display_df.columns]
                         
                         st.table(display_df[existing_cols])
