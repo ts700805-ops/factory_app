@@ -332,15 +332,13 @@ else:
                             if st.button("🗑️ 刪除", key=f"d_{db_id}"): requests.delete(f"{TIMER_DB_URL}/{db_id}.json"); st.rerun()
         else: st.info("💡 目前無進行中任務。")
 
-# --- 📜 完工紀錄查詢 ---
+# --- 📜 完工紀錄查詢 (計算逆推版) ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📜 歷史完工紀錄</h1>', unsafe_allow_html=True)
         
-        # 抓取資料
         all_logs = requests.get(f"{FINISH_URL}.json").json()
         if all_logs:
             df = pd.DataFrame([dict(v, db_id=k) for k, v in all_logs.items()])
-            
             search_q = st.text_input("🔍 搜尋紀錄")
             if search_q: 
                 df = df[df.astype(str).apply(lambda x: x.str.contains(search_q, case=False)).any(axis=1)]
@@ -350,27 +348,32 @@ else:
                     with st.expander(f"📦 製令：{o_id}"):
                         display_df = group.copy()
                         
-                        # 1. 整理欄位順序：將「工序」排最前，「db_id」隱藏
-                        all_cols = list(display_df.columns)
-                        if 'db_id' in all_cols: all_cols.remove('db_id')
-                        if '製令' in all_cols: all_cols.remove('製令')
+                        # 1. 找回工時(分)
+                        if '秒數' in display_df.columns:
+                            display_df['工時(分)'] = (display_df['秒數'] / 60).round(2)
+                            
+                            # 2. 【核心修正】既然資料庫沒存，我們用算的！
+                            # 邏輯：開始時間 = 完工時間 - 秒數
+                            try:
+                                # 將完工時間轉為時間格式
+                                temp_finish = pd.to_datetime(display_df['完工時間'])
+                                # 減去秒數，得到開始時間
+                                display_df['開始時間'] = (temp_finish - pd.to_timedelta(display_df['秒數'], unit='s')).dt.strftime('%Y-%m-%d %H:%M:%S')
+                            except:
+                                display_df['開始時間'] = "計算失敗"
+
+                        # 3. 設定顯示順序
+                        cols = ["工序", "開始時間", "完工時間", "工時(分)"]
+                        # 只顯示存在的欄位
+                        existing_cols = [c for c in cols if c in display_df.columns]
                         
-                        # 強制讓「工序」排在第一個，其他的排後面
-                        main_cols = ['工序'] if '工序' in all_cols else []
-                        other_cols = [c for c in all_cols if c != '工序']
-                        final_cols = main_cols + other_cols
-                        
-                        # 2. 直接顯示所有現有欄位，不做篩選
-                        st.table(display_df[final_cols])
+                        st.table(display_df[existing_cols])
                         
                         if st.button(f"🗑️ 刪除紀錄", key=f"del_{o_id}"):
-                            for d_id in group['db_id']: 
-                                requests.delete(f"{FINISH_URL}/{d_id}.json")
+                            for d_id in group['db_id']: requests.delete(f"{FINISH_URL}/{d_id}.json")
                             st.rerun()
-            else:
-                st.warning("查無紀錄。")
-        else:
-            st.info("💡 目前尚無紀錄。")
+            else: st.warning("查無紀錄。")
+        else: st.info("💡 目前尚無紀錄。")
 # --- 🔧 人員手工具紀錄表 (修正版：恢復資產匯出 + 移除重複) ---
     elif st.session_state.menu_selection == "🔧 固資&手工具紀錄表":
         import io
