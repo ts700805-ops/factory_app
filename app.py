@@ -271,28 +271,31 @@ else:
         # 1. 取得當前組長名字 (例如: 陳德文)
         current_leader = st.session_state.user 
         
-        # 2. 強化版組員抓取邏輯
+        # 2. 針對您的 Firebase 結構做抓取
         display_list = []
         try:
-            # 直接抓取 staff_map.json
+            # 抓取 staff_map.json
             map_res = requests.get(f"{DB_BASE_URL}/settings/staff_map.json")
             if map_res.status_code == 200:
-                staff_data = map_res.json()
+                staff_data = map_res.json() or {}
                 
-                # 確保我們處理的是字典格式 {"組員": "組長"}
-                if isinstance(staff_data, dict):
-                    # 核心過濾：找出所有組長是目前登入者的組員
-                    display_list = [member for member, leader in staff_data.items() if str(leader).strip() == str(current_leader).strip()]
+                # --- 關鍵修正：直接用組長名字當 Key 抓取組員列表 ---
+                # 您的資料結構是： "陳德文": ["徐梓翔", "牟育玄", ...]
+                my_team = staff_data.get(current_leader, [])
                 
-            # 如果抓完還是空的，放個保險，至少讓組長能選自己
+                if isinstance(my_team, list):
+                    display_list = [str(member).strip() for member in my_team]
+                
+            # 保險：如果沒抓到，讓組長選自己
             if not display_list:
                 display_list = [current_leader]
         except Exception as e:
-            st.error(f"連線對照表失敗: {e}")
+            st.error(f"連線失敗: {e}")
             display_list = [current_leader]
 
-        # 3. 顯示下拉選單 (這裡就是您的組員名單)
-        selected_worker = st.selectbox("👤 請選擇執行組員 (您的成員)", sorted(display_list), key="active_worker_select")
+        # 3. 顯示下拉選單 (大字體標題)
+        st.markdown('<p style="font-size:1.2rem; font-weight:bold;">👤 請選擇執行組員 (您的成員)</p>', unsafe_allow_html=True)
+        selected_worker = st.selectbox("", sorted(display_list), label_visibility="collapsed", key="active_worker_select")
         st.divider()
 
         # --- 加入看板區域 ---
@@ -315,11 +318,12 @@ else:
                     st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
-        # --- 顯示計時看板 (重點：放大執行人員字體) ---
+        # --- 顯示計時看板 (執行人員名字放大) ---
         TIMER_DB_URL = f"{DB_BASE_URL}/active_timers"
-        active_timers = requests.get(f"{TIMER_DB_URL}.json").json() or {}
+        active_timers_res = requests.get(f"{TIMER_DB_URL}.json")
+        active_timers = active_timers_res.json() if active_timers_res.status_code == 200 else {}
         
-        if active_timers:
+        if active_timers and isinstance(active_timers, dict):
             for db_id, task in active_timers.items():
                 oid = task.get("製令", "未知")
                 p_name = task.get("工序", "未知")
@@ -330,14 +334,14 @@ else:
 
                 st.markdown(f'<div style="background:#1e3a8a; color:white; padding:8px 15px; border-radius:10px 10px 0 0; font-weight:bold;">📦 製令：{oid}</div>', unsafe_allow_html=True)
                 with st.container(border=True):
-                    # --- HTML 區塊：顯著放大執行人員與計時器 ---
+                    # --- HTML 區塊：顯著放大字體 ---
                     st.components.v1.html(f"""
-                        <div style="background:#f1f5f9; padding:15px; border-radius:8px; border-left:8px solid #3b82f6; display:flex; justify-content:space-between; align-items:center; font-family: sans-serif;">
+                        <div style="background:#f1f5f9; padding:15px; border-radius:8px; border-left:8px solid #3b82f6; display:flex; justify-content:space-between; align-items:center; font-family: 'Microsoft JhengHei', sans-serif;">
                             <div>
-                                <div style="font-weight:bold; color:#0f172a; font-size:1rem;">🛠️ {p_name}</div>
-                                <div style="font-size:1.6rem; color:#1e40af; font-weight:900; margin-top:8px;">👤 執行人員: {worker_name}</div>
+                                <div style="font-weight:bold; color:#0f172a; font-size:1.1rem;">🛠️ {p_name}</div>
+                                <div style="font-size:1.8rem; color:#1e40af; font-weight:900; margin-top:8px;">👤 執行人員: {worker_name}</div>
                             </div>
-                            <div id="timer_{db_id}" style="color:#ef4444; font-family:monospace; font-size:2.2rem; font-weight:bold; background:white; padding:5px 15px; border-radius:10px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);">00:00:00</div>
+                            <div id="timer_{db_id}" style="color:#ef4444; font-family:monospace; font-size:2.2rem; font-weight:bold; background:white; padding:5px 15px; border-radius:10px;">00:00:00</div>
                         </div>
                         <script>
                             (function() {{
@@ -352,7 +356,7 @@ else:
                                 setInterval(update, 1000); update();
                             }})();
                         </script>
-                    """, height=120)
+                    """, height=130)
                     
                     b1, b2, b3 = st.columns([1, 1, 1])
                     with b1:
@@ -367,9 +371,9 @@ else:
                     with b2:
                         if st.button("⏹️ 結束", key=f"e_{db_id}", use_container_width=True, type="primary"):
                             final_sec = acc + (time.time() - start if status == 'running' else 0)
-                            requests.post(f"{FINISH_URL}.json", data=json.dumps({
+                            requests.post(f"{DB_BASE_URL}/work_logs.json", data=json.dumps({
                                 "製令": oid, "工序": p_name, "秒數": final_sec, 
-                                "完工時間": get_now_str(), "人員1": worker_name
+                                "完工時間": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "人員1": worker_name
                             }))
                             requests.delete(f"{TIMER_DB_URL}/{db_id}.json")
                             st.rerun()
