@@ -324,7 +324,8 @@ else:
         user_tool_raw = requests.get(f"{USER_TOOLS_URL}.json").json() or {}
         asset_tools_raw = requests.get(f"{DB_URL}/asset_tools.json").json() or {}
         
-        # 💡 重要修正：讀取「一般工具清單」供編輯時的下拉選單使用
+        # 💡 重要：讀取「一般工具清單」供編輯時的下拉選單使用
+        # 確保這段在 dialog 定義之前，縮排與讀取資料一致
         tool_settings = requests.get(f"{TOOL_LIST_URL}.json").json() or {"tool_types": []}
         all_tool_options = tool_settings.get("tool_types", [])
         
@@ -336,18 +337,23 @@ else:
         def edit_record_dialog(record_id, current_val):
             st.write(f"正在修改 **{current_val.get('人員')}** 的紀錄")
             
-            # 1. 驗證碼 (保留您的安全機制)
+            # 1. 驗證碼
             pwd = st.text_input("請輸入驗證碼", type="password", key=f"pwd_{record_id}")
             
             st.write("---")
             
             # 2. 修改工具名稱 (加入下拉選單)
-            # 使用剛才讀取的 all_tool_options
             current_tool = current_val.get('手工具名稱')
+            
+            # 如果目前紀錄的工具不在清單內，自動加入避免報錯
+            temp_options = list(all_tool_options)
+            if current_tool and current_tool not in temp_options:
+                temp_options.append(current_tool)
+
             new_tool_name = st.selectbox(
                 "修改工具名稱", 
-                options=all_tool_options, 
-                index=all_tool_options.index(current_tool) if current_tool in all_tool_options else 0,
+                options=temp_options, 
+                index=temp_options.index(current_tool) if current_tool in temp_options else 0,
                 key=f"edit_tool_{record_id}"
             )
             
@@ -363,12 +369,12 @@ else:
                 if pwd == "0000":
                     updated_payload = {
                         "人員": current_val.get('人員'),
-                        "手工具名稱": new_tool_name, # 更新為新選的工具名稱
-                        "數量": int(new_qty),      # 更新為新數量
-                        "登記時間": current_val.get('登記時間'), # 保留原始領用時間
+                        "手工具名稱": new_tool_name, 
+                        "數量": int(new_qty),      
+                        "登記時間": current_val.get('登記時間'), 
                         "登記人": st.session_state.user
                     }
-                    # 執行資料庫更新 (使用 PUT 覆蓋該 ID 的舊資料)
+                    # 執行資料庫更新
                     response = requests.put(f"{USER_TOOLS_URL}/{record_id}.json", data=json.dumps(updated_payload))
                     
                     if response.status_code == 200:
@@ -379,6 +385,9 @@ else:
                         st.error("更新失敗，請檢查資料庫連線")
                 else:
                     st.error("驗證碼錯誤，無法修改")
+
+        # --- 後續顯示邏輯 (請確保您的顯示迴圈中使用 edit_record_dialog) ---
+        # 這裡會根據您的需求列出表格或卡片
 
         # --- 這裡接您原本的資料過濾與顯示邏輯 ---
         # (例如：依人員分類顯示、導出 Excel 按鈕等內容...)
