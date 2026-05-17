@@ -194,10 +194,28 @@ else:
         st.session_state.menu_selection = nav
         st.rerun()
 
-# --- 請找到類似這段的程式碼，並替換成這樣 ---
-if st.sidebar.button("🚪 登出系統", type="primary", use_container_width=True):
-    st.session_state.clear()  # 或是您原本的登出邏輯
-    st.rerun()
+# --- 登出系統按鈕與樣式修正 (只影響側邊欄按鈕，不影響右邊網頁) ---
+        st.markdown("""
+            <style>
+            /* 精準鎖定側邊欄最底部的登出按鈕 */
+            div[data-testid="stSidebar"] div.stButton > button {
+                border: 2px solid #dc2626 !important;   /* 深紅色邊框 */
+                color: #dc2626 !important;            /* 深紅色字體 */
+                background-color: #ffffff !important; /* 純白背景 */
+                font-weight: 900 !important;          /* 字體加粗 */
+                width: 100% !important;
+            }
+            div[data-testid="stSidebar"] div.stButton > button:hover {
+                background-color: #fef2f2 !important; /* 滑鼠移上去變淡紅底 */
+                color: #b91c1c !important;
+                border-color: #b91c1c !important;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+
+        if st.sidebar.button("🚪 登出系統", key="logout_btn_sidebar"):
+            st.session_state.clear()
+            st.rerun()
         
 # --- 📊 製造部派工專區 ---
     if st.session_state.menu_selection == "📊 製造部派工專區":
