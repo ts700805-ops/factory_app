@@ -594,6 +594,35 @@ else:
                     st.success("已刪除！"); time.sleep(0.5); st.rerun()
                 else: st.error("驗證碼錯誤")
 
+        # 注入專屬 CSS 優化，解決白色與灰色文字看不到的問題
+        st.markdown("""
+            <style>
+            /* 1. 強制讓分頁標籤（Tabs）文字變大、顏色清晰醒目 */
+            div[data-testid="stTabs"] button {
+                font-size: 1.15rem !important;
+                font-weight: 700 !important;
+                color: #a7f3d0 !important; /* 未選中時為漂亮的淡翠綠色 */
+            }
+            div[data-testid="stTabs"] button[aria-selected="true"] {
+                color: #f472b6 !important; /* 選中時為亮眼的粉紅色 */
+                font-weight: 900 !important;
+                border-bottom: 3px solid #f472b6 !important;
+            }
+            
+            /* 2. 強制讓單選鈕（Radio）與核取方塊的文字變純白粗體 */
+            div[data-testid="stMarkdownContainer"] p, .stRadio label {
+                color: #ffffff !important;
+                font-weight: 800 !important;
+            }
+            
+            /* 3. 修改選單標題等文字對比 */
+            h3, .stWidgetLabel p {
+                color: #ffffff !important;
+                font-weight: 800 !important;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+
         # 3. 建立分頁
         tab1, tab2 = st.tabs(["👥 人員紀錄", "🛡️ 資產總覽"])
 
