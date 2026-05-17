@@ -213,7 +213,8 @@ else:
             </style>
         """, unsafe_allow_html=True)
 
-        if st.sidebar.button("🚪 登出系統", key="logout_btn_sidebar"):
+       # --- 登出系統按鈕（使用內建藍底白字，保證清晰且不影響網頁內容）---
+        if st.sidebar.button("🚪 登出系統", type="primary", use_container_width=True, key="logout_btn_sidebar_fixed"):
             st.session_state.clear()
             st.rerun()
         
