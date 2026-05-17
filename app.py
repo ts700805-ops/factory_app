@@ -391,13 +391,13 @@ else:
             display_list = [current_leader]
 
         # 3. 顯示下拉選單 (大字體標題)
-        st.markdown('<p style="font-size:1.2rem; font-weight:bold;">👤 請選擇執行組員 (您的成員)</p>', unsafe_allow_html=True)
+        st.markdown('<p style="font-size:1.2rem; font-weight:bold; color:#1e3a8a;">👤 請選擇執行組員 (您的成員)</p>', unsafe_allow_html=True)
         selected_worker = st.selectbox("", sorted(display_list), label_visibility="collapsed", key="active_worker_select")
         st.divider()
 
         # --- 加入看板區域 ---
         with st.container():
-            st.markdown('<div style="background-color:#f8f9fa; padding:20px; border-radius:15px; border:1px solid #dee2e6; margin-bottom:20px;">', unsafe_allow_html=True)
+            st.markdown('<div style="background-color:#f1f5f9; padding:20px; border-radius:15px; border:2px solid #cbd5e1; margin-bottom:20px;">', unsafe_allow_html=True)
             c1, c2, c3 = st.columns([2, 2, 1])
             with c1:
                 t_oid = st.selectbox("📦 選擇製令編號", sorted([str(o).strip() for o in order_list]), key="t_oid_select") if order_list else st.text_input("📦 手動輸入製令")
@@ -429,16 +429,16 @@ else:
                 start = task.get("start_time", 0)
                 worker_name = task.get("人員1", "未指定")
 
-                st.markdown(f'<div style="background:#1e3a8a; color:white; padding:8px 15px; border-radius:10px 10px 0 0; font-weight:bold;">📦 製令：{oid}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="background:#1e3a8a; color:white; padding:10px 15px; border-radius:10px 10px 0 0; font-weight:bold; font-size:1.1rem; border:1px solid #1e3a8a; border-bottom:none;">📦 製令：{oid}</div>', unsafe_allow_html=True)
                 with st.container(border=True):
-                    # --- HTML 區塊：顯著放大字體 ---
+                    # --- HTML 區塊：顯著放大字體，加深顏色與對比 ---
                     st.components.v1.html(f"""
-                        <div style="background:#f1f5f9; padding:15px; border-radius:8px; border-left:8px solid #3b82f6; display:flex; justify-content:space-between; align-items:center; font-family: 'Microsoft JhengHei', sans-serif;">
+                        <div style="background:#ffffff; padding:15px; border-radius:8px; border:2px solid #cbd5e1; border-left:10px solid #1e40af; display:flex; justify-content:space-between; align-items:center; font-family: 'Microsoft JhengHei', sans-serif;">
                             <div>
-                                <div style="font-weight:bold; color:#0f172a; font-size:1.1rem;">🛠️ {p_name}</div>
-                                <div style="font-size:1.8rem; color:#1e40af; font-weight:900; margin-top:8px;">👤 執行人員: {worker_name}</div>
+                                <div style="font-weight:900; color:#0f172a; font-size:1.2rem; margin-bottom:5px;">🛠️ 工序: {p_name}</div>
+                                <div style="font-size:2rem; color:#1e3a8a; font-weight:900; margin-top:5px; background-color:#eff6ff; padding:5px 12px; border-radius:6px; display:inline-block; border:1px solid #bfdbfe;">👤 執行人員: {worker_name}</div>
                             </div>
-                            <div id="timer_{db_id}" style="color:#ef4444; font-family:monospace; font-size:2.2rem; font-weight:bold; background:white; padding:5px 15px; border-radius:10px;">00:00:00</div>
+                            <div id="timer_{db_id}" style="color:#991b1b; font-family:monospace; font-size:2.5rem; font-weight:900; background:#fee2e2; padding:8px 20px; border-radius:10px; border:2px solid #fca5a5;">00:00:00</div>
                         </div>
                         <script>
                             (function() {{
@@ -453,7 +453,7 @@ else:
                                 setInterval(update, 1000); update();
                             }})();
                         </script>
-                    """, height=130)
+                    """, height=140)
                     
                     b1, b2, b3 = st.columns([1, 1, 1])
                     with b1:
@@ -480,6 +480,7 @@ else:
                             st.rerun()
         else:
             st.info("💡 目前無進行中任務。")
+
 # --- 📜 完工紀錄查詢 ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📜 歷史完工紀錄</h1>', unsafe_allow_html=True)
@@ -526,8 +527,9 @@ else:
                         if st.button(f"🗑️ 刪除紀錄", key=f"del_{o_id}"):
                             for d_id in group['db_id']: requests.delete(f"{FINISH_URL}/{d_id}.json")
                             st.rerun()
-            else: st.warning("查無紀錄。")
+            else: st.warning("查查無紀錄。")
         else: st.info("💡 目前尚無紀錄。")
+
 # --- 🔧 人員手工具紀錄表 (修正版：恢復資產匯出 + 移除重複) ---
     elif st.session_state.menu_selection == "🔧 固資&手工具紀錄表":
         import io
@@ -600,7 +602,14 @@ else:
                     csv_data = display_df.to_csv(index=False).encode('utf-8-sig')
                     st.download_button(label="📄 匯出人員清點表", data=csv_data, file_name="人員工具清點.csv", key="p_csv_btn")
 
-                    st.markdown("""<style>.card { background: white; border-radius: 8px; padding: 10px; margin-bottom: 5px; border: 1px solid #fce7f3; } .asset-card { border-left: 8px solid #8b5cf6 !important; background: #f5f3ff !important; } .t-title { font-weight: 800; color: #1f2937; } .t-qty { color: #db2777; margin-left: 5px; }</style>""", unsafe_allow_html=True)
+                    # 優化後的明亮與清晰卡片 CSS 樣式
+                    st.markdown("""<style>
+                        .card { background: #ffffff; border-radius: 10px; padding: 15px; margin-bottom: 10px; border: 2px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.05); } 
+                        .asset-card { border-left: 10px solid #7c3aed !important; background: #f5f3ff !important; border-color: #ddd6fe; } 
+                        .t-title { font-weight: 900; color: #0f172a; font-size: 1.1rem; } 
+                        .t-qty { color: #dc2626; font-weight: 900; font-size: 1.2rem; margin-left: 8px; background: #fee2e2; padding: 2px 8px; border-radius: 5px; }
+                        .t-meta { color: #475569; font-size: 0.85rem; margin-top: 5px; font-weight: 600; }
+                    </style>""", unsafe_allow_html=True)
 
                     for person, group in display_df.groupby("人員"):
                         with st.expander(f"👩‍🔧 {person} ({len(group)} 項)", expanded=True):
@@ -611,7 +620,7 @@ else:
                                 col1, col2 = st.columns([7.5, 2.5])
                                 with col1:
                                     st.markdown(f'<div class="t-title">🛠️ {row["手工具名稱"]} <span class="t-qty">x {row["數量"]}</span></div>', unsafe_allow_html=True)
-                                    st.markdown(f'<div style="color:gray; font-size:0.8rem;">登記人: {row.get("登記人","-")} | {row["登記時間"]}</div>', unsafe_allow_html=True)
+                                    st.markdown(f'<div class="t-meta">登記人: {row.get("登記人","-")} | 時間: {row["登記時間"]}</div>', unsafe_allow_html=True)
                                 with col2:
                                     sc1, sc2 = st.columns(2)
                                     if sc1.button("✏️", key=f"e_{db_id}"): edit_record_dialog(db_id, row['手工具名稱'], row['數量'], person)
@@ -633,12 +642,12 @@ else:
         
 # --- ⚙️ 編輯手工具清單 (修正 Duplicate ID 版本) ---
     elif st.session_state.menu_selection == "⚙️ 資產編輯清單":
-        # 1. 補回關鍵的粉紅色 CSS 樣式
+        # 1. 補回關鍵的粉紅色 CSS 樣式 (優化對比度與文字清晰度)
         st.markdown("""
             <style>
             .pink-card {
                 background-color: #fff1f2;
-                border: 2px solid #fda4af;
+                border: 2px solid #f43f5e;
                 padding: 20px;
                 border-radius: 15px;
                 box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
@@ -646,10 +655,15 @@ else:
             }
             .stButton>button {
                 border-radius: 10px;
-                font-weight: 600;
+                font-weight: bold;
             }
             h3 {
-                color: #db2777 !important;
+                color: #be123c !important;
+                font-weight: 900 !important;
+            }
+            label {
+                color: #4c0519 !important;
+                font-weight: bold !important;
             }
             </style>
         """, unsafe_allow_html=True)
@@ -719,7 +733,7 @@ else:
                 st.write("---")
                 for k, v in asset_tools_raw.items():
                     c_t1, c_t2, c_t3 = st.columns([4, 1, 1])
-                    c_t1.markdown(f"📍 **{v['no']}** - {v['name']}")
+                    c_t1.markdown(f"📍 **{v['no']}** - {v['name']}", help="資產項目")
                     if c_t2.button("✏️", key=f"edit_ast_{k}"):
                         edit_asset_dialog(k, v)
                     if c_t3.button("🗑️", key=f"del_ast_{k}"):
@@ -750,6 +764,7 @@ else:
                     requests.post(f"{USER_TOOLS_URL}.json", data=json.dumps(tool_payload))
                     st.success(f"已紀錄！"); time.sleep(0.5); st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
+
     # --- 📝 任務派發 ---
     elif st.session_state.menu_selection == "📝 任務派發":
         st.title("📝 任務指派與編輯")
