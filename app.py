@@ -594,31 +594,61 @@ else:
                     st.success("已刪除！"); time.sleep(0.5); st.rerun()
                 else: st.error("驗證碼錯誤")
 
-        # 注入專屬 CSS 優化，解決白色與灰色文字看不到的問題
+        # 注入全新深藍色文字主題 CSS（修正所有匯出按鈕、折疊標題、卡片內部文字看不見的問題）
         st.markdown("""
             <style>
-            /* 1. 強制讓分頁標籤（Tabs）文字變大、顏色清晰醒目 */
+            /* 1. 全網頁基本文字與標籤強制改為深藍色 */
+            div[data-testid="stMarkdownContainer"] p, 
+            .stRadio label, 
+            label, 
+            .stWidgetLabel p,
+            span {
+                color: #1e3a8a !important;
+                font-weight: 800 !important;
+            }
+            
+            /* 2. 修正分頁標籤（Tabs）選取與未選取文字，皆改為深藍色系 */
             div[data-testid="stTabs"] button {
                 font-size: 1.15rem !important;
-                font-weight: 700 !important;
-                color: #a7f3d0 !important; /* 未選中時為漂亮的淡翠綠色 */
+                font-weight: 800 !important;
+                color: #475569 !important; /* 未選中時為深灰藍 */
             }
             div[data-testid="stTabs"] button[aria-selected="true"] {
-                color: #f472b6 !important; /* 選中時為亮眼的粉紅色 */
+                color: #1e3a8a !important; /* 選中時為深藍色 */
                 font-weight: 900 !important;
-                border-bottom: 3px solid #f472b6 !important;
+                border-bottom: 3px solid #1e3a8a !important;
             }
             
-            /* 2. 強制讓單選鈕（Radio）與核取方塊的文字變純白粗體 */
-            div[data-testid="stMarkdownContainer"] p, .stRadio label {
-                color: #ffffff !important;
-                font-weight: 800 !important;
+            /* 3. 修正 st.expander (例如: 蘇萬紘 👩‍🔧 折疊區塊) 的標題文字顏色 */
+            div[data-testid="stExpander"] details summary p {
+                color: #1e3a8a !important;
+                font-weight: 900 !important;
+                font-size: 1.15rem !important;
             }
             
-            /* 3. 修改選單標題等文字對比 */
-            h3, .stWidgetLabel p {
-                color: #ffffff !important;
-                font-weight: 800 !important;
+            /* 4. 修正 st.download_button (匯出人員清點表) 的按鈕文字顏色 */
+            div.stDownloadButton button p {
+                color: #1e3a8a !important;
+                font-weight: 900 !important;
+            }
+            div.stDownloadButton button {
+                border: 2px solid #1e3a8a !important;
+                background-color: #ffffff !important;
+            }
+            div.stDownloadButton button:hover {
+                background-color: #eff6ff !important;
+            }
+            
+            /* 5. 下拉選單選中文字、輸入框等基本元件優化 */
+            .stSelectbox div div, .stTextInput div div input {
+                color: #0f172a !important;
+                font-weight: 700 !important;
+            }
+            
+            /* 6. 查詢與清點小標題 */
+            h3 {
+                color: #1e3a8a !important;
+                font-weight: 900 !important;
             }
             </style>
         """, unsafe_allow_html=True)
@@ -655,13 +685,13 @@ else:
                     csv_data = display_df.to_csv(index=False).encode('utf-8-sig')
                     st.download_button(label="📄 匯出人員清點表", data=csv_data, file_name="人員工具清點.csv", key="p_csv_btn")
 
-                    # 優化後的明亮與清晰卡片 CSS 樣式
+                    # 卡片內部文字設定為深藍色/黑色
                     st.markdown("""<style>
-                        .card { background: #ffffff; border-radius: 10px; padding: 15px; margin-bottom: 10px; border: 2px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.05); } 
+                        .card { background: #ffffff; border-radius: 10px; padding: 15px; margin-bottom: 10px; border: 2px solid #cbd5e1; box-shadow: 0 2px 4px rgba(0,0,0,0.05); } 
                         .asset-card { border-left: 10px solid #7c3aed !important; background: #f5f3ff !important; border-color: #ddd6fe; } 
-                        .t-title { font-weight: 900; color: #0f172a; font-size: 1.1rem; } 
-                        .t-qty { color: #dc2626; font-weight: 900; font-size: 1.2rem; margin-left: 8px; background: #fee2e2; padding: 2px 8px; border-radius: 5px; }
-                        .t-meta { color: #475569; font-size: 0.85rem; margin-top: 5px; font-weight: 600; }
+                        .t-title { font-weight: 900; color: #0f172a !important; font-size: 1.15rem; } 
+                        .t-qty { color: #dc2626 !important; font-weight: 900; font-size: 1.2rem; margin-left: 8px; background: #fee2e2; padding: 2px 8px; border-radius: 5px; }
+                        .t-meta { color: #1e3a8a !important; font-size: 0.85rem; margin-top: 5px; font-weight: 700; }
                     </style>""", unsafe_allow_html=True)
 
                     for person, group in display_df.groupby("人員"):
@@ -672,6 +702,7 @@ else:
                                 st.markdown(f'<div class="card {is_a}">', unsafe_allow_html=True)
                                 col1, col2 = st.columns([7.5, 2.5])
                                 with col1:
+                                    # 卡片內部的手工具名稱與數量顯示
                                     st.markdown(f'<div class="t-title">🛠️ {row["手工具名稱"]} <span class="t-qty">x {row["數量"]}</span></div>', unsafe_allow_html=True)
                                     st.markdown(f'<div class="t-meta">登記人: {row.get("登記人","-")} | 時間: {row["登記時間"]}</div>', unsafe_allow_html=True)
                                 with col2:
