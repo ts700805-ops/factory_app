@@ -190,35 +190,36 @@ else:
         "⚙️ 設定管理"
     ])
     
+    # --- 登出系統按鈕（放到側邊欄 radio 下方，確保 100% 執行與顯示）---
+    st.sidebar.markdown(
+        """
+        <div style="padding: 10px 0; text-align: center;">
+            <a href="/?logout=true" target="_self" style="
+                display: block; 
+                padding: 12px; 
+                color: #ffffff !important; 
+                background-color: #dc2626 !important; 
+                border-radius: 8px; 
+                text-decoration: none !important; 
+                font-size: 1.2rem; 
+                font-weight: 900; 
+                box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
+            ">🚪 點此登出系統</a>
+        </div>
+        """, 
+        unsafe_allow_html=True
+    )
+
+    # 檢查是否點擊了登出連結
+    if "logout" in st.query_params:
+        st.query_params.clear()
+        st.session_state.clear()
+        st.rerun()
+
+    # 導航頁面重整判斷（移至登出按鈕下方，不阻斷程式執行）
     if nav != st.session_state.menu_selection:
         st.session_state.menu_selection = nav
         st.rerun()
-
-# --- 登出系統按鈕（全新純 HTML 點擊設計，確保字體清晰、絕對不消失）---
-        st.sidebar.markdown(
-            """
-            <div style="padding: 10px 0; text-align: center;">
-                <a href="/?logout=true" target="_self" style="
-                    display: block; 
-                    padding: 12px; 
-                    color: #ffffff !important; 
-                    background-color: #dc2626 !important; 
-                    border-radius: 8px; 
-                    text-decoration: none !important; 
-                    font-size: 1.2rem; 
-                    font-weight: 900; 
-                    box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
-                ">🚪 點此登出系統</a>
-            </div>
-            """, 
-            unsafe_allow_html=True
-        )
-
-        # 檢查是否點擊了登出連結
-        if "logout" in st.query_params:
-            st.query_params.clear()
-            st.session_state.clear()
-            st.rerun()
         
 # --- 📊 製造部派工專區 ---
     if st.session_state.menu_selection == "📊 製造部派工專區":
