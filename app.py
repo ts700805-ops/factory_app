@@ -109,15 +109,16 @@ st.markdown("""
         padding-left: 12px; 
     }
     
-    /* 人員標籤：深底綠字，對比極度清晰 */
+    /* 人員標籤：優化背景與文字對比度，改為明亮清晰字體 */
     .badge-staff { 
-        background: #022c22; 
-        color: #34d399; 
+        background: #059669; 
+        color: #ffffff; 
         padding: 4px 10px; 
         border-radius: 6px; 
         font-size: 0.95rem; 
         font-weight: 700; 
-        border: 1px solid #059669; 
+        border: 1px solid #34d399; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
     
     /* 狀態框：已完工 (明亮綠) */
@@ -150,7 +151,7 @@ st.markdown("""
         color: #ffffff !important;
     }
     
-    .status-empty { color: #94a3b8; font-style: italic; font-weight: 700; font-size: 0.95rem; }
+    .status-empty { color: #cbd5e1; font-style: italic; font-weight: 700; font-size: 0.95rem; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -329,7 +330,7 @@ else:
                                     staff_html = "".join([f'<span class="badge-staff">{target_row.get(f"人員{i}")}</span> ' for i in range(1,6) if target_row.get(f"人員{i}") not in ["NA", None]])
                                     st.markdown(f'<div style="display:flex; flex-wrap:wrap; gap:4px;">{staff_html if staff_html else "尚未派工"}</div>', unsafe_allow_html=True)
                                 else:
-                                    st.markdown('<div style="color:#94a3b8; font-size:0.8rem;">尚未派工</div>', unsafe_allow_html=True)
+                                    st.markdown('<div style="color:#cbd5e1; font-weight:700; font-size:0.95rem;">尚未派工</div>', unsafe_allow_html=True)
                             
                             with r_ui[2]:
                                 if not is_done and st.button("✏️", key=f"eb_staff_{u_key}"):
@@ -360,7 +361,6 @@ else:
             # 💡 增加錯誤偵測，幫助開發者看到真正的問題
             st.error(f"系統偵測到錯誤：{str(e)}")
             st.warning("目前系統資料緩衝中，請稍後再試。")
-
 # --- 📈 工時統計分析 ---
     elif st.session_state.menu_selection == "📈 工時統計分析":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">⏱️ 生產工時管理系統</h1>', unsafe_allow_html=True)
