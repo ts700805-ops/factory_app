@@ -40,21 +40,117 @@ def get_settings():
     except:
         return default_settings
 
-# --- 2. 介面樣式設定 ---
+# --- 2. 介面樣式設定 (全面升級為照片中的高質感深綠色漸層主題) ---
 st.set_page_config(page_title="超慧科技管理系統", layout="wide")
 
 st.markdown("""
     <style>
-    .stApp { background-color: #f1f5f9; }
-    .order-card { background: white; border-radius: 12px; border: 1px solid #cbd5e1; margin-bottom: 25px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
-    .order-header { background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%); color: white; padding: 12px 18px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; font-size: 1.2rem; }
-    .power-date-tag { background: #fbbf24; color: #1e3a8a; padding: 4px 12px; border-radius: 8px; font-size: 0.9rem; font-weight: 800; display: flex; align-items: center; }
-    .proc-row-container { padding: 15px 18px; border-bottom: 1px solid #cbd5e1; background-color: #e2e8f0; }
-    .proc-name { font-weight: 900; color: #0f172a; font-size: 1.05rem; border-left: 5px solid #ef4444; padding-left: 12px; }
-    .badge-staff { background: #eff6ff; color: #1e40af; padding: 4px 10px; border-radius: 6px; font-size: 0.95rem; font-weight: 700; border: 1px solid #bfdbfe; }
-    .status-done-box { background: #dcfce7; color: #166534; font-weight: 800; font-size: 0.9rem; padding: 6px 12px; border-radius: 6px; border: 1px solid #bbf7d0; display: inline-block; }
-    .status-assign-box { background: #fff9db; color: #854d0e; font-weight: 700; padding: 6px 12px; border-radius: 6px; border: 1px solid #ffe066; font-size: 0.9rem; }
-    .status-empty { color: #64748b; font-style: italic; font-weight: 700; font-size: 0.95rem; }
+    /* 全網頁背景改成深綠至黑綠色漸層 */
+    .stApp { 
+        background: linear-gradient(135deg, #04241a 0%, #01140f 100%) !important; 
+        color: #e2e8f0 !important;
+    }
+    
+    /* 側邊欄與相關表單文字顏色微調 */
+    .stSidebar, [data-testid="stSidebarUserContent"] {
+        background-color: #021a14 !important;
+        color: #f0fdf4 !important;
+    }
+    
+    /* 製令卡片改為深綠色帶金屬感的漸層外框 */
+    .order-card { 
+        background: linear-gradient(145deg, #083b2e 0%, #031c16 100%); 
+        border-radius: 14px; 
+        border: 1px solid #10b981; 
+        margin-bottom: 25px; 
+        overflow: hidden; 
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5); 
+    }
+    
+    /* 卡片標頭：亮綠色漸層，配上清楚白字 */
+    .order-header { 
+        background: linear-gradient(90deg, #059669 0%, #047857 100%); 
+        color: white; 
+        padding: 14px 18px; 
+        font-weight: 800; 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        font-size: 1.25rem; 
+        border-bottom: 1px solid #10b981;
+    }
+    
+    /* 通電日期標籤改為顯眼明亮的冰藍或黃金配色 */
+    .power-date-tag { 
+        background: #06b6d4; 
+        color: #ffffff; 
+        padding: 4px 12px; 
+        border-radius: 8px; 
+        font-size: 0.9rem; 
+        font-weight: 800; 
+        display: flex; 
+        align-items: center; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    /* 工序橫條：改為半透明深色底，帶有翠綠邊線 */
+    .proc-row-container { 
+        padding: 15px 18px; 
+        border-bottom: 1px solid #064e3b; 
+        background-color: rgba(2, 44, 34, 0.6); 
+    }
+    
+    /* 工序名稱字體：亮白色，左邊改為亮綠色條 */
+    .proc-name { 
+        font-weight: 900; 
+        color: #ffffff; 
+        font-size: 1.1rem; 
+        border-left: 5px solid #34d399; 
+        padding-left: 12px; 
+    }
+    
+    /* 人員標籤：深底綠字，對比極度清晰 */
+    .badge-staff { 
+        background: #022c22; 
+        color: #34d399; 
+        padding: 4px 10px; 
+        border-radius: 6px; 
+        font-size: 0.95rem; 
+        font-weight: 700; 
+        border: 1px solid #059669; 
+    }
+    
+    /* 狀態框：已完工 (明亮綠) */
+    .status-done-box { 
+        background: #065f46; 
+        color: #34d399; 
+        font-weight: 800; 
+        font-size: 0.9rem; 
+        padding: 6px 12px; 
+        border-radius: 6px; 
+        border: 1px solid #34d399; 
+        display: inline-block; 
+        text-align: center;
+    }
+    
+    /* 狀態框：請指派 (鮮艷橘黃) */
+    .status-assign-box { 
+        background: #78350f; 
+        color: #fcd34d; 
+        font-weight: 700; 
+        padding: 6px 12px; 
+        border-radius: 6px; 
+        border: 1px solid #f59e0b; 
+        font-size: 0.9rem; 
+        text-align: center;
+    }
+    
+    /* 修正下拉選單與一般標題文字在黑底下的顏色 */
+    h1, h2, h3, p, label, .stWidgetLabel {
+        color: #ffffff !important;
+    }
+    
+    .status-empty { color: #94a3b8; font-style: italic; font-weight: 700; font-size: 0.95rem; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -73,7 +169,7 @@ if "menu_selection" not in st.session_state:
 # --- 4. 登入介面 ---
 if "user" not in st.session_state:
     st.markdown('<div style="height:100px;"></div>', unsafe_allow_html=True)
-    st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-size:3rem; font-weight:900;">⚓ 超慧科技系統</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 style="text-align:center; color:#34d399; font-size:3rem; font-weight:900;">⚓ 超慧科技系統</h1>', unsafe_allow_html=True)
     with st.columns([1,1.2,1])[1]:
         with st.container(border=True):
             u = st.selectbox("👤 請選擇組長姓名登入", sorted(all_leaders))
@@ -100,9 +196,10 @@ else:
     if st.sidebar.button("登出系統", use_container_width=True):
         st.session_state.clear()
         st.rerun()
+        
 # --- 📊 製造部派工專區 ---
     if st.session_state.menu_selection == "📊 製造部派工專區":
-        st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📋 製造部派工進度看板</h1>', unsafe_allow_html=True)
+        st.markdown('<h1 style="text-align:center; color:#34d399; font-weight:900;">📋 製造部派工進度看板</h1>', unsafe_allow_html=True)
 
         @st.dialog("👥 編輯施工人員", width="medium")
         def edit_staff_dialog(order_id, proc_name, current_data):
@@ -232,7 +329,7 @@ else:
                                     staff_html = "".join([f'<span class="badge-staff">{target_row.get(f"人員{i}")}</span> ' for i in range(1,6) if target_row.get(f"人員{i}") not in ["NA", None]])
                                     st.markdown(f'<div style="display:flex; flex-wrap:wrap; gap:4px;">{staff_html if staff_html else "尚未派工"}</div>', unsafe_allow_html=True)
                                 else:
-                                    st.markdown('<div style="color:gray; font-size:0.8rem;">尚未派工</div>', unsafe_allow_html=True)
+                                    st.markdown('<div style="color:#94a3b8; font-size:0.8rem;">尚未派工</div>', unsafe_allow_html=True)
                             
                             with r_ui[2]:
                                 if not is_done and st.button("✏️", key=f"eb_staff_{u_key}"):
