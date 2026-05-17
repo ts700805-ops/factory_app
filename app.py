@@ -432,13 +432,20 @@ else:
                 st.markdown(f'<div style="background:#1e3a8a; color:white; padding:10px 15px; border-radius:10px 10px 0 0; font-weight:bold; font-size:1.1rem; border:1px solid #1e3a8a; border-bottom:none;">📦 製令：{oid}</div>', unsafe_allow_html=True)
                 with st.container(border=True):
                     # --- HTML 區塊：顯著放大字體，加深顏色與對比 ---
+                    # --- HTML 區塊：優化字體大小、顏色與對比度，確保文字極度清晰 ---
                     st.components.v1.html(f"""
-                        <div style="background:#ffffff; padding:15px; border-radius:8px; border:2px solid #cbd5e1; border-left:10px solid #1e40af; display:flex; justify-content:space-between; align-items:center; font-family: 'Microsoft JhengHei', sans-serif;">
-                            <div>
-                                <div style="font-weight:900; color:#0f172a; font-size:1.2rem; margin-bottom:5px;">🛠️ 工序: {p_name}</div>
-                                <div style="font-size:2rem; color:#1e3a8a; font-weight:900; margin-top:5px; background-color:#eff6ff; padding:5px 12px; border-radius:6px; display:inline-block; border:1px solid #bfdbfe;">👤 執行人員: {worker_name}</div>
+                        <div style="background:#ffffff; padding:12px 15px; border-radius:8px; border:2px solid #cbd5e1; border-left:10px solid #1e40af; display:flex; justify-content:space-between; align-items:center; font-family: 'Microsoft JhengHei', sans-serif;">
+                            <div style="flex: 1; min-width: 0; padding-right: 10px;">
+                                <div style="font-weight:900; color:#000000; font-size:1.3rem; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                    🛠️ 工序：{p_name}
+                                </div>
+                                <div style="font-size:1.6rem; color:#1e3a8a; font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                    👤 人員：{worker_name}
+                                </div>
                             </div>
-                            <div id="timer_{db_id}" style="color:#991b1b; font-family:monospace; font-size:2.5rem; font-weight:900; background:#fee2e2; padding:8px 20px; border-radius:10px; border:2px solid #fca5a5;">00:00:00</div>
+                            <div id="timer_{db_id}" style="color:#b91c1c; font-family:monospace; font-size:2.3rem; font-weight:900; background:#fee2e2; padding:5px 15px; border-radius:8px; border:2px solid #fca5a5; min-width:160px; text-align:center; flex-shrink: 0;">
+                                00:00:00
+                            </div>
                         </div>
                         <script>
                             (function() {{
@@ -453,7 +460,7 @@ else:
                                 setInterval(update, 1000); update();
                             }})();
                         </script>
-                    """, height=140)
+                    """, height=130)
                     
                     b1, b2, b3 = st.columns([1, 1, 1])
                     with b1:
