@@ -194,9 +194,10 @@ else:
         st.session_state.menu_selection = nav
         st.rerun()
 
-    if st.sidebar.button("登出系統", use_container_width=True):
-        st.session_state.clear()
-        st.rerun()
+# --- 請找到類似這段的程式碼，並替換成這樣 ---
+if st.sidebar.button("🚪 登出系統", type="primary", use_container_width=True):
+    st.session_state.clear()  # 或是您原本的登出邏輯
+    st.rerun()
         
 # --- 📊 製造部派工專區 ---
     if st.session_state.menu_selection == "📊 製造部派工專區":
