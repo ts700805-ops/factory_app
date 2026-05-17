@@ -454,7 +454,6 @@ else:
 
                 st.markdown(f'<div style="background:#1e3a8a; color:white; padding:10px 15px; border-radius:10px 10px 0 0; font-weight:bold; font-size:1.1rem; border:1px solid #1e3a8a; border-bottom:none;">📦 製令：{oid}</div>', unsafe_allow_html=True)
                 with st.container(border=True):
-                    # --- HTML 區塊：顯著放大字體，加深顏色與對比 ---
                     # --- HTML 區塊：優化字體大小、顏色與對比度，確保文字極度清晰 ---
                     st.components.v1.html(f"""
                         <div style="background:#ffffff; padding:12px 15px; border-radius:8px; border:2px solid #cbd5e1; border-left:10px solid #1e40af; display:flex; justify-content:space-between; align-items:center; font-family: 'Microsoft JhengHei', sans-serif;">
@@ -498,7 +497,8 @@ else:
                     with b2:
                         if st.button("⏹️ 結束", key=f"e_{db_id}", use_container_width=True, type="primary"):
                             final_sec = acc + (time.time() - start if status == 'running' else 0)
-                            requests.post(f"{DB_BASE_URL}/work_logs.json", data=json.dumps({
+                            # --- 關鍵修正：確保結束時寫入 FINISH_URL，使歷史完工紀錄同步抓得到 ---
+                            requests.post(f"{FINISH_URL}.json", data=json.dumps({
                                 "製令": oid, "工序": p_name, "秒數": final_sec, 
                                 "完工時間": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "人員1": worker_name
                             }))
@@ -526,11 +526,11 @@ else:
                 for o_id, group in df.groupby("製令"):
                     display_df = group.copy()
                     
-                    # 1. 計算工時(分)與總秒數
-                    total_all_seconds = 0
+                    # 1. 計算每筆工時(分)與總工時(分鐘數相加)
+                    total_all_minutes = 0.0
                     if '秒數' in display_df.columns:
                         display_df['工時(分)'] = (display_df['秒數'] / 60).round(2)
-                        total_all_seconds = int(display_df['秒數'].sum()) # 取得該製令總秒數
+                        total_all_minutes = round(display_df['工時(分)'].sum(), 2) # 找回原本 Minutes 相加功能
                         
                         # 2. 逆推開始時間
                         try:
@@ -539,14 +539,8 @@ else:
                         except:
                             display_df['開始時間'] = "計算失敗"
 
-                    # 3. 將總秒數轉換為「xx小時 xx分 xx秒」
-                    hrs = total_all_seconds // 3600
-                    mins = (total_all_seconds % 3600) // 60
-                    secs = total_all_seconds % 60
-                    time_str = f"{hrs}小時 {mins}分 {secs}秒"
-
-                    # 4. 在標題顯示 (包含您紅框要求的總工時，格式改為時分秒)
-                    with st.expander(f"📦 製令：{o_id} ({len(group)} 項 | 總工時：{time_str})"):
+                    # 3. 在標題顯示 (找回原本的 總工時：xx 分鐘 顯示格式)
+                    with st.expander(f"📦 製令：{o_id} ({len(group)} 項 | 總工時：{total_all_minutes} 分鐘)"):
                         
                         # 設定表格順序
                         cols = ["工序", "開始時間", "完工時間", "工時(分)"]
@@ -557,7 +551,7 @@ else:
                         if st.button(f"🗑️ 刪除紀錄", key=f"del_{o_id}"):
                             for d_id in group['db_id']: requests.delete(f"{FINISH_URL}/{d_id}.json")
                             st.rerun()
-            else: st.warning("查查無紀錄。")
+            else: st.warning("查無紀錄。")
         else: st.info("💡 目前尚無紀錄。")
 
 # --- 🔧 人員手工具紀錄表 (修正版：恢復資產匯出 + 移除重複) ---
