@@ -194,27 +194,29 @@ else:
         st.session_state.menu_selection = nav
         st.rerun()
 
-# --- 登出系統按鈕與樣式修正 (只影響側邊欄按鈕，不影響右邊網頁) ---
-        st.markdown("""
-            <style>
-            /* 精準鎖定側邊欄最底部的登出按鈕 */
-            div[data-testid="stSidebar"] div.stButton > button {
-                border: 2px solid #dc2626 !important;   /* 深紅色邊框 */
-                color: #dc2626 !important;            /* 深紅色字體 */
-                background-color: #ffffff !important; /* 純白背景 */
-                font-weight: 900 !important;          /* 字體加粗 */
-                width: 100% !important;
-            }
-            div[data-testid="stSidebar"] div.stButton > button:hover {
-                background-color: #fef2f2 !important; /* 滑鼠移上去變淡紅底 */
-                color: #b91c1c !important;
-                border-color: #b91c1c !important;
-            }
-            </style>
-        """, unsafe_allow_html=True)
+# --- 登出系統按鈕（全新純 HTML 點擊設計，確保字體清晰、絕對不消失）---
+        st.sidebar.markdown(
+            """
+            <div style="padding: 10px 0; text-align: center;">
+                <a href="/?logout=true" target="_self" style="
+                    display: block; 
+                    padding: 12px; 
+                    color: #ffffff !important; 
+                    background-color: #dc2626 !important; 
+                    border-radius: 8px; 
+                    text-decoration: none !important; 
+                    font-size: 1.2rem; 
+                    font-weight: 900; 
+                    box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
+                ">🚪 點此登出系統</a>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
 
-       # --- 登出系統按鈕（使用內建藍底白字，保證清晰且不影響網頁內容）---
-        if st.sidebar.button("🚪 登出系統", type="primary", use_container_width=True, key="logout_btn_sidebar_fixed"):
+        # 檢查是否點擊了登出連結
+        if "logout" in st.query_params:
+            st.query_params.clear()
             st.session_state.clear()
             st.rerun()
         
