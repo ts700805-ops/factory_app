@@ -743,7 +743,7 @@ else:
                 st.dataframe(asset_df, use_container_width=True, hide_index=True)
             else:
                 st.info("💡 目前無資產資料")
- # --- 🧾 人員評核表 ---
+# --- 🧾 人員評核表 ---
     elif st.session_state.menu_selection == "🧾 人員評核表":
         import io
 
@@ -751,6 +751,53 @@ else:
             '<h1 style="text-align:center; color:#f59e0b; font-weight:900;">🧾 人員評核表</h1>',
             unsafe_allow_html=True
         )
+
+        # 注入專屬「亮紫色」樣式優化，解決黑底環境下所有表單與滑桿字體看不見的問題
+        st.markdown("""
+            <style>
+            /* 1. 讓表單內所有的文字、下拉選單標題、滑桿名稱、點開明細強制變亮紫色 */
+            div[data-testid="stMarkdownContainer"] p, 
+            label, 
+            .stWidgetLabel p,
+            span,
+            li {
+                color: #e879f9 !important; /* 明亮的紫羅蘭色 */
+                font-weight: 800 !important;
+            }
+            
+            /* 2. 讓大標題與小標題維持高對比 */
+            h3 {
+                color: #ff00ff !important;
+                font-weight: 900 !important;
+            }
+            
+            /* 3. 修正明細折疊區塊 (st.expander) 的標題文字顏色 */
+            div[data-testid="stExpander"] details summary p {
+                color: #ff00ff !important;
+                font-weight: 900 !important;
+                font-size: 1.1rem !important;
+            }
+            
+            /* 4. 修正匯出按鈕的文字與邊框 */
+            div.stDownloadButton button p {
+                color: #ff00ff !important;
+                font-weight: 900 !important;
+            }
+            div.stDownloadButton button {
+                border: 2px solid #ff00ff !important;
+                background-color: #ffffff !important;
+            }
+            div.stDownloadButton button:hover {
+                background-color: #fdf4ff !important;
+            }
+            
+            /* 5. 表單輸入框內部的填入文字（維持暗色，便於白底閱讀） */
+            .stSelectbox div div, .stTextInput div div input, textarea {
+                color: #0f172a !important;
+                font-weight: 700 !important;
+            }
+            </style>
+        """, unsafe_allow_html=True)
 
         current_leader = st.session_state.user
         my_team = staff_map.get(current_leader, [])
@@ -841,17 +888,19 @@ else:
 
                 eval_df = pd.DataFrame(eval_list)
 
-                # 僅顯示當前組長的紀錄
-                if "組長" in eval_df.columns:
+                # 安全檢查：確保 DataFrame 不為空且包含「組長」欄位時才進行篩選，避免空資料庫崩潰
+                if not eval_df.empty and "組長" in eval_df.columns:
                     eval_df = eval_df[eval_df["組長"] == current_leader]
+                else:
+                    eval_df = pd.DataFrame() # 欄位不對時直接清空
 
-                if filter_staff != "全部":
+                if not eval_df.empty and filter_staff != "全部" and "人員" in eval_df.columns:
                     eval_df = eval_df[eval_df["人員"] == filter_staff]
 
-                if filter_month != "全部":
+                if not eval_df.empty and filter_month != "全部" and "評核月份" in eval_df.columns:
                     eval_df = eval_df[eval_df["評核月份"] == filter_month]
 
-                if keyword:
+                if not eval_df.empty and keyword:
                     eval_df = eval_df[
                         eval_df.astype(str).apply(
                             lambda x: x.str.contains(keyword, case=False, na=False)
@@ -869,39 +918,33 @@ else:
                     )
 
                     st.markdown("### 📊 評核總覽")
+                    
+                    # 確保要展示的欄位在 DataFrame 內都有存在
+                    show_cols = [
+                        "人員", "評核月份", "出勤表現", "品質表現", "工作效率",
+                        "團隊配合", "紀律態度", "5S維護", "平均分數", "評語", "建立時間"
+                    ]
+                    available_cols = [c for c in show_cols if c in eval_df.columns]
+                    
                     st.dataframe(
-                        eval_df[
-                            [
-                                "人員", "評核月份", "出勤表現", "品質表現", "工作效率",
-                                "團隊配合", "紀律態度", "5S維護", "平均分數", "評語", "建立時間"
-                            ]
-                        ],
+                        eval_df[available_cols],
                         use_container_width=True,
                         hide_index=True
                     )
 
                     st.markdown("### 👁️ 明細檢視 / 刪除")
                     for _, row in eval_df.sort_values(by="建立時間", ascending=False).iterrows():
-                        with st.expander(f"👤 {row['人員']}｜📅 {row['評核月份']}｜⭐ 平均 {row['平均分數']}"):
+                        with st.expander(f"👤 {row.get('人員', '未知')}｜📅 {row.get('評核月份', '')}｜⭐ 平均 {row.get('平均分數', 0)}"):
                             st.markdown(f"""
                             - **組長：** {row.get('組長', '-')}
-
                             - **出勤表現：** {row.get('出勤表現', '-')}
-
                             - **品質表現：** {row.get('品質表現', '-')}
-
                             - **工作效率：** {row.get('工作效率', '-')}
-
                             - **團隊配合：** {row.get('團隊配合', '-')}
-
                             - **紀律態度：** {row.get('紀律態度', '-')}
-
                             - **5S維護：** {row.get('5S維護', '-')}
-
                             - **平均分數：** {row.get('平均分數', '-')}
-
                             - **評語：** {row.get('評語', '-')}
-
                             - **建立時間：** {row.get('建立時間', '-')}
                             """)
 
