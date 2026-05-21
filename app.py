@@ -759,7 +759,7 @@ else:
             else:
                 EVALUATION_URL = "https://your-firebase-url/evaluation" # 防護備用機制
 
-        # 注入專屬「亮黃色」全網頁字體主題 CSS，解決黑底環境下所有表單與滑桿字體看不見的問題
+        # 注入專屬 CSS：將全網頁字體調為亮黃色，並將白色輸入框改為深綠色底框
         st.markdown("""
             <style>
             /* 1. 讓表單內所有的文字、下拉選單標題、滑桿名稱、點開明細強制變亮黃色 */
@@ -798,10 +798,27 @@ else:
                 background-color: #fefcbf !important;
             }
             
-            /* 5. 下拉選單與輸入框內部的填入文字（維持暗色，便於白底閱讀） */
-            .stSelectbox div div, .stTextInput div div input, textarea {
-                color: #0f172a !important;
+            /* 5. 【全新修正】將原本的白色輸入框、下拉選單、文字區域底色全部改為深綠色 */
+            /* 針對 下拉選單(Selectbox) 與 文字輸入框(TextInput) 與 欄位外框 */
+            div[data-baseweb="select"] > div, 
+            div[data-testid="stTextInput"] div div input, 
+            div[data-testid="stTextArea"] textarea {
+                background-color: #052e16 !important; /* 深森林綠底色 */
+                color: #ffff00 !important;           /* 輸入的文字改為亮黃色 */
+                border: 1px solid #22c55e !important; /* 綠色邊框 */
                 font-weight: 700 !important;
+            }
+
+            /* 確保下拉選單點開後的單選項也是深綠底、黃字 */
+            div[ul][role="listbox"] {
+                background-color: #052e16 !important;
+            }
+            div[role="option"] {
+                background-color: #052e16 !important;
+                color: #ffff00 !important;
+            }
+            div[role="option"]:hover {
+                background-color: #14532d !important; /* 滑鼠移上去時稍微亮一點的綠色 */
             }
             </style>
         """, unsafe_allow_html=True)
