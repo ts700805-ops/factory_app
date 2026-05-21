@@ -759,7 +759,7 @@ else:
             else:
                 EVALUATION_URL = "https://your-firebase-url/evaluation" # 防護備用機制
 
-        # 注入全新改良版 CSS：徹底解決下拉選單彈出視窗變白、看不到字的問題
+        # 注入全新改良版 CSS：徹底解決下拉選單與表單按鈕變白、看不到字的問題
         st.markdown("""
             <style>
             /* 1. 讓表單內所有的文字、下拉選單標題、滑桿名稱、點開明細強制變亮黃色 */
@@ -808,7 +808,7 @@ else:
                 font-weight: 700 !important;
             }
 
-            /* 6. 【核心修正】徹底解決下拉選單點開後「彈出白底浮窗」看不到字的問題 */
+            /* 6. 徹底解決下拉選單點開後「彈出白底浮窗」看不到字的問題 */
             /* 強制將全域所有 Streamlit 下拉選單彈出的清單容器改為深綠底、黃字 */
             div[data-baseweb="menu"], 
             div[role="listbox"], 
@@ -834,6 +834,20 @@ else:
             div[data-baseweb="menu"] li:hover,
             div[aria-selected="true"] {
                 background-color: #14532d !important; /* 較亮綠色 */
+                color: #ffffff !important;           /* 滑過時字體變白色，極度清晰 */
+            }
+
+            /* 7. 【全新修正】徹底將「儲存評核」按鈕格子從白色改成深綠色 */
+            /* 針對表單內的 submit 按鈕 */
+            div[data-testid="stForm"] div.stButton > button {
+                background-color: #052e16 !important; /* 深森林綠底色 */
+                color: #ffff00 !important;           /* 文字改為亮黃色 */
+                border: 1px solid #22c55e !important; /* 綠色邊框 */
+                font-weight: 700 !important;
+                opacity: 1 !important; /* 確保不被其他樣式影響透明度 */
+            }
+            div[data-testid="stForm"] div.stButton > button:hover {
+                background-color: #14532d !important; /* 滑鼠移上去時稍微亮一點的綠色 */
                 color: #ffffff !important;           /* 滑過時字體變白色，極度清晰 */
             }
             </style>
@@ -940,7 +954,7 @@ else:
                 if not eval_df.empty and filter_month != "全部" and "評核月份" in eval_df.columns:
                     eval_df = eval_df[eval_df["評核月份"] == filter_month]
 
-                if not eval_df.empty and keyword:
+                if not eval_df.empty auctions and keyword:
                     eval_df = eval_df[
                         eval_df.astype(str).apply(
                             lambda x: x.str.contains(keyword, case=False, na=False)
