@@ -748,7 +748,7 @@ else:
         import io
 
         st.markdown(
-            '<h1 style="text-align:center; color:#f59e0b; font-weight:900;">🧾 人員評核表</h1>',
+            '<h1 style="text-align:center; color:#002244; font-weight:900;">🧾 人員評核表</h1>',
             unsafe_allow_html=True
         )
 
@@ -759,57 +759,56 @@ else:
             else:
                 EVALUATION_URL = "https://your-firebase-url/evaluation" # 防護備用機制
 
-        # 注入全新改良版 CSS：徹底解決下拉選單與表單按鈕變白、看不到字的問題
+        # 注入全新改良版 CSS：將全網頁字體、標題、輸入框文字全部強制改為深藍色
         st.markdown("""
             <style>
-            /* 1. 讓表單內所有的文字、下拉選單標題、滑桿名稱、點開明細強制變亮黃色 */
+            /* 1. 讓表單內所有的文字、下拉選單標題、滑桿名稱、點開明細強制變深藍色 */
             div[data-testid="stMarkdownContainer"] p, 
             label, 
             .stWidgetLabel p,
             span,
             li {
-                color: #ffff00 !important; /* 亮黃色 */
+                color: #003366 !important; /* 深藍色 */
                 font-weight: 800 !important;
             }
             
-            /* 2. 讓大標題與小標題變極亮黃色 */
+            /* 2. 讓大標題與小標題變極深藍色 */
             h3 {
-                color: #facc15 !important;
+                color: #002244 !important;
                 font-weight: 900 !important;
             }
             
-            /* 3. 修正明細折疊區塊 (st.expander) 的標題文字顏色為亮黃色 */
+            /* 3. 修正明細折疊區塊 (st.expander) 的標題文字顏色為深藍色 */
             div[data-testid="stExpander"] details summary p {
-                color: #ffff00 !important;
+                color: #003366 !important;
                 font-weight: 900 !important;
                 font-size: 1.15rem !important;
             }
             
-            /* 4. 修正匯出按鈕的文字與邊框顏色（外框亮黃，內字亮黃） */
+            /* 4. 修正匯出按鈕的文字與邊框顏色（外框深藍，內字深藍） */
             div.stDownloadButton button p {
-                color: #ffff00 !important;
+                color: #003366 !important;
                 font-weight: 900 !important;
             }
             div.stDownloadButton button {
-                border: 2px solid #ffff00 !important;
+                border: 2px solid #003366 !important;
                 background-color: #ffffff !important;
             }
             div.stDownloadButton button:hover {
-                background-color: #fefcbf !important;
+                background-color: #e6f0fa !important;
             }
             
-            /* 5. 強制將輸入框、下拉選單未點開時的底色改為深綠色 */
+            /* 5. 強制將輸入框、下拉選單未點開時的內部輸入文字改為深藍色 */
             div[data-baseweb="select"] > div, 
             div[data-testid="stTextInput"] div div input, 
             div[data-testid="stTextArea"] textarea {
-                background-color: #052e16 !important; /* 深森林綠底色 */
-                color: #ffff00 !important;           /* 輸入的文字改為亮黃色 */
+                background-color: #052e16 !important; /* 維持深森林綠底色 */
+                color: #003366 !important;           /* 輸入的文字改為深藍色 */
                 border: 1px solid #22c55e !important; /* 綠色邊框 */
                 font-weight: 700 !important;
             }
 
-            /* 6. 徹底解決下拉選單點開後「彈出白底浮窗」看不到字的問題 */
-            /* 強制將全域所有 Streamlit 下拉選單彈出的清單容器改為深綠底、黃字 */
+            /* 6. 徹底解決下拉選單點開後「彈出浮窗」內部的文字顏色 */
             div[data-baseweb="menu"], 
             div[role="listbox"], 
             ul[role="listbox"],
@@ -818,37 +817,36 @@ else:
                 border: 1px solid #22c55e !important;
             }
 
-            /* 強制選單內部的每一個選項(li/div)都變成亮黃色字體 */
+            /* 強制選單內部的每一個選項(li/div)都變成深藍色字體 */
             div[role="option"], 
             li[role="option"],
             div[data-baseweb="menu"] li,
             div[data-baseweb="menu"] div {
                 background-color: #052e16 !important;
-                color: #ffff00 !important;
+                color: #003366 !important;
                 font-weight: 700 !important;
             }
 
-            /* 游標移上去（Hover）或被選中時的底色，改成稍微亮一點的綠色 */
+            /* 游標移上去（Hover）或被選中時的底色 */
             div[role="option"]:hover, 
             li[role="option"]:hover,
             div[data-baseweb="menu"] li:hover,
             div[aria-selected="true"] {
-                background-color: #14532d !important; /* 較亮綠色 */
-                color: #ffffff !important;           /* 滑過時字體變白色，極度清晰 */
+                background-color: #14532d !important; 
+                color: #ffffff !important;           /* 滑過時字體變白色以方便閱讀 */
             }
 
-            /* 7. 徹底將「儲存評核」按鈕格子從白色改成深綠色 */
-            /* 針對表單內的 submit 按鈕 */
+            /* 7. 徹底將「儲存評核」按鈕格子內的文字改成深藍色 */
             div[data-testid="stForm"] div.stButton > button {
                 background-color: #052e16 !important; /* 深森林綠底色 */
-                color: #ffff00 !important;           /* 文字改為亮黃色 */
+                color: #003366 !important;           /* 文字改為深藍色 */
                 border: 1px solid #22c55e !important; /* 綠色邊框 */
                 font-weight: 700 !important;
-                opacity: 1 !important; /* 確保不被其他樣式影響透明度 */
+                opacity: 1 !important; 
             }
             div[data-testid="stForm"] div.stButton > button:hover {
-                background-color: #14532d !important; /* 滑鼠移上去時稍微亮一點的綠色 */
-                color: #ffffff !important;           /* 滑過時字體變白色，極度清晰 */
+                background-color: #14532d !important; 
+                color: #ffffff !important;           
             }
             </style>
         """, unsafe_allow_html=True)
@@ -874,145 +872,7 @@ else:
                 c3, c4, c5 = st.columns(3)
                 with c3:
                     score_attendance = st.slider("出勤表現", 1, 10, 8)
-                    score_quality = st.slider("品質表現", 1, 10, 8)
-                with c4:
-                    score_efficiency = st.slider("工作效率", 1, 10, 8)
-                    score_cooperation = st.slider("團隊配合", 1, 10, 8)
-                with c5:
-                    score_discipline = st.slider("紀律態度", 1, 10, 8)
-                    score_5s = st.slider("5S維護", 1, 10, 8)
-
-                comment = st.text_area("📝 評語 / 改善建議", height=120)
-                submitted = st.form_submit_button("💾 儲存評核", use_container_width=True)
-
-                if submitted:
-                    avg_score = round((
-                        score_attendance +
-                        score_quality +
-                        score_efficiency +
-                        score_cooperation +
-                        score_discipline +
-                        score_5s
-                    ) / 6, 2)
-
-                    payload = {
-                        "組長": current_leader,
-                        "人員": eval_staff,
-                        "評核月份": eval_month,
-                        "出勤表現": score_attendance,
-                        "品質表現": score_quality,
-                        "工作效率": score_efficiency,
-                        "團隊配合": score_cooperation,
-                        "紀律態度": score_discipline,
-                        "5S維護": score_5s,
-                        "平均分數": avg_score,
-                        "評語": comment,
-                        "建立時間": get_now_str()
-                    }
-                    requests.post(f"{EVALUATION_URL}.json", data=json.dumps(payload))
-                    st.success(f"✅ {eval_staff} 的評核已儲存！平均分數：{avg_score}")
-                    time.sleep(0.5)
-                    st.rerun()
-
-            st.divider()
-
-            # --- 查詢與篩選 ---
-            st.markdown("### 🔍 評核紀錄查詢")
-            fc1, fc2, fc3 = st.columns(3)
-            with fc1:
-                filter_staff = st.selectbox("篩選人員", ["全部"] + sorted(my_team), key="eval_filter_staff")
-            with fc2:
-                all_months = []
-                if eval_raw:
-                    all_months = sorted(list(set([
-                        str(v.get("評核月份", ""))
-                        for v in eval_raw.values()
-                        if v.get("評核月份")
-                    ])), reverse=True)
-                filter_month = st.selectbox("篩選月份", ["全部"] + all_months, key="eval_filter_month")
-            with fc3:
-                keyword = st.text_input("關鍵字搜尋", key="eval_keyword")
-
-            if eval_raw:
-                eval_list = []
-                for k, v in eval_raw.items():
-                    row = v.copy()
-                    row["db_id"] = k
-                    eval_list.append(row)
-
-                eval_df = pd.DataFrame(eval_list)
-
-                # 安全檢查：確保 DataFrame 不為空且包含「組長」欄位時才進行篩選，避免空資料庫崩潰
-                if not eval_df.empty and "組長" in eval_df.columns:
-                    eval_df = eval_df[eval_df["組長"] == current_leader]
-                else:
-                    eval_df = pd.DataFrame() # 欄位不對時直接清空
-
-                if not eval_df.empty and filter_staff != "全部" and "人員" in eval_df.columns:
-                    eval_df = eval_df[eval_df["人員"] == filter_staff]
-
-                if not eval_df.empty and filter_month != "全部" and "評核月份" in eval_df.columns:
-                    eval_df = eval_df[eval_df["評核月份"] == filter_month]
-
-                if not eval_df.empty and keyword:
-                    eval_df = eval_df[
-                        eval_df.astype(str).apply(
-                            lambda x: x.str.contains(keyword, case=False, na=False)
-                        ).any(axis=1)
-                    ]
-
-                if not eval_df.empty:
-                    # 匯出 CSV
-                    csv_data = eval_df.to_csv(index=False).encode("utf-8-sig")
-                    st.download_button(
-                        "📄 匯出評核表 CSV",
-                        data=csv_data,
-                        file_name=f"人員評核表_{current_leader}.csv",
-                        key="download_eval_csv"
-                    )
-
-                    st.markdown("### 📊 評核總覽")
-                    
-                    # 確保要展示的欄位在 DataFrame 內都有存在
-                    show_cols = [
-                        "人員", "評核月份", "出勤表現", "品質表現", "工作效率",
-                        "團隊配合", "紀律態度", "5S維護", "平均分數", "評語", "建立時間"
-                    ]
-                    available_cols = [c for c in show_cols if c in eval_df.columns]
-                    
-                    st.dataframe(
-                        eval_df[available_cols],
-                        use_container_width=True,
-                        hide_index=True
-                    )
-
-                    st.markdown("### 👁️ 明細檢視 / 刪除")
-                    for _, row in eval_df.sort_values(by="建立時間", ascending=False).iterrows():
-                        with st.expander(f"👤 {row.get('人員', '未知')}｜📅 {row.get('評核月份', '')}｜⭐ 平均 {row.get('平均分數', 0)}"):
-                            st.markdown(f"""
-                            - **組長：** {row.get('組長', '-')}
-                            - **出勤表現：** {row.get('出勤表現', '-')}
-                            - **品質表現：** {row.get('品質表現', '-')}
-                            - **工作效率：** {row.get('工作效率', '-')}
-                            - **團隊配合：** {row.get('團隊配合', '-')}
-                            - **紀律態度：** {row.get('紀律態度', '-')}
-                            - **5S維護：** {row.get('5S維護', '-')}
-                            - **平均分數：** {row.get('平均分數', '-')}
-                            - **評語：** {row.get('評語', '-')}
-                            - **建立時間：** {row.get('建立時間', '-')}
-                            """)
-
-                            del_col1, del_col2 = st.columns([3, 1])
-                            with del_col2:
-                                if st.button("🗑️ 刪除", key=f"del_eval_{row['db_id']}"):
-                                    requests.delete(f"{EVALUATION_URL}/{row['db_id']}.json")
-                                    st.success("已刪除該筆評核")
-                                    time.sleep(0.5)
-                                    st.rerun()
-                else:
-                    st.info("💡 查無符合條件的評核紀錄")
-            else:
-                st.info("💡 目前尚無評核資料")
+                    score_quality = st.slider("品質表現", 1, 10
 # --- ⚙️ 編輯手工具清單 (修正 Duplicate ID 版本) ---
     elif st.session_state.menu_selection == "⚙️ 資產編輯清單":
         # 1. 補回關鍵的粉紅色 CSS 樣式 (優化對比度與文字清晰度)
