@@ -830,7 +830,189 @@ else:
 
             /* 游標移上去（Hover）或被選中時的底色，改成稍微亮一點的綠色 */
             div[role="option"]:hover, 
-            li
+            li[role="option"]:hover,
+            div[data-baseweb="menu"] li:hover,
+            div[aria-selected="true"] {
+                background-color: #14532d !important; /* 較亮綠色 */
+                color: #ffffff !important;           /* 滑過時字體變白色，極度清晰 */
+            }
+
+            /* 7. 徹底將「儲存評核」按鈕格子從白色改成深綠色 */
+            /* 針對表單內的 submit 按鈕 */
+            div[data-testid="stForm"] div.stButton > button {
+                background-color: #052e16 !important; /* 深森林綠底色 */
+                color: #ffff00 !important;           /* 文字改為亮黃色 */
+                border: 1px solid #22c55e !important; /* 綠色邊框 */
+                font-weight: 700 !important;
+                opacity: 1 !important; /* 確保不被其他樣式影響透明度 */
+            }
+            div[data-testid="stForm"] div.stButton > button:hover {
+                background-color: #14532d !important; /* 滑鼠移上去時稍微亮一點的綠色 */
+                color: #ffffff !important;           /* 滑過時字體變白色，極度清晰 */
+            }
+            </style>
+        """, unsafe_allow_html=True)
+
+        current_leader = st.session_state.user
+        my_team = staff_map.get(current_leader, [])
+
+        if not my_team:
+            st.warning("⚠️ 目前此組長尚未設定組員，請先到【設定管理】設定 staff_map。")
+        else:
+            # 讀取現有評核資料
+            eval_raw = requests.get(f"{EVALUATION_URL}.json").json() or {}
+
+            # --- 新增評核表單 ---
+            st.markdown("### ✍️ 新增評核")
+            with st.form("evaluation_form"):
+                c1, c2 = st.columns(2)
+                with c1:
+                    eval_staff = st.selectbox("👤 評核人員", sorted(my_team))
+                with c2:
+                    eval_month = st.text_input("📅 評核月份", value=datetime.datetime.now().strftime("%Y-%m"))
+
+                c3, c4, c5 = st.columns(3)
+                with c3:
+                    score_attendance = st.slider("出勤表現", 1, 10, 8)
+                    score_quality = st.slider("品質表現", 1, 10, 8)
+                with c4:
+                    score_efficiency = st.slider("工作效率", 1, 10, 8)
+                    score_cooperation = st.slider("團隊配合", 1, 10, 8)
+                with c5:
+                    score_discipline = st.slider("紀律態度", 1, 10, 8)
+                    score_5s = st.slider("5S維護", 1, 10, 8)
+
+                comment = st.text_area("📝 評語 / 改善建議", height=120)
+                submitted = st.form_submit_button("💾 儲存評核", use_container_width=True)
+
+                if submitted:
+                    avg_score = round((
+                        score_attendance +
+                        score_quality +
+                        score_efficiency +
+                        score_cooperation +
+                        score_discipline +
+                        score_5s
+                    ) / 6, 2)
+
+                    payload = {
+                        "組長": current_leader,
+                        "人員": eval_staff,
+                        "評核月份": eval_month,
+                        "出勤表現": score_attendance,
+                        "品質表現": score_quality,
+                        "工作效率": score_efficiency,
+                        "團隊配合": score_cooperation,
+                        "紀律態度": score_discipline,
+                        "5S維護": score_5s,
+                        "平均分數": avg_score,
+                        "評語": comment,
+                        "建立時間": get_now_str()
+                    }
+                    requests.post(f"{EVALUATION_URL}.json", data=json.dumps(payload))
+                    st.success(f"✅ {eval_staff} 的評核已儲存！平均分數：{avg_score}")
+                    time.sleep(0.5)
+                    st.rerun()
+
+            st.divider()
+
+            # --- 查詢與篩選 ---
+            st.markdown("### 🔍 評核紀錄查詢")
+            fc1, fc2, fc3 = st.columns(3)
+            with fc1:
+                filter_staff = st.selectbox("篩選人員", ["全部"] + sorted(my_team), key="eval_filter_staff")
+            with fc2:
+                all_months = []
+                if eval_raw:
+                    all_months = sorted(list(set([
+                        str(v.get("評核月份", ""))
+                        for v in eval_raw.values()
+                        if v.get("評核月份")
+                    ])), reverse=True)
+                filter_month = st.selectbox("篩選月份", ["全部"] + all_months, key="eval_filter_month")
+            with fc3:
+                keyword = st.text_input("關鍵字搜尋", key="eval_keyword")
+
+            if eval_raw:
+                eval_list = []
+                for k, v in eval_raw.items():
+                    row = v.copy()
+                    row["db_id"] = k
+                    eval_list.append(row)
+
+                eval_df = pd.DataFrame(eval_list)
+
+                # 安全檢查：確保 DataFrame 不為空且包含「組長」欄位時才進行篩選，避免空資料庫崩潰
+                if not eval_df.empty and "組長" in eval_df.columns:
+                    eval_df = eval_df[eval_df["組長"] == current_leader]
+                else:
+                    eval_df = pd.DataFrame() # 欄位不對時直接清空
+
+                if not eval_df.empty and filter_staff != "全部" and "人員" in eval_df.columns:
+                    eval_df = eval_df[eval_df["人員"] == filter_staff]
+
+                if not eval_df.empty and filter_month != "全部" and "評核月份" in eval_df.columns:
+                    eval_df = eval_df[eval_df["評核月份"] == filter_month]
+
+                if not eval_df.empty and keyword:
+                    eval_df = eval_df[
+                        eval_df.astype(str).apply(
+                            lambda x: x.str.contains(keyword, case=False, na=False)
+                        ).any(axis=1)
+                    ]
+
+                if not eval_df.empty:
+                    # 匯出 CSV
+                    csv_data = eval_df.to_csv(index=False).encode("utf-8-sig")
+                    st.download_button(
+                        "📄 匯出評核表 CSV",
+                        data=csv_data,
+                        file_name=f"人員評核表_{current_leader}.csv",
+                        key="download_eval_csv"
+                    )
+
+                    st.markdown("### 📊 評核總覽")
+                    
+                    # 確保要展示的欄位在 DataFrame 內都有存在
+                    show_cols = [
+                        "人員", "評核月份", "出勤表現", "品質表現", "工作效率",
+                        "團隊配合", "紀律態度", "5S維護", "平均分數", "評語", "建立時間"
+                    ]
+                    available_cols = [c for c in show_cols if c in eval_df.columns]
+                    
+                    st.dataframe(
+                        eval_df[available_cols],
+                        use_container_width=True,
+                        hide_index=True
+                    )
+
+                    st.markdown("### 👁️ 明細檢視 / 刪除")
+                    for _, row in eval_df.sort_values(by="建立時間", ascending=False).iterrows():
+                        with st.expander(f"👤 {row.get('人員', '未知')}｜📅 {row.get('評核月份', '')}｜⭐ 平均 {row.get('平均分數', 0)}"):
+                            st.markdown(f"""
+                            - **組長：** {row.get('組長', '-')}
+                            - **出勤表現：** {row.get('出勤表現', '-')}
+                            - **品質表現：** {row.get('品質表現', '-')}
+                            - **工作效率：** {row.get('工作效率', '-')}
+                            - **團隊配合：** {row.get('團隊配合', '-')}
+                            - **紀律態度：** {row.get('紀律態度', '-')}
+                            - **5S維護：** {row.get('5S維護', '-')}
+                            - **平均分數：** {row.get('平均分數', '-')}
+                            - **評語：** {row.get('評語', '-')}
+                            - **建立時間：** {row.get('建立時間', '-')}
+                            """)
+
+                            del_col1, del_col2 = st.columns([3, 1])
+                            with del_col2:
+                                if st.button("🗑️ 刪除", key=f"del_eval_{row['db_id']}"):
+                                    requests.delete(f"{EVALUATION_URL}/{row['db_id']}.json")
+                                    st.success("已刪除該筆評核")
+                                    time.sleep(0.5)
+                                    st.rerun()
+                else:
+                    st.info("💡 查無符合條件的評核紀錄")
+            else:
+                st.info("💡 目前尚無評核資料")
 # --- ⚙️ 編輯手工具清單 (修正 Duplicate ID 版本) ---
     elif st.session_state.menu_selection == "⚙️ 資產編輯清單":
         # 1. 補回關鍵的粉紅色 CSS 樣式 (優化對比度與文字清晰度)
