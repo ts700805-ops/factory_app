@@ -866,6 +866,180 @@ else:
                     st.success(f"已紀錄！"); time.sleep(0.5); st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
+    # --- 🧾 人員評核表 ---
+    elif st.session_state.menu_selection == "🧾 人員評核表":
+        import io
+
+        st.markdown(
+            '<h1 style="text-align:center; color:#f59e0b; font-weight:900;">🧾 人員評核表</h1>',
+            unsafe_allow_html=True
+        )
+
+        current_leader = st.session_state.user
+        my_team = staff_map.get(current_leader, [])
+
+        if not my_team:
+            st.warning("⚠️ 目前此組長尚未設定組員，請先到【設定管理】設定 staff_map。")
+        else:
+            # 讀取現有評核資料
+            eval_raw = requests.get(f"{EVALUATION_URL}.json").json() or {}
+
+            # --- 新增評核表單 ---
+            st.markdown("### ✍️ 新增評核")
+            with st.form("evaluation_form"):
+                c1, c2 = st.columns(2)
+                with c1:
+                    eval_staff = st.selectbox("👤 評核人員", sorted(my_team))
+                with c2:
+                    eval_month = st.text_input("📅 評核月份", value=datetime.datetime.now().strftime("%Y-%m"))
+
+                c3, c4, c5 = st.columns(3)
+                with c3:
+                    score_attendance = st.slider("出勤表現", 1, 10, 8)
+                    score_quality = st.slider("品質表現", 1, 10, 8)
+                with c4:
+                    score_efficiency = st.slider("工作效率", 1, 10, 8)
+                    score_cooperation = st.slider("團隊配合", 1, 10, 8)
+                with c5:
+                    score_discipline = st.slider("紀律態度", 1, 10, 8)
+                    score_5s = st.slider("5S維護", 1, 10, 8)
+
+                comment = st.text_area("📝 評語 / 改善建議", height=120)
+                submitted = st.form_submit_button("💾 儲存評核", use_container_width=True)
+
+                if submitted:
+                    avg_score = round((
+                        score_attendance +
+                        score_quality +
+                        score_efficiency +
+                        score_cooperation +
+                        score_discipline +
+                        score_5s
+                    ) / 6, 2)
+
+                    payload = {
+                        "組長": current_leader,
+                        "人員": eval_staff,
+                        "評核月份": eval_month,
+                        "出勤表現": score_attendance,
+                        "品質表現": score_quality,
+                        "工作效率": score_efficiency,
+                        "團隊配合": score_cooperation,
+                        "紀律態度": score_discipline,
+                        "5S維護": score_5s,
+                        "平均分數": avg_score,
+                        "評語": comment,
+                        "建立時間": get_now_str()
+                    }
+                    requests.post(f"{EVALUATION_URL}.json", data=json.dumps(payload))
+                    st.success(f"✅ {eval_staff} 的評核已儲存！平均分數：{avg_score}")
+                    time.sleep(0.5)
+                    st.rerun()
+
+            st.divider()
+
+            # --- 查詢與篩選 ---
+            st.markdown("### 🔍 評核紀錄查詢")
+            fc1, fc2, fc3 = st.columns(3)
+            with fc1:
+                filter_staff = st.selectbox("篩選人員", ["全部"] + sorted(my_team), key="eval_filter_staff")
+            with fc2:
+                all_months = []
+                if eval_raw:
+                    all_months = sorted(list(set([
+                        str(v.get("評核月份", ""))
+                        for v in eval_raw.values()
+                        if v.get("評核月份")
+                    ])), reverse=True)
+                filter_month = st.selectbox("篩選月份", ["全部"] + all_months, key="eval_filter_month")
+            with fc3:
+                keyword = st.text_input("關鍵字搜尋", key="eval_keyword")
+
+            if eval_raw:
+                eval_list = []
+                for k, v in eval_raw.items():
+                    row = v.copy()
+                    row["db_id"] = k
+                    eval_list.append(row)
+
+                eval_df = pd.DataFrame(eval_list)
+
+                # 僅顯示當前組長的紀錄
+                if "組長" in eval_df.columns:
+                    eval_df = eval_df[eval_df["組長"] == current_leader]
+
+                if filter_staff != "全部":
+                    eval_df = eval_df[eval_df["人員"] == filter_staff]
+
+                if filter_month != "全部":
+                    eval_df = eval_df[eval_df["評核月份"] == filter_month]
+
+                if keyword:
+                    eval_df = eval_df[
+                        eval_df.astype(str).apply(
+                            lambda x: x.str.contains(keyword, case=False, na=False)
+                        ).any(axis=1)
+                    ]
+
+                if not eval_df.empty:
+                    # 匯出 CSV
+                    csv_data = eval_df.to_csv(index=False).encode("utf-8-sig")
+                    st.download_button(
+                        "📄 匯出評核表 CSV",
+                        data=csv_data,
+                        file_name=f"人員評核表_{current_leader}.csv",
+                        key="download_eval_csv"
+                    )
+
+                    st.markdown("### 📊 評核總覽")
+                    st.dataframe(
+                        eval_df[
+                            [
+                                "人員", "評核月份", "出勤表現", "品質表現", "工作效率",
+                                "團隊配合", "紀律態度", "5S維護", "平均分數", "評語", "建立時間"
+                            ]
+                        ],
+                        use_container_width=True,
+                        hide_index=True
+                    )
+
+                    st.markdown("### 👁️ 明細檢視 / 刪除")
+                    for _, row in eval_df.sort_values(by="建立時間", ascending=False).iterrows():
+                        with st.expander(f"👤 {row['人員']}｜📅 {row['評核月份']}｜⭐ 平均 {row['平均分數']}"):
+                            st.markdown(f"""
+                            - **組長：** {row.get('組長', '-')}
+
+                            - **出勤表現：** {row.get('出勤表現', '-')}
+
+                            - **品質表現：** {row.get('品質表現', '-')}
+
+                            - **工作效率：** {row.get('工作效率', '-')}
+
+                            - **團隊配合：** {row.get('團隊配合', '-')}
+
+                            - **紀律態度：** {row.get('紀律態度', '-')}
+
+                            - **5S維護：** {row.get('5S維護', '-')}
+
+                            - **平均分數：** {row.get('平均分數', '-')}
+
+                            - **評語：** {row.get('評語', '-')}
+
+                            - **建立時間：** {row.get('建立時間', '-')}
+                            """)
+
+                            del_col1, del_col2 = st.columns([3, 1])
+                            with del_col2:
+                                if st.button("🗑️ 刪除", key=f"del_eval_{row['db_id']}"):
+                                    requests.delete(f"{EVALUATION_URL}/{row['db_id']}.json")
+                                    st.success("已刪除該筆評核")
+                                    time.sleep(0.5)
+                                    st.rerun()
+                else:
+                    st.info("💡 查無符合條件的評核紀錄")
+            else:
+                st.info("💡 目前尚無評核資料")
+
     # --- 📝 任務派發 ---
     elif st.session_state.menu_selection == "📝 任務派發":
         st.title("📝 任務指派與編輯")
