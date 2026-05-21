@@ -759,7 +759,7 @@ else:
             else:
                 EVALUATION_URL = "https://your-firebase-url/evaluation" # 防護備用機制
 
-        # 注入專屬 CSS：將全網頁字體調為亮黃色，並將白色輸入框改為深綠色底框
+        # 注入全新改良版 CSS：徹底解決下拉選單彈出視窗變白、看不到字的問題
         st.markdown("""
             <style>
             /* 1. 讓表單內所有的文字、下拉選單標題、滑桿名稱、點開明細強制變亮黃色 */
@@ -798,8 +798,7 @@ else:
                 background-color: #fefcbf !important;
             }
             
-            /* 5. 【全新修正】將原本的白色輸入框、下拉選單、文字區域底色全部改為深綠色 */
-            /* 針對 下拉選單(Selectbox) 與 文字輸入框(TextInput) 與 欄位外框 */
+            /* 5. 強制將輸入框、下拉選單未點開時的底色改為深綠色 */
             div[data-baseweb="select"] > div, 
             div[data-testid="stTextInput"] div div input, 
             div[data-testid="stTextArea"] textarea {
@@ -809,16 +808,33 @@ else:
                 font-weight: 700 !important;
             }
 
-            /* 確保下拉選單點開後的單選項也是深綠底、黃字 */
-            div[ul][role="listbox"] {
+            /* 6. 【核心修正】徹底解決下拉選單點開後「彈出白底浮窗」看不到字的問題 */
+            /* 強制將全域所有 Streamlit 下拉選單彈出的清單容器改為深綠底、黃字 */
+            div[data-baseweb="menu"], 
+            div[role="listbox"], 
+            ul[role="listbox"],
+            div[data-baseweb="popover"] ul {
                 background-color: #052e16 !important;
+                border: 1px solid #22c55e !important;
             }
-            div[role="option"] {
+
+            /* 強制選單內部的每一個選項(li/div)都變成亮黃色字體 */
+            div[role="option"], 
+            li[role="option"],
+            div[data-baseweb="menu"] li,
+            div[data-baseweb="menu"] div {
                 background-color: #052e16 !important;
                 color: #ffff00 !important;
+                font-weight: 700 !important;
             }
-            div[role="option"]:hover {
-                background-color: #14532d !important; /* 滑鼠移上去時稍微亮一點的綠色 */
+
+            # 游標移上去（Hover）或被選中時的底色，改成稍微亮一點的綠色
+            div[role="option"]:hover, 
+            li[role="option"]:hover,
+            div[data-baseweb="menu"] li:hover,
+            div[aria-selected="true"] {
+                background-color: #14532d !important; /* 較亮綠色 */
+                color: #ffffff !important;           /* 滑過時字體變白色，極度清晰 */
             }
             </style>
         """, unsafe_allow_html=True)
