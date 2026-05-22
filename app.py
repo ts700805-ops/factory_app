@@ -748,7 +748,7 @@ else:
         import io
 
         st.markdown(
-            '<h1 style="text-align:center; color:#002244; font-weight:900;">🧾 人員評核表</h1>',
+            '<h1 style="text-align:center; color:#7DD3FC; font-weight:900; font-size:2.5rem;">🧾 人員評核表</h1>',
             unsafe_allow_html=True
         )
 
@@ -759,94 +759,101 @@ else:
             else:
                 EVALUATION_URL = "https://your-firebase-url/evaluation" # 防護備用機制
 
-        # 注入 CSS：將全網頁字體、標題、輸入框文字全部強制改為深藍色
+        # 注入優化 CSS：字體全面放大、改用顯眼的亮天藍色與冰藍色，確保深色背景清晰可讀
         st.markdown("""
             <style>
-            /* 1. 讓表單內所有的文字、下拉選單標題、滑桿名稱、點開明細強制變深藍色 */
+            /* 1. 讓表單內所有的普通文字、欄位標題、滑桿名稱、列表文字放大並變亮藍色 */
             div[data-testid="stMarkdownContainer"] p, 
             label, 
             .stWidgetLabel p,
             span,
             li {
-                color: #003366 !important;
+                color: #7DD3FC !important; /* 高亮度冰藍色 */
+                font-size: 1.15rem !important; /* 字體放大 */
                 font-weight: 800 !important;
             }
             
-            /* 2. 讓大標題與小標題變極深藍色 */
+            /* 2. 讓區域大標題（例如：新增評核、評核紀錄查詢）更亮、更大 */
             h3 {
-                color: #002244 !important;
+                color: #38BDF8 !important; /* 亮天藍色 */
+                font-size: 1.6rem !important; /* 標題放大 */
                 font-weight: 900 !important;
+                margin-top: 1rem !important;
             }
             
-            /* 3. 修正明細折疊區塊 (st.expander) 的標題文字顏色為深藍色 */
+            /* 3. 修正明細折疊區塊 (st.expander) 的標題文字（放大且清晰） */
             div[data-testid="stExpander"] details summary p {
-                color: #003366 !important;
+                color: #38BDF8 !important;
                 font-weight: 900 !important;
-                font-size: 1.15rem !important;
+                font-size: 1.25rem !important;
             }
             
-            /* 4. 修正匯出按鈕的文字與邊框顏色（外框深藍，內字深藍） */
+            /* 4. 修正匯出按鈕的文字與外框 */
             div.stDownloadButton button p {
-                color: #003366 !important;
+                color: #7DD3FC !important;
                 font-weight: 900 !important;
+                font-size: 1.1rem !important;
             }
             div.stDownloadButton button {
-                border: 2px solid #003366 !important;
-                background-color: #ffffff !important;
+                border: 2px solid #38BDF8 !important;
+                background-color: #052e16 !important;
             }
             div.stDownloadButton button:hover {
-                background-color: #e6f0fa !important;
+                background-color: #14532d !important;
             }
             
-            /* 5. 強制將輸入框、下拉選單未點開時的內部輸入文字改為深藍色 */
+            /* 5. 輸入框與文字區域內的文字（讓使用者打字時看得很清楚） */
             div[data-baseweb="select"] > div, 
             div[data-testid="stTextInput"] div div input, 
             div[data-testid="stTextArea"] textarea {
-                background-color: #052e16 !important; /* 維持深森林綠底色 */
-                color: #003366 !important;           /* 輸入的文字改為深藍色 */
-                border: 1px solid #22c55e !important; /* 綠色邊框 */
+                background-color: #052e16 !important; /* 維持深綠底 */
+                color: #ffffff !important;           /* 輸入的文字用純白，最好讀 */
+                border: 1px solid #38BDF8 !important; /* 改用天藍色邊框圍繞 */
+                font-size: 1.1rem !important;
                 font-weight: 700 !important;
             }
 
-            /* 6. 徹底解決下拉選單點開後「彈出浮窗」內部的文字顏色 */
+            /* 6. 下拉選單點開後的浮動視窗內部選項 */
             div[data-baseweb="menu"], 
             div[role="listbox"], 
             ul[role="listbox"],
             div[data-baseweb="popover"] ul {
                 background-color: #052e16 !important;
-                border: 1px solid #22c55e !important;
+                border: 1px solid #38BDF8 !important;
             }
 
-            /* 強制選單內部的每一個選項(li/div)都變成深藍色字體 */
+            /* 選單內的每一行字體放大、變亮藍色 */
             div[role="option"], 
             li[role="option"],
             div[data-baseweb="menu"] li,
             div[data-baseweb="menu"] div {
                 background-color: #052e16 !important;
-                color: #003366 !important;
+                color: #7DD3FC !important;
+                font-size: 1.1rem !important;
                 font-weight: 700 !important;
             }
 
-            /* 游標移上去（Hover）或被選中時的底色 */
+            /* 當滑鼠移到下拉選單選項上時 */
             div[role="option"]:hover, 
             li[role="option"]:hover,
             div[data-baseweb="menu"] li:hover,
             div[aria-selected="true"] {
-                background-color: #14532d !important; 
-                color: #ffffff !important;           
+                background-color: #38BDF8 !important; 
+                color: #052e16 !important; /* 反白時字體變深綠色以利閱讀 */
             }
 
-            /* 7. 徹底將「儲存評核」按鈕格子內的文字改成深藍色 */
+            /* 7. 「儲存評核」按鈕內的文字放大、變亮藍色 */
             div[data-testid="stForm"] div.stButton > button {
-                background-color: #052e16 !important; /* 深森林綠底色 */
-                color: #003366 !important;           /* 文字改為深藍色 */
-                border: 1px solid #22c55e !important; /* 綠色邊框 */
-                font-weight: 700 !important;
+                background-color: #052e16 !important;
+                color: #38BDF8 !important;
+                border: 2px solid #38BDF8 !important;
+                font-size: 1.2rem !important;
+                font-weight: 900 !important;
                 opacity: 1 !important; 
             }
             div[data-testid="stForm"] div.stButton > button:hover {
-                background-color: #14532d !important; 
-                color: #ffffff !important;           
+                background-color: #38BDF8 !important; 
+                color: #052e16 !important;           
             }
             </style>
         """, unsafe_allow_html=True)
