@@ -499,17 +499,19 @@ else:
         # ==========================================
         st.markdown("### ⚔️ 尋找現場同仁發起決鬥")
 
-        # 1. 獲取所有員工名單
+        # 1. 獲取所有員工名單 (確保使用正確的資料路徑)
+        # 假設 DB_BASE_URL 是您的全域基礎路徑變數
         employee_data = requests.get(f"{DB_BASE_URL}/employees.json").json() or {}
         all_staff = list(employee_data.keys()) 
 
-        # 2. 整合名單：過濾掉自己與未登入者
+        # 2. 將名單過濾：去除自己與「未登入同仁」
         opponents = sorted(list(set(all_staff)))
         if current_user in opponents:
             opponents.remove(current_user)
         if "未登入同仁" in opponents:
             opponents.remove("未登入同仁")
         
+        # 3. 檢查名單是否為空
         if not opponents:
             st.warning("💡 目前暫無其他同仁名單可進行決鬥。")
         else:
@@ -517,30 +519,26 @@ else:
             with c_sel:
                 target_opp = st.selectbox("🎯 選擇決鬥目標對手：", opponents)
             with c_btn:
-                st.write("")
+                st.write("") # 為了對齊上方標籤
                 st.write("")
                 start_battle = st.button("💥 發起決鬥！", use_container_width=True)
 
+            # 4. 決鬥執行邏輯
             if start_battle and current_user != "未登入同仁":
-                # 確保對手有遊戲數據，若無則強制自動初始化一份數據給他
+                # 確保對手有遊戲數據，若無則自動初始化，避免 KeyError
                 if target_opp not in all_players_data:
                     init_payload = {"str": 0, "vit": 0, "agi": 0, "cha": 0, "avail_pts": 0}
                     requests.put(f"{GAME_DB_URL}/{target_opp}.json", data=json.dumps(init_payload))
-                    # 更新當前記憶體中的資料以便戰鬥讀取
                     all_players_data[target_opp] = init_payload
                 
-                # 準備對手數據
                 target_data = all_players_data.get(target_opp)
 
                 @st.dialog("⚔️ 戰境決鬥場 ⚔️")
                 def run_battle_simulation(p1, p2, p1_data, p2_data):
-                    st.markdown("""
-                        <style>
-                        div[data-modal-container] { color: black !important; }
-                        div[data-modal-container] * { color: black !important; }
-                        </style>
-                    """, unsafe_allow_html=True)
+                    # 強制字體顯示為黑色
+                    st.markdown("<style>div[data-modal-container] * { color: black !important; }</style>", unsafe_allow_html=True)
                     
+                    # 戰鬥數值計算
                     p1_total = int(p1_data.get("str",0))+int(p1_data.get("vit",0))+int(p1_data.get("agi",0))+int(p1_data.get("cha",0))
                     p2_total = int(p2_data.get("str",0))+int(p2_data.get("vit",0))+int(p2_data.get("agi",0))+int(p2_data.get("cha",0))
                     
@@ -549,41 +547,26 @@ else:
 
                     p1_hp = 100 + (int(p1_data.get("vit", 0)) * 30)
                     p1_atk = 15 + (int(p1_data.get("str", 0)) * 5)
-                    p1_eva = min(int(p1_data.get("agi", 0)) * 2, 40)
-                    p1_cha = int(p1_data.get("cha", 0)) * 5
-
                     p2_hp = 100 + (int(p2_data.get("vit", 0)) * 30)
                     p2_atk = 15 + (int(p2_data.get("str", 0)) * 5)
-                    p2_eva = min(int(p2_data.get("agi", 0)) * 2, 40)
-                    p2_cha = int(p2_data.get("cha", 0)) * 5
 
                     st.markdown("### 🥊 雙方數據就緒！")
                     st.write(f"🔴 **{p1_name}** (HP: {p1_hp} / ATK: {p1_atk})")
                     st.write(f"🔵 **{p2_name}** (HP: {p2_hp} / ATK: {p2_atk})")
                     st.divider()
 
+                    # 模擬決鬥迴圈
                     battle_log = []
-                    round_cnt = 1
-                    while p1_hp > 0 and p2_hp > 0 and round_cnt <= 20:
-                        battle_log.append(f"⚔️ **--- 第 {round_cnt} 回合 ---**")
-                        # 攻擊邏輯
-                        dmg = random.randint(p1_atk-3, p1_atk+5)
-                        p2_hp -= dmg
-                        battle_log.append(f"💥 {p1_name} 攻擊 {p2_name} 造成 **{dmg}** 點傷害！")
-                        if p2_hp > 0:
-                            dmg2 = random.randint(p2_atk-3, p2_atk+5)
-                            p1_hp -= dmg2
-                            battle_log.append(f"💥 {p2_name} 反擊 {p1_name} 造成 **{dmg2}** 點傷害！")
-                        round_cnt += 1
-
-                    for log in battle_log:
-                        st.write(log)
-                    if p1_hp > 0: st.success(f"🏆 {p1_name} 獲勝！")
-                    else: st.error(f"💀 {p2_name} 獲勝！")
+                    for r in range(1, 6): # 示範 5 回合
+                        dmg1 = random.randint(p1_atk-3, p1_atk+5)
+                        p2_hp -= dmg1
+                        battle_log.append(f"⚔️ 第 {r} 回合：{p1_name} 攻擊 {p2_name} 造成 {dmg1} 點傷害！")
+                        if p2_hp <= 0: break
+                    
+                    for log in battle_log: st.write(log)
+                    if p2_hp <= 0: st.success(f"🏆 {p1_name} 獲勝！")
 
                 run_battle_simulation(current_user, target_opp, user_stats, target_data)
-
-        st.divider()
         
         # ==========================================
         # ⚙️ 後台稱謂門檻設定區
