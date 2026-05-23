@@ -499,7 +499,18 @@ else:
         # ⚔️ 擂台決鬥 PK 場
         # ==========================================
         st.markdown("### ⚔️ 尋找現場同仁發起決鬥")
-        opponents = [p for p in all_players_data.keys() if p != current_user and p != "未登入同仁"]
+    # --- 修改後 ---
+# 1. 獲取完整組員名單 (請確認這是您維護人員名單的正確路徑)
+employee_data = requests.get(f"{DB_BASE_URL}/employees.json").json() or {}
+all_staff = list(employee_data.keys()) 
+
+# 2. 將所有組員整合，並過濾掉自己與未登入者
+# 確保名單內沒有重複項
+opponents = sorted(list(set(all_staff)))
+if current_user in opponents:
+    opponents.remove(current_user)
+if "未登入同仁" in opponents:
+    opponents.remove("未登入同仁")
         
         if not opponents:
             st.warning("💡 目前現場戰報中還沒有其他同仁建立角色。")
