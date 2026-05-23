@@ -229,7 +229,7 @@ else:
 # 📝 頁面一：每日 6S 任務回報中心 (後台優先同步版)
 # ==========================================
 # 建議將選單名稱改為不含 Emoji 的純文字，避免系統解析錯誤
-    elif st.session_state.menu_selection == "每日6S任務回報":
+    elif st.session_state.menu_selection == "📝每日6S任務回報報":
         import requests
         import json
         from datetime import datetime, timedelta, timezone
@@ -238,7 +238,7 @@ else:
         # 使用三重引號確保 HTML 標籤正確包覆，並移除會干擾渲染的額外引號
         st.markdown('''
             <div style="text-align:center; margin-bottom:2rem;">
-                <h1 style="color:#60A5FA; font-weight:900; font-size: 3.5rem;">📋 每日 6S 任務回報中心</h1>
+                <h1 style="color:#60A5FA; font-weight:900; font-size: 3.5rem;">📝每日6S任務回報</h1>
                 <p style="color:#9CA3AF;">完成今日現場回報，即可領取 1 點自由屬性點數！</p>
             </div>
             ''', unsafe_allow_html=True)
