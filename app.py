@@ -1187,7 +1187,7 @@ else:
             st.markdown('</div>', unsafe_allow_html=True)
 
 # ==========================================
-# 📝 頁面一：每日 6S 任務回報中心 (動態後台連動版)
+# 📝 頁面一：每日 6S 任務回報中心 (考核進度完美同步版)
 # ==========================================
     elif st.session_state.menu_selection == "📝每日6S任務回報":
         import requests
@@ -1224,27 +1224,21 @@ else:
 
         st.info(f"📅 任務結算基準日（台北時間）：**{today_tw_str}**")
 
-        # 2. 【動態讀取】直接從您的後台資料庫節點讀取組長名單與人員對應
-        # 讀取組長清單文字 (陳德文,劉志偉,吳政昌...)
-        leaders_raw = requests.get(f"{BASE_URL}/leaders_list.json").json() or ""
-        leader_list = [l.strip() for l in leaders_raw.split(",") if l.strip()] if isinstance(leaders_raw, str) else []
+        # ====================================================================
+        # 核心修正：百分之百照搬您「💡2o26上半年技能考核進度」的原始配置
+        # 這樣能保證選單呈現的人員與您的考核進度、後台照片、歷史紀錄完全一致！
+        # ====================================================================
+        leader_member_mapping = {
+            "陳德文": ["姚奕舟", "張文品", "彭鈺麟", "洪敏強", "蘇雍盛", "趙健浩"],
+            "劉志偉": ["劉定澤", "胡瑄芸", "蕭詩瓊", "劉秀鳳", "龍才華", "龍斯愷", "姜治銘", "彭毓萱", "邱珍娜", "陳建勳", "黃建堃", "麥可", "費南"],
+            "吳政昌": ["吳政昌", "劉韋廷", "張佳銓", "陳長彥", "李守益", "林昶志"],
+            "蘇萬紘": ["梁志宏", "謝宛庭", "潘威傑", "徐兆生", "鄭智鍵", "王添應", "徐聖淇", "黃承淮", "溫翠茹", "張瑀榛", "周政龍", "保羅", "羅丹"],
+            "陳文山": ["姚奕舟", "張文品", "彭鈺麟", "洪敏強", "蘇雍盛", "趙健浩"],
+            "李俊霖": ["陳育信", "陳凱彥"]
+        }
 
-        # 讀取組長屬下人員對應文字
-        members_raw = requests.get(f"{BASE_URL}/leader_members.json").json() or ""
-        
-        # 解析後台的文字，建立正確的對應字典
-        leader_member_mapping = {}
-        if isinstance(members_raw, str):
-            for line in members_raw.split("\n"):
-                if ":" in line:
-                    parts = line.split(":")
-                    l_name = parts[0].strip()
-                    m_list = [m.strip() for m in parts[1].split(",") if m.strip()]
-                    leader_member_mapping[l_name] = m_list
-
-        # 如果後台完全沒抓到資料，才啟用安全保底名單
-        if not leader_list:
-            leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
+        # 撈取所有的組長清單
+        leader_list = list(leader_member_mapping.keys())
 
         # 介面渲染：選擇組長與成員
         st.markdown("### 🔍 第一步：確認您的身份")
@@ -1254,14 +1248,14 @@ else:
             selected_leader = st.selectbox("👤 選擇所屬組長：", leader_list)
         
         with col_member:
-            # 根據選取的組長，動態撈出該組長在後台設定的同仁
+            # 動態撈出對應的同仁
             available_members = leader_member_mapping.get(selected_leader, [])
             
             if available_members:
                 selected_user = st.selectbox("🎯 選擇回報同仁姓名：", available_members)
                 has_members = True
             else:
-                st.warning("⚠️ 此組長尚未在後台配置屬下同仁")
+                st.warning("⚠️ 此組長尚未配置屬下同仁")
                 selected_user = None
                 has_members = False
 
@@ -1270,7 +1264,7 @@ else:
         st.markdown("### 🚀 第二步：送出回報領取獎勵")
         
         if not has_members:
-            st.error("❌ 無法回報：請先聯絡管理員至【設定管理】配置該組長的屬下人員。")
+            st.error("❌ 無法回報：請先確認程式碼中的組長人員對應設定。")
         else:
             st.warning(f"⚠️ 請注意：每人每日限領取一次。送出後系統會撥發 1 點自由屬性點給【{selected_user}】")
 
@@ -1297,7 +1291,7 @@ else:
                     current_avail_pts = int(player_rpg_data.get("avail_pts", 0))
                     new_avail_pts = current_avail_pts + 1
 
-                    # 寫回資料庫
+                    # 寫回資料庫 (強制型態過濾，防止跳出 TypeError 紅色錯誤畫面)
                     update_rpg_payload = {
                         "str": int(player_rpg_data.get("str", 0)),
                         "vit": int(player_rpg_data.get("vit", 0)),
@@ -1539,6 +1533,9 @@ else:
                 st.success("後台晉升設定更新完成！")
                 time.sleep(0.5)
                 st.rerun()
+
+
+    
     # --- ⚙️ 設定管理 ---
     elif st.session_state.menu_selection == "⚙️ 設定管理":
         st.title("⚙️ 系統核心設定")
