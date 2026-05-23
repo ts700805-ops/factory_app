@@ -234,37 +234,30 @@ elif st.session_state.menu_selection == "📝每日6S任務回報":
     from datetime import datetime, timedelta, timezone
     import time
 
-    # 確保頁面樣式
-    st.markdown(
-        '''
+    # 1. 頁面標題區域
+    st.markdown('''
         <div style="text-align:center; margin-bottom:2rem;">
             <h1 style="color:#60A5FA !important; font-weight:900 !important; font-size: 3.5rem !important; display:inline-block;">
                 📋 每日 6S 任務回報中心
             </h1>
             <p style="color:#9CA3AF;">完成今日現場回報，即可領取 1 點自由屬性點數！</p>
         </div>
-        ''',
-        unsafe_allow_html=True
-    )
+    ''', unsafe_allow_html=True)
 
-    # 1. 確保 DB_URL 存在，防止 NameError
-    if 'DB_URL' not in locals() and 'DB_URL' not in globals():
-        DB_URL = "https://my-factory-system-default-rtdb.firebaseio.com" # 請確認此處為您的 Firebase URL
-    
-    BASE_URL = DB_URL
+    # 2. 基礎路徑設定 (使用您的全域變數，若無則預設)
+    BASE_URL = globals().get('DB_URL', "https://my-factory-system-default-rtdb.firebaseio.com")
     GAME_DB_URL = f"{BASE_URL}/game_rpg_data"
     REPORT_LOG_URL = f"{BASE_URL}/daily_6s_report_logs"
 
-    # 2. 取得時間
+    # 3. 時間設定與資料抓取
     tz_taiwan = timezone(timedelta(hours=8))
     today_tw_str = datetime.now(tz_taiwan).strftime("%Y-%m-%d")
-
     st.info(f"📅 任務結算基準日（台北時間）：**{today_tw_str}**")
 
-    # 3. 讀取組長與成員資料
+    # 讀取後台資料 (容錯處理)
     try:
         leaders_raw = requests.get(f"{BASE_URL}/leaders_list.json").json() or ""
-        leader_list = [l.strip() for l in leaders_raw.split(",")] if isinstance(leaders_raw, str) and leaders_raw else []
+        leader_list = [l.strip() for l in leaders_raw.split(",")] if isinstance(leaders_raw, str) else []
         
         raw_data_1 = requests.get(f"{BASE_URL}/leader_members.json").json() or ""
         raw_data_2 = requests.get(f"{BASE_URL}/leader_members_2.json").json() or ""
@@ -285,21 +278,19 @@ elif st.session_state.menu_selection == "📝每日6S任務回報":
         leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
         leader_member_mapping = {}
 
-    # 設定預設值 (避免選單錯誤)
-    if not leader_list:
-        leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
+    if not leader_list: leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
 
-    # 4. 介面渲染
+    # 4. 介面操作區 (已加入唯一的 key 防止 ID 重複)
     st.markdown("### 🔍 第一步：確認您的身份")
     col_leader, col_member = st.columns(2)
     
     with col_leader:
-        selected_leader = st.selectbox("👤 選擇所屬組長：", leader_list, key="sel_leader")
+        selected_leader = st.selectbox("👤 選擇所屬組長：", leader_list, key="sel_leader_6s_v1")
     
     with col_member:
         available_members = leader_member_mapping.get(selected_leader, [])
         if available_members:
-            selected_user = st.selectbox("🎯 選擇回報同仁姓名：", available_members, key="sel_user")
+            selected_user = st.selectbox("🎯 選擇回報同仁姓名：", available_members, key="sel_user_6s_v1")
             has_members = True
         else:
             st.warning("⚠️ 此組長尚未配置同仁")
@@ -308,29 +299,29 @@ elif st.session_state.menu_selection == "📝每日6S任務回報":
 
     st.divider()
 
-    # 5. 送出回報
+    # 5. 回報邏輯
     st.markdown("### 🚀 第二步：送出回報領取獎勵")
     if not has_members:
         st.error("❌ 無法回報：請確認後台設定")
     else:
         st.warning(f"⚠️ 請注意：每人每日限領取一次。撥發 1 點給【{selected_user}】")
 
-        if st.button(f"✨ 繳交今日 6S 成果，領取點數！", use_container_width=True, type="primary"):
+        if st.button(f"✨ 繳交今日 6S 成果，領取點數！", use_container_width=True, type="primary", key="btn_submit_6s_v1"):
             safe_user_key = str(selected_user).strip()
             
-            # 檢查重複
+            # 檢查是否已重複回報
             check_exist = requests.get(f"{REPORT_LOG_URL}/{today_tw_str}/{safe_user_key}.json").json()
 
             if check_exist is not None:
                 st.error(f"❌ 提示：【{selected_user}】今天 ({today_tw_str}) 已回報過囉！")
             else:
-                # 寫入紀錄
+                # 寫入回報紀錄
                 report_payload = {
                     "reported_at": str(datetime.now(tz_taiwan).strftime("%Y-%m-%d %H:%M:%S")),
                     "leader": str(selected_leader),
                     "status": "已完成"
                 }
-                requests.put(f"{REPORT_LOG_URL}/{today_tw_str}/{safe_user_key}.json", data=json.dumps(report_payload))
+                requests.put(f"{REPORT_LOG_URL}/{today_tw_str}/{safe_user_key}.json", json=report_payload)
 
                 # 更新點數
                 player_rpg_data = requests.get(f"{GAME_DB_URL}/{safe_user_key}.json").json() or {}
@@ -343,17 +334,16 @@ elif st.session_state.menu_selection == "📝每日6S任務回報":
                     "cha": int(player_rpg_data.get("cha", 0)),
                     "avail_pts": current_avail_pts + 1
                 }
-                requests.put(f"{GAME_DB_URL}/{safe_user_key}.json", data=json.dumps(update_rpg_payload))
+                requests.put(f"{GAME_DB_URL}/{safe_user_key}.json", json=update_rpg_payload)
 
-                # 更新 Session 並跳轉
-                st.session_state.user = safe_user_key
+                # 成功提示與跳轉
                 st.balloons()
                 st.success(f"🎉 大成功！【{selected_user}】今日 6S 回報完畢！")
-                
                 time.sleep(1.2)
                 st.session_state.menu_selection = "🎮6S戰境養成"
                 st.rerun()
-        
+
+
 # --- 📊 製造部派工專區 ---
     if st.session_state.menu_selection == "📊 製造部派工專區":
         st.markdown('<h1 style="text-align:center; color:#34d399; font-weight:900;">📋 製造部派工進度看板</h1>', unsafe_allow_html=True)
