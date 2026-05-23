@@ -1187,7 +1187,7 @@ else:
             st.markdown('</div>', unsafe_allow_html=True)
 
 # ==========================================
-# 📝 頁面一：每日 6S 任務回報中心 (雙後台節點完美合併版)
+# 📝 頁面一：每日 6S 任務回報中心 (即時動態同步修正版)
 # ==========================================
     elif st.session_state.menu_selection == "📝每日6S任務回報":
         import requests
@@ -1227,50 +1227,40 @@ else:
         # 2. 讀取組長主清單 (陳德文,劉志偉,吳政昌...)
         leaders_raw = requests.get(f"{BASE_URL}/leaders_list.json").json() or ""
         leader_list = [l.strip() for l in leaders_raw.split(",") if l.strip()] if isinstance(leaders_raw, str) else []
+        if not leader_list:
+            leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
 
-        # 3. 【核心修正】同時讀取並合併後台所有的組員設定，防止資料被蓋掉
-        # 分別讀取 leader_members 以及可能存在的其他後台配置文字
+        # 3. 【核心修正】實時讀取並融合雙後台文字，絕不夾帶舊的死資料保底
         raw_data_1 = requests.get(f"{BASE_URL}/leader_members.json").json() or ""
-        raw_data_2 = requests.get(f"{BASE_URL}/leader_members_2.json").json() or ""  # 相容多個輸入框
+        raw_data_2 = requests.get(f"{BASE_URL}/leader_members_2.json").json() or ""
         
-        # 如果您的後台是同一個欄位但在不同網頁儲存，這裡我們確保將所有可能格式拆開並融合
         combined_lines = []
         if isinstance(raw_data_1, str):
             combined_lines.extend(raw_data_1.split("\n"))
         if isinstance(raw_data_2, str):
             combined_lines.extend(raw_data_2.split("\n"))
 
-        # 建立萬無一失的組長-組員對照表
+        # 建立全新的空對照表，完全由後台資料決定內容
         leader_member_mapping = {}
-        
-        # 為了保證如果後台斷網或被洗掉時不崩潰，先塞入考核進度的基礎保底資料
-        backup_mapping = {
-            "陳德文": ["徐梓翔", "牟育玄", "林建安", "魏瑄毅", "羅立昕", "江金福", "呂是儒", "邱信維", "張瑀榛", "陳宛廷", "戴鎰祥", "鍾明志", "黃瑞翎", "羅文發", "羅章淳", "蕭桓惟", "周棟榮", "李偉誠", "潘信成", "張瑀榛", "周政龍", "傑米", "達文", "吉爾"],
-            "劉志偉": ["劉定澤", "胡瑄芸", "蕭詩瓊", "劉秀鳳", "龍才華", "龍斯愷", "姜治銘", "彭毓萱", "邱珍娜", "陳建勳", "黃建堃", "麥可", "費南"],
-            "吳政昌": ["吳政昌", "劉韋廷", "張佳銓", "陳長彥", "李守益", "林昶志"],
-            "蘇萬紘": ["梁志宏", "謝宛庭", "潘威傑", "徐兆生", "鄭智鍵", "王添應", "徐聖淇", "黃承淮", "溫翠茹", "張瑀榛", "張瑀榛", "周政龍", "保羅", "羅丹"],
-            "陳文山": ["蘇雍盛", "張文品", "趙健浩", "洪敏強", "姚奕舟", "彭鈺麟"],
-            "李俊霖": ["陳育信", "陳凱彥"]
-        }
-        leader_member_mapping.update(backup_mapping)
 
-        # 動態解析後台文字並複寫/更新進對照表（同時支援全形 ： 與半形 :）
+        # 逐行動態解析後台最新填寫的內容
         for line in combined_lines:
             line = line.strip()
             if not line:
                 continue
+            
+            # 強制將可能混入的全形冒號「：」替換成半形冒號「:」，確保 100% 能切開
             line_fixed = line.replace("：", ":")
+            
             if ":" in line_fixed:
                 parts = line_fixed.split(":")
                 l_name = parts[0].strip()
+                # 提取後面所有組員（以逗號隔開），並過濾掉可能不小心多打的空格
                 m_list = [m.strip() for m in parts[1].split(",") if m.strip()]
+                
                 if l_name and m_list:
-                    # 如果後台有設定，就以最新後台設定為主
+                    # 直接寫入/覆蓋最新名單，後台改什麼，這裡立刻變什麼
                     leader_member_mapping[l_name] = m_list
-
-        # 如果主清單在後台是空的，自動採用預設完整組長清單
-        if not leader_list:
-            leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
 
         # 介面渲染：選擇組長與成員
         st.markdown("### 🔍 第一步：確認您的身份")
@@ -1280,7 +1270,7 @@ else:
             selected_leader = st.selectbox("👤 選擇所屬組長：", leader_list)
         
         with col_member:
-            # 獲取完美融合後的名單
+            # 獲取後台動態即時解析出來的組員名單
             available_members = leader_member_mapping.get(selected_leader, [])
             
             if available_members:
@@ -1296,7 +1286,7 @@ else:
         st.markdown("### 🚀 第二步：送出回報領取獎勵")
         
         if not has_members:
-            st.error("❌ 無法回報：請確認後台設定管理中的配置。")
+            st.error("❌ 無法回報：請確認後台設定管理中的配置是否正確填寫。")
         else:
             st.warning(f"⚠️ 請注意：每人每日限領取一次。送出後系統會撥發 1 點自由屬性點給【{selected_user}】")
 
@@ -1345,7 +1335,6 @@ else:
                     time.sleep(1.2)
                     st.session_state.menu_selection = "🎮6S戰境養成"
                     st.rerun()
-
     
     # --- ⚙️ 設定管理 ---
     elif st.session_state.menu_selection == "⚙️ 設定管理":
