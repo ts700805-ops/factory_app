@@ -508,8 +508,6 @@ else:
 
         st.divider()
 
-  
-
         # ==========================================
         # ⚔️ 尋找現場同仁發起決鬥系統
         # ==========================================
@@ -536,7 +534,7 @@ else:
         else:
             target_user = st.selectbox("🎯 選擇決鬥對手同仁：", all_opponents, key="duel_target_select")
             
-            # 點擊按鈕跳出對話框
+            # 點擊按鈕跳出對話框 (強制定調文字為黑色防止白底遮蔽)
             if st.button(f"💥 與 【{target_user}】 展開 6S 實力對決！", use_container_width=True, type="primary"):
                 target_stats = all_players_data.get(target_user, {"str": 0, "vit": 0, "agi": 0, "cha": 0, "level_name": "🌾 平民"})
                 
@@ -549,8 +547,61 @@ else:
                 p2_atk = 15 + int(target_stats.get("str", 0)) * 2
                 p2_title = target_stats.get("level_name", "🌾 平民")
 
-                # 呼叫外層對話框函數，確保 100% 跳出視窗
-                show_battle_logs_fixed(p1_title, current_user, p1_hp, p1_atk, p2_title, target_user, p2_hp, p2_atk)
+                # 對話框宣告：用強制的 style="color: #111827 !important;" 鎖定黑字
+                @st.dialog("⚔️ 戰境決鬥場 ⚔️", width="large")
+                def show_battle_logs():
+                    st.markdown(
+                        f'''
+                        <div style="color: #111827 !important; font-family: sans-serif;">
+                            <h3 style="color: #1E40AF !important; margin-bottom: 5px;">🥊 雙方數據就緒！</h3>
+                            <p style="margin: 3px 0; font-size: 1.1rem; color: #111827 !important;">🔴 <b>【{p1_title}】{current_user}</b> (HP: {p1_hp} / ATK: {p1_atk})</p>
+                            <p style="margin: 3px 0; font-size: 1.1rem; color: #111827 !important;">🔵 <b>【{p2_title}】{target_user}</b> (HP: {p2_hp} / ATK: {p2_atk})</p>
+                            <hr style="border-top: 1px solid #CCC; margin: 10px 0;">
+                        </div>
+                        ''', 
+                        unsafe_allow_html=True
+                    )
+                    
+                    hp1, hp2 = p1_hp, p2_hp
+                    round_num = 1
+                    logs_html = '<div style="color: #111827 !important; font-size: 1rem; line-height: 1.6;">'
+
+                    while hp1 > 0 and hp2 > 0 and round_num <= 10:
+                        # 隨機波動攻擊力
+                        dmg1 = max(1, p1_atk + random.randint(-3, 3))
+                        hp2 -= dmg1
+                        logs_html += f"⚔️ <b>第 {round_num} 回合</b>：【{p1_title}】{current_user} 攻擊，對 【{p2_title}】{target_user} 造成 <span style='color:#DC2626;'><b>{dmg1}</b></span> 點傷害！<br>"
+                        if hp2 <= 0: break
+                        
+                        dmg2 = max(1, p2_atk + random.randint(-3, 3))
+                        hp1 -= dmg2
+                        logs_html += f"🛡️ <b>第 {round_num} 回合</b>：【{p2_title}】{target_user} 反擊，對 【{p1_title}】{current_user} 造成 <span style='color:#2563EB;'><b>{dmg2}</b></span> 點傷害！<br>"
+                        logs_html += "<div style='margin-bottom: 8px;'></div>"
+                        round_num += 1
+
+                    logs_html += "</div>"
+                    st.markdown(logs_html, unsafe_allow_html=True)
+                    
+                    # 判定勝負結果
+                    if hp1 > hp2:
+                        winner_text = f"🏆 【{p1_title}】{current_user} 獲勝！"
+                        bg_color = "#DCFCE7"
+                        text_color = "#166534"
+                    else:
+                        winner_text = f"🏆 【{p2_title}】{target_user} 獲勝！"
+                        bg_color = "#FEE2E2"
+                        text_color = "#991B1B"
+                        
+                    st.markdown(
+                        f'''
+                        <div style="background-color: {bg_color}; border: 1px solid {text_color}; padding: 1rem; border-radius: 8px; margin-top: 15px; text-align: center;">
+                            <h3 style="color: {text_color} !important; margin: 0; font-size: 1.5rem; font-weight: bold;">{winner_text}</h3>
+                        </div>
+                        ''', 
+                        unsafe_allow_html=True
+                    )
+
+                show_battle_logs()
 
         # ==========================================
         # ⚙️ 6S 戰境養成管理後台 (調整階級與自訂功能)
@@ -588,7 +639,6 @@ else:
                 st.success("✅ 階級稱號更新成功！系統已將所有人員名單頭銜同步洗牌。")
                 time.sleep(1)
                 st.rerun()
-
       
 
 
