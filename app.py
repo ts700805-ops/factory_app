@@ -574,12 +574,12 @@ else:
                 
                 if hp1 > hp2:
                     winner_text = f"🏆 【{p1_title}】{p1_name} 獲勝！"
-                    bg_color = "#DCFCE7"
-                    text_color = "#111827" # 修改為更深黑的顏色
+                    bg_color = "#000000"
+                    text_color = "#000000" # 修改為更深黑的顏色
                 else:
                     winner_text = f"🏆 【{p2_title}】{p2_name} 獲勝！"
-                    bg_color = "#FEE2E2"
-                    text_color = "#111827" # 修改為更深黑的顏色
+                    bg_color = "#000000"
+                    text_color = "#000000" # 修改為更深黑的顏色
                     
                 # 底部勝負宣告區塊：使用強制黑色字體 color: #000000 !important
                 st.markdown(
