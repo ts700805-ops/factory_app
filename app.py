@@ -794,11 +794,11 @@ else:
             <style>
             /* 【關鍵修正】建立專屬的獨立類別，強制將標題設定為 80px 巨大字體 */
             .my-giant-title {
-                font-size: 80px !important;
+                font-size: 60px !important;
                 font-weight: 900 !important;
                 color: #7DD3FC !important;
                 text-align: center !important;
-                margin-bottom: 25px !important;
+                margin-bottom: 20px !important;
                 display: block !important;
             }
             
