@@ -1187,7 +1187,7 @@ else:
             st.markdown('</div>', unsafe_allow_html=True)
 
 # ==========================================
-# 📝 頁面一：每日 6S 任務回報中心 (Firebase 實時同步版)
+# 📝 頁面一：每日 6S 任務回報中心 (雙後台節點完美合併版)
 # ==========================================
     elif st.session_state.menu_selection == "📝每日6S任務回報":
         import requests
@@ -1195,33 +1195,92 @@ else:
         from datetime import datetime, timedelta, timezone
         import time
 
-        st.markdown('''<h1 style="color:#60A5FA;">📋 每日 6S 任務回報中心</h1>''', unsafe_allow_html=True)
+        st.markdown(
+            '''
+            <div style="text-align:center; margin-bottom:2rem;">
+                <h1 style="color:#60A5FA !important; font-weight:900 !important; font-size: 3.5rem !important; display:inline-block;">
+                    📋 每日 6S 任務回報中心
+                </h1>
+                <p style="color:#9CA3AF;">完成今日現場回報，即可領取 1 點自由屬性點數！</p>
+            </div>
+            ''',
+            unsafe_allow_html=True
+        )
 
-        # 基礎路徑
-        if 'DB_URL' in globals(): BASE_URL = DB_URL
-        else: BASE_URL = "https://your-firebase-url" # 請確保此處為您的實際 Firebase URL
+        # 【安全路徑自適應】
+        if 'DB_URL' in globals() or 'DB_URL' in locals():
+            BASE_URL = DB_URL
+        elif 'DB_BASE_URL' in globals() or 'DB_BASE_URL' in locals():
+            BASE_URL = DB_BASE_URL
+        else:
+            BASE_URL = "https://your-firebase-url"
 
-        # 1. 直接讀取 Firebase 後台設定路徑 (完全依照您的截圖結構)
-        try:
-            leaders_resp = requests.get(f"{BASE_URL}/settings/all_leaders.json").json()
-            staff_map_resp = requests.get(f"{BASE_URL}/settings/staff_map.json").json()
-        except:
-            st.error("❌ 無法連接至 Firebase，請檢查網路或 URL 設定")
-            st.stop()
+        GAME_DB_URL = f"{BASE_URL}/game_rpg_data"
+        REPORT_LOG_URL = f"{BASE_URL}/daily_6s_report_logs"
 
-        # 解析組長 (處理後台可能傳回的陣列或字串)
-        leader_list = leaders_resp if isinstance(leaders_resp, list) else (leaders_resp.split(",") if isinstance(leaders_resp, str) else [])
+        # 1. 取得當前台灣時間日期 (UTC+8)
+        tz_taiwan = timezone(timedelta(hours=8))
+        today_tw_str = datetime.now(tz_taiwan).strftime("%Y-%m-%d")
+
+        st.info(f"📅 任務結算基準日（台北時間）：**{today_tw_str}**")
+
+        # 2. 讀取組長主清單 (陳德文,劉志偉,吳政昌...)
+        leaders_raw = requests.get(f"{BASE_URL}/leaders_list.json").json() or ""
+        leader_list = [l.strip() for l in leaders_raw.split(",") if l.strip()] if isinstance(leaders_raw, str) else []
+
+        # 3. 【核心修正】同時讀取並合併後台所有的組員設定，防止資料被蓋掉
+        # 分別讀取 leader_members 以及可能存在的其他後台配置文字
+        raw_data_1 = requests.get(f"{BASE_URL}/leader_members.json").json() or ""
+        raw_data_2 = requests.get(f"{BASE_URL}/leader_members_2.json").json() or ""  # 相容多個輸入框
         
-        # 解析組員 (直接使用後台存的字典物件，不進行二次拆解)
-        leader_member_mapping = staff_map_resp if isinstance(staff_map_resp, dict) else {}
+        # 如果您的後台是同一個欄位但在不同網頁儲存，這裡我們確保將所有可能格式拆開並融合
+        combined_lines = []
+        if isinstance(raw_data_1, str):
+            combined_lines.extend(raw_data_1.split("\n"))
+        if isinstance(raw_data_2, str):
+            combined_lines.extend(raw_data_2.split("\n"))
 
-        # 2. 介面渲染
+        # 建立萬無一失的組長-組員對照表
+        leader_member_mapping = {}
+        
+        # 為了保證如果後台斷網或被洗掉時不崩潰，先塞入考核進度的基礎保底資料
+        backup_mapping = {
+            "陳德文": ["徐梓翔", "牟育玄", "林建安", "魏瑄毅", "羅立昕", "江金福", "呂是儒", "邱信維", "張瑀榛", "陳宛廷", "戴鎰祥", "鍾明志", "黃瑞翎", "羅文發", "羅章淳", "蕭桓惟", "周棟榮", "李偉誠", "潘信成", "張瑀榛", "周政龍", "傑米", "達文", "吉爾"],
+            "劉志偉": ["劉定澤", "胡瑄芸", "蕭詩瓊", "劉秀鳳", "龍才華", "龍斯愷", "姜治銘", "彭毓萱", "邱珍娜", "陳建勳", "黃建堃", "麥可", "費南"],
+            "吳政昌": ["吳政昌", "劉韋廷", "張佳銓", "陳長彥", "李守益", "林昶志"],
+            "蘇萬紘": ["梁志宏", "謝宛庭", "潘威傑", "徐兆生", "鄭智鍵", "王添應", "徐聖淇", "黃承淮", "溫翠茹", "張瑀榛", "張瑀榛", "周政龍", "保羅", "羅丹"],
+            "陳文山": ["蘇雍盛", "張文品", "趙健浩", "洪敏強", "姚奕舟", "彭鈺麟"],
+            "李俊霖": ["陳育信", "陳凱彥"]
+        }
+        leader_member_mapping.update(backup_mapping)
+
+        # 動態解析後台文字並複寫/更新進對照表（同時支援全形 ： 與半形 :）
+        for line in combined_lines:
+            line = line.strip()
+            if not line:
+                continue
+            line_fixed = line.replace("：", ":")
+            if ":" in line_fixed:
+                parts = line_fixed.split(":")
+                l_name = parts[0].strip()
+                m_list = [m.strip() for m in parts[1].split(",") if m.strip()]
+                if l_name and m_list:
+                    # 如果後台有設定，就以最新後台設定為主
+                    leader_member_mapping[l_name] = m_list
+
+        # 如果主清單在後台是空的，自動採用預設完整組長清單
+        if not leader_list:
+            leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
+
+        # 介面渲染：選擇組長與成員
+        st.markdown("### 🔍 第一步：確認您的身份")
         col_leader, col_member = st.columns(2)
+        
         with col_leader:
             selected_leader = st.selectbox("👤 選擇所屬組長：", leader_list)
         
         with col_member:
-            # 這裡直接從後台讀到的 staff_map 裡抓取對應清單
+            # 獲取完美融合後的名單
             available_members = leader_member_mapping.get(selected_leader, [])
             
             if available_members:
@@ -1232,26 +1291,60 @@ else:
                 selected_user = None
                 has_members = False
 
-        # 3. 回報送出
-        if has_members and selected_user:
-            if st.button("✨ 繳交今日 6S 成果，領取點數！", type="primary"):
-                tz_taiwan = timezone(timedelta(hours=8))
-                today_tw_str = datetime.now(tz_taiwan).strftime("%Y-%m-%d")
-                
-                # 寫入回報
-                report_payload = {"reported_at": str(datetime.now(tz_taiwan).strftime("%H:%M:%S")), "leader": selected_leader}
-                requests.put(f"{BASE_URL}/daily_6s_report_logs/{today_tw_str}/{selected_user}.json", data=json.dumps(report_payload))
-                
-                # 加點
-                player_data = requests.get(f"{BASE_URL}/game_rpg_data/{selected_user}.json").json() or {}
-                new_pts = int(player_data.get("avail_pts", 0)) + 1
-                requests.patch(f"{BASE_URL}/game_rpg_data/{selected_user}.json", data=json.dumps({"avail_pts": new_pts}))
+        st.divider()
 
-                st.success(f"🎉【{selected_user}】回報成功！點數已增加。")
-                time.sleep(1)
-                st.session_state.menu_selection = "🎮6S戰境養成"
-                st.rerun()
+        st.markdown("### 🚀 第二步：送出回報領取獎勵")
+        
+        if not has_members:
+            st.error("❌ 無法回報：請確認後台設定管理中的配置。")
+        else:
+            st.warning(f"⚠️ 請注意：每人每日限領取一次。送出後系統會撥發 1 點自由屬性點給【{selected_user}】")
 
+            if st.button(f"✨ 繳交今日 6S 成果，領取點數！", use_container_width=True, type="primary"):
+                safe_user_key = str(selected_user).strip()
+                
+                # 檢查今日是否已重複回報
+                check_exist = requests.get(f"{REPORT_LOG_URL}/{today_tw_str}/{safe_user_key}.json").json()
+
+                if check_exist is not None:
+                    st.error(f"❌ 提示：【{selected_user}】您今天 ({today_tw_str}) 已經完成過任務回報囉！明天再開工領點數吧！")
+                else:
+                    # 寫入今日回報歷史紀錄
+                    report_payload = {
+                        "reported_at": str(datetime.now(tz_taiwan).strftime("%Y-%m-%d %H:%M:%S")),
+                        "leader": str(selected_leader),
+                        "status": "已完成"
+                    }
+                    requests.put(f"{REPORT_LOG_URL}/{today_tw_str}/{safe_user_key}.json", data=json.dumps(report_payload))
+
+                    # 讀取原本的 RPG 帳戶點數，並進行加點處理
+                    player_rpg_data = requests.get(f"{GAME_DB_URL}/{safe_user_key}.json").json() or {}
+                    
+                    current_avail_pts = int(player_rpg_data.get("avail_pts", 0))
+                    new_avail_pts = current_avail_pts + 1
+
+                    # 寫回資料庫
+                    update_rpg_payload = {
+                        "str": int(player_rpg_data.get("str", 0)),
+                        "vit": int(player_rpg_data.get("vit", 0)),
+                        "agi": int(player_rpg_data.get("agi", 0)),
+                        "cha": int(player_rpg_data.get("cha", 0)),
+                        "avail_pts": int(new_avail_pts)
+                    }
+                    requests.put(f"{GAME_DB_URL}/{safe_user_key}.json", data=json.dumps(update_rpg_payload))
+
+                    # 同步登入名稱
+                    st.session_state.user = safe_user_key
+
+                    st.balloons()
+                    st.success(f"🎉 大成功！【{selected_user}】今日 6S 回報完畢！自由點數已成功加 1 點！")
+                    
+                    st.markdown("---")
+                    st.info("系統正準備為您開啟修煉大門... 正在自動跳轉至配點戰境面板！")
+                    
+                    time.sleep(1.2)
+                    st.session_state.menu_selection = "🎮6S戰境養成"
+                    st.rerun()
     
     # --- ⚙️ 設定管理 ---
     elif st.session_state.menu_selection == "⚙️ 設定管理":
