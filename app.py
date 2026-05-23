@@ -226,15 +226,15 @@ else:
         st.rerun()
 
 # ==========================================
-# 📝 頁面一：每日 6S 任務回報中心 (修正版)
+# 📝 頁面：每日 6S 任務回報中心 (修正版)
 # ==========================================
-elif st.session_state.menu_selection == "📝每日6S任務回報":
+elif st.session_state.menu_selection == "每日6S任務回報":
     import requests
     import json
     from datetime import datetime, timedelta, timezone
     import time
 
-    # 1. 頁面標題區域
+    # 1. 頁面標題 (在這裡可以使用 emoji)
     st.markdown('''
         <div style="text-align:center; margin-bottom:2rem;">
             <h1 style="color:#60A5FA !important; font-weight:900 !important; font-size: 3.5rem !important; display:inline-block;">
@@ -244,17 +244,17 @@ elif st.session_state.menu_selection == "📝每日6S任務回報":
         </div>
     ''', unsafe_allow_html=True)
 
-    # 2. 基礎路徑設定 (使用您的全域變數，若無則預設)
+    # 2. 基礎路徑設定
     BASE_URL = globals().get('DB_URL', "https://my-factory-system-default-rtdb.firebaseio.com")
     GAME_DB_URL = f"{BASE_URL}/game_rpg_data"
     REPORT_LOG_URL = f"{BASE_URL}/daily_6s_report_logs"
 
-    # 3. 時間設定與資料抓取
+    # 3. 時間與資料抓取
     tz_taiwan = timezone(timedelta(hours=8))
     today_tw_str = datetime.now(tz_taiwan).strftime("%Y-%m-%d")
     st.info(f"📅 任務結算基準日（台北時間）：**{today_tw_str}**")
 
-    # 讀取後台資料 (容錯處理)
+    # 讀取後台資料
     try:
         leaders_raw = requests.get(f"{BASE_URL}/leaders_list.json").json() or ""
         leader_list = [l.strip() for l in leaders_raw.split(",")] if isinstance(leaders_raw, str) else []
@@ -278,19 +278,20 @@ elif st.session_state.menu_selection == "📝每日6S任務回報":
         leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
         leader_member_mapping = {}
 
-    if not leader_list: leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
+    if not leader_list: 
+        leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
 
-    # 4. 介面操作區 (已加入唯一的 key 防止 ID 重複)
+    # 4. 介面操作區 (每個元件都加上了唯一的 key)
     st.markdown("### 🔍 第一步：確認您的身份")
     col_leader, col_member = st.columns(2)
     
     with col_leader:
-        selected_leader = st.selectbox("👤 選擇所屬組長：", leader_list, key="sel_leader_6s_v1")
+        selected_leader = st.selectbox("👤 選擇所屬組長：", leader_list, key="6s_leader_input")
     
     with col_member:
         available_members = leader_member_mapping.get(selected_leader, [])
         if available_members:
-            selected_user = st.selectbox("🎯 選擇回報同仁姓名：", available_members, key="sel_user_6s_v1")
+            selected_user = st.selectbox("🎯 選擇回報同仁姓名：", available_members, key="6s_member_input")
             has_members = True
         else:
             st.warning("⚠️ 此組長尚未配置同仁")
@@ -299,14 +300,14 @@ elif st.session_state.menu_selection == "📝每日6S任務回報":
 
     st.divider()
 
-    # 5. 回報邏輯
+    # 5. 回報邏輯 (使用了唯一的按鈕 key)
     st.markdown("### 🚀 第二步：送出回報領取獎勵")
     if not has_members:
         st.error("❌ 無法回報：請確認後台設定")
     else:
         st.warning(f"⚠️ 請注意：每人每日限領取一次。撥發 1 點給【{selected_user}】")
 
-        if st.button(f"✨ 繳交今日 6S 成果，領取點數！", use_container_width=True, type="primary", key="btn_submit_6s_v1"):
+        if st.button(f"✨ 繳交今日 6S 成果，領取點數！", use_container_width=True, type="primary", key="6s_submit_button"):
             safe_user_key = str(selected_user).strip()
             
             # 檢查是否已重複回報
@@ -340,7 +341,7 @@ elif st.session_state.menu_selection == "📝每日6S任務回報":
                 st.balloons()
                 st.success(f"🎉 大成功！【{selected_user}】今日 6S 回報完畢！")
                 time.sleep(1.2)
-                st.session_state.menu_selection = "🎮6S戰境養成"
+                st.session_state.menu_selection = "6S戰境養成" # 這裡也對應移除 emoji
                 st.rerun()
 
 
