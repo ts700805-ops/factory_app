@@ -387,9 +387,9 @@ else:
             # 💡 增加錯誤偵測，幫助開發者看到真正的問題
             st.error(f"系統偵測到錯誤：{str(e)}")
             st.warning("目前系統資料緩衝中，請稍後再試。")
-# --- 📈 工時統計分析 (已修改為 📊 技能評核表) ---
+# --- 📈 工時統計分析 (已修改為 📊 技能評核表並列版) ---
     elif st.session_state.menu_selection == "📈 工時統計分析":
-        st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📊 員工技能評核表</h1>', unsafe_allow_html=True)
+        st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📋 員工技能評核表</h1>', unsafe_allow_html=True)
         
         # 1. 取得當前組長名字 (例如: 陳德文)
         current_leader = st.session_state.user 
@@ -408,45 +408,86 @@ else:
                 if isinstance(my_team, list):
                     display_list = [str(member).strip() for member in my_team]
                 
-            # 保險：如果沒抓到，讓組長看到自己
+            # 保險：如果沒抓到，讓組長選自己
             if not display_list:
                 display_list = [current_leader]
         except Exception as e:
             st.error(f"連線失敗: {e}")
             display_list = [current_leader]
 
-        st.markdown(f'<p style="font-size:1.2rem; font-weight:bold; color:#1e3a8a;">👥 {current_leader} 組長 的成員技能考核進度：</p>', unsafe_allow_html=True)
+        st.markdown(f'<p style="font-size:1.2rem; font-weight:bold; color:#1e3a8a;">👥 {current_leader} 組長 的全體組員考核表：</p>', unsafe_allow_html=True)
         st.divider()
 
-        # 3. 並列由上往下列出該組所有員工，並顯示考核完成程度百分比表
+        # 3. 並列由上往下列出該組所有員工
         if display_list:
             for member in sorted(display_list):
-                # 建立一個乾淨的員工區塊容器
-                with st.container():
-                    col1, col2 = st.columns([1, 3])
-                    
-                    with col1:
-                        # 放大顯示員工姓名
-                        st.markdown(f'<p style="font-size:1.3rem; font-weight:900; color:#000000; margin-top:5px;">👤 {member}</p>', unsafe_allow_html=True)
-                    
-                    with col2:
-                        # 這裡使用 slider 當作範例百分比控鍵（範圍 0-100%），之後您也可以直接綁定 Firebase 數值
-                        # 為了避免 key 重複，使用 member 名字作為 key
-                        score = st.slider(
-                            "考核完成度", 
-                            min_value=0, 
-                            max_value=100, 
-                            value=50,  # 預設 50%，您可以依照需求調整
-                            step=5,
-                            key=f"skill_{member}",
-                            label_visibility="collapsed" # 隱藏欄位小標題讓畫面更乾淨
-                        )
-                        
-                        # 顯示美觀的進度條
-                        st.progress(score / 100)
-                        st.markdown(f'<p style="text-align:right; font-weight:bold; color:#1e40af; margin-top:-10px;">目前進度: {score}%</p>', unsafe_allow_html=True)
+                # 建立外層精美的大外框，把每位員工隔開
+                st.markdown(f'<div style="background:#1e3a8a; color:white; padding:10px 15px; border-radius:10px 10px 0 0; font-weight:bold; font-size:1.2rem;">👤 評核人員：{member}</div>', unsafe_allow_html=True)
                 
-                st.markdown('<hr style="margin:10px 0; border-top:1px dashed #cbd5e1;">', unsafe_allow_html=True)
+                with st.container(border=True):
+                    # 第一排：三個滑桿 (出勤、工作效率、紀律)
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        st.markdown('<p style="color:#1e3a8a; font-weight:bold; margin-bottom:-5px;">📋 出勤表現</p>', unsafe_allow_html=True)
+                        score_attendance = st.slider("出勤", 1, 10, 8, key=f"score_attend_{member}", label_visibility="collapsed")
+                    with c2:
+                        st.markdown('<p style="color:#1e3a8a; font-weight:bold; margin-bottom:-5px;">⚡ 工作效率</p>', unsafe_allow_html=True)
+                        score_efficiency = st.slider("效率", 1, 10, 8, key=f"score_eff_{member}", label_visibility="collapsed")
+                    with c3:
+                        st.markdown('<p style="color:#1e3a8a; font-weight:bold; margin-bottom:-5px;">🛡️ 紀律態度</p>', unsafe_allow_html=True)
+                        score_discipline = st.slider("紀律", 1, 10, 8, key=f"score_disc_{member}", label_visibility="collapsed")
+                    
+                    # 第二排：三個滑桿 (品質、團隊、5S)
+                    c4, c5, c6 = st.columns(3)
+                    with c4:
+                        st.markdown('<p style="color:#1e3a8a; font-weight:bold; margin-bottom:-5px;">💎 品質表現</p>', unsafe_allow_html=True)
+                        score_quality = st.slider("品質", 1, 10, 8, key=f"score_qual_{member}", label_visibility="collapsed")
+                    with c5:
+                        st.markdown('<p style="color:#1e3a8a; font-weight:bold; margin-bottom:-5px;">🤝 團隊配合</p>', unsafe_allow_html=True)
+                        score_team = st.slider("團隊", 1, 10, 8, key=f"score_team_{member}", label_visibility="collapsed")
+                    with c6:
+                        st.markdown('<p style="color:#1e3a8a; font-weight:bold; margin-bottom:-5px;">🧹 5S維護</p>', unsafe_allow_html=True)
+                        score_5s = st.slider("5S", 1, 10, 8, key=f"score_5s_{member}", label_visibility="collapsed")
+                    
+                    # 評語輸入框
+                    st.markdown('<p style="color:#1e3a8a; font-weight:bold; margin-bottom:-5px;">📝 評語 / 改善建議</p>', unsafe_allow_html=True)
+                    eval_comment = st.text_area("評語", value="", placeholder=f"請輸入對 {member} 的評語...", key=f"comment_{member}", label_visibility="collapsed")
+                    
+                    # 計算該員工目前的完成度百分比總分 (以 6 項 10 分滿分為 100% 換算)
+                    total_score = score_attendance + score_efficiency + score_discipline + score_quality + score_team + score_5s
+                    percentage = int((total_score / 60) * 100)
+                    
+                    st.progress(percentage / 100)
+                    st.markdown(f'<p style="text-align:right; font-weight:bold; color:#1e40af; margin-top:-10px;">📊 考核完成程度：{percentage}%</p>', unsafe_allow_html=True)
+                    
+                    # 獨立的儲存按鈕
+                    if st.button(f"💾 儲存 {member} 評核", key=f"save_btn_{member}", use_container_width=True, type="primary"):
+                        # 這裡保留並對接你原本送出至 Firebase 的資料格式
+                        eval_db_url = f"{DB_BASE_URL}/skills_evaluations"
+                        new_eval = {
+                            "人員": member,
+                            "評核月份": datetime.datetime.now().strftime("%Y-%m"),
+                            "出勤表現": score_attendance,
+                            "工作效率": score_efficiency,
+                            "紀律態度": score_discipline,
+                            "品質表現": score_quality,
+                            "團隊配合": score_team,
+                            "5S維護": score_5s,
+                            "評語": eval_comment,
+                            "完成百分比": percentage,
+                            "評核時間": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        }
+                        try:
+                            res = requests.post(f"{eval_db_url}.json", data=json.dumps(new_eval))
+                            if res.status_code == 200:
+                                st.success(f"🎉 {member} 的評核資料已成功儲存！")
+                            else:
+                                st.error("儲存失敗，請檢查資料庫連線。")
+                        except Exception as save_err:
+                            st.error(f"儲存出錯: {save_err}")
+                
+                # 員工之間的間距線
+                st.markdown('<br>', unsafe_allow_html=True)
         else:
             st.info("💡 目前此組別無成員資料。")
 
@@ -469,7 +510,7 @@ else:
                     total_all_minutes = 0.0
                     if '秒數' in display_df.columns:
                         display_df['工時(分)'] = (display_df['秒數'] / 60).round(2)
-                        total_all_minutes = round(display_df['工時(分)'].sum(), 2) # 找回原本 Minutes 相加功能
+                        total_all_minutes = round(display_df['工時(分)'].sum(), 2) 
                         
                         # 2. 逆推開始時間
                         try:
@@ -478,7 +519,7 @@ else:
                         except:
                             display_df['開始時間'] = "計算失敗"
 
-                    # 3. 在標題顯示 (找回原本的 總工時：xx 分鐘 顯示格式)
+                    # 3. 在標題顯示
                     with st.expander(f"📦 製令：{o_id} ({len(group)} 項 | 總工時：{total_all_minutes} 分鐘)"):
                         
                         # 設定表格順序
