@@ -229,7 +229,7 @@ else:
 # ==========================================
 # 📝 頁面一：每日 6S 任務回報中心 (後台優先同步版)
 # ==========================================
-elif st.session_state.menu_selection == "📝每日6S任務回報":
+ elif st.session_state.menu_selection == "📝每日6S任務回報":
         import requests
         import json
         from datetime import datetime, timedelta, timezone
@@ -241,7 +241,7 @@ elif st.session_state.menu_selection == "📝每日6S任務回報":
                 <h1 style="color:#60A5FA !important; font-weight:900 !important; font-size: 3.5rem !important; display:inline-block;">
                     📋 每日 6S 任務回報中心
                 </h1>
-                <p style="color:#000000 !important; font-weight: bold !important; font-size: 1.2rem !important;">完成今日現場回報，即可領取 1 點自由屬性點數！</p>
+                <p style="color:#9CA3AF;">完成今日現場回報，即可領取 1 點自由屬性點數！</p>
             </div>
             ''',
             unsafe_allow_html=True
@@ -380,7 +380,6 @@ elif st.session_state.menu_selection == "📝每日6S任務回報":
                     time.sleep(1.2)
                     st.session_state.menu_selection = "🎮6S戰境養成"
                     st.rerun()
-
 
 
 
