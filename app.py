@@ -225,7 +225,9 @@ else:
         st.session_state.menu_selection = nav
         st.rerun()
 
-
+# ==========================================
+# 📝 頁面一：每日 6S 任務回報中心 (後台優先同步版)
+# ==========================================
 elif st.session_state.menu_selection == "📝每日6S任務回報":
         import requests
         import json
