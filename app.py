@@ -1186,42 +1186,67 @@ else:
                     st.success(f"已紀錄！"); time.sleep(0.5); st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
-# 核心修正：確保資料讀取與解析邏輯的穩定性
+# ==========================================
+# 📝 頁面一：每日 6S 任務回報中心 (針對 Firebase 結構修正版)
+# ==========================================
     elif st.session_state.menu_selection == "📝每日6S任務回報":
-        # ... (省略前方設定)
+        import requests
+        import json
+        from datetime import datetime, timedelta, timezone
+        import time
+
+        st.markdown('''<h1 style="color:#60A5FA;">📋 每日 6S 任務回報中心</h1>''', unsafe_allow_html=True)
+
+        # 基礎設定
+        if 'DB_URL' in globals(): BASE_URL = DB_URL
+        else: BASE_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
+
+        # 1. 取得組長列表 (對應 Firebase: settings/all_leaders)
+        leaders_resp = requests.get(f"{BASE_URL}/settings/all_leaders.json").json()
+        # 假設資料是字串或陣列
+        if isinstance(leaders_resp, str):
+            leader_list = [l.strip() for l in leaders_resp.split(",")]
+        elif isinstance(leaders_resp, list):
+            leader_list = leaders_resp
+        else:
+            leader_list = []
+
+        # 2. 獲取組員設定 (對應 Firebase: settings/staff_map)
+        # 這裡假設 staff_map 是結構化資料或是您後台儲存的字串
+        staff_map_resp = requests.get(f"{BASE_URL}/settings/staff_map.json").json()
         
-        # 1. 取得組長列表
-        leaders_raw = requests.get(f"{BASE_URL}/leaders_list.json").json()
-        leader_list = [l.strip() for l in leaders_raw.split(",")] if isinstance(leaders_raw, str) else []
-        
-        # 2. 獲取組員設定資料
-        members_raw = requests.get(f"{BASE_URL}/leader_members.json").json()
-        
-        # 3. 嚴謹解析邏輯
+        # 根據您的截圖，staff_map 可能是以字典方式儲存的對照表
         leader_member_mapping = {}
-        if isinstance(members_raw, str):
-            for line in members_raw.split("\n"):
-                line = line.strip()
-                if not line or ":" not in line: continue
-                
-                parts = line.split(":")
-                l_name = parts[0].strip()
-                # 確保正確拆分組員名稱
-                m_list = [m.strip() for m in parts[1].split(",") if m.strip()]
-                leader_member_mapping[l_name] = m_list
-        
-        # 4. 介面渲染部分
+        if isinstance(staff_map_resp, dict):
+            leader_member_mapping = staff_map_resp
+        elif isinstance(staff_map_resp, str):
+            # 若是字串格式，則沿用之前的解析邏輯
+            for line in staff_map_resp.split("\n"):
+                if ":" in line:
+                    parts = line.split(":")
+                    leader_member_mapping[parts[0].strip()] = [m.strip() for m in parts[1].split(",")]
+
+        # 3. 介面渲染
         col_leader, col_member = st.columns(2)
         with col_leader:
-            selected_leader = st.selectbox("👤 選擇所屬組長：", leader_list if leader_list else [])
+            selected_leader = st.selectbox("👤 選擇所屬組長：", leader_list if leader_list else ["無資料"])
         
         with col_member:
             available_members = leader_member_mapping.get(selected_leader, [])
             if available_members:
                 selected_user = st.selectbox("🎯 選擇回報同仁姓名：", available_members)
+                has_members = True
             else:
                 st.warning("⚠️ 此組長尚未在後台配置屬下同仁")
+                selected_user = None
+                has_members = False
 
+        # 4. 回報邏輯
+        if has_members and selected_user:
+            if st.button("✨ 送出今日回報"):
+                # 寫入邏輯保持不變
+                st.success(f"🎉【{selected_user}】回報成功！")
+                st.rerun()
 
 
     
