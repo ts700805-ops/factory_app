@@ -229,7 +229,7 @@ else:
 # 📝 頁面一：每日 6S 任務回報中心 (後台優先同步版)
 # ==========================================
 # 建議將選單名稱改為不含 Emoji 的純文字，避免系統解析錯誤
-    elif st.session_state.menu_selection == "📝每日6S任務回報報":
+    elif st.session_state.menu_selection == "📝每日6S任務回報":
         import requests
         import json
         from datetime import datetime, timedelta, timezone
