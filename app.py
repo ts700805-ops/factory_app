@@ -229,19 +229,22 @@ else:
 # ==========================================
 # 📝 頁面一：每日 6S 任務回報中心 (後台優先同步版)
 # ==========================================
-    elif st.session_state.menu_selection == "📝每日6S任務回報":
+   elif st.session_state.menu_selection == "📝每日6S任務回報":
         import requests
         import json
         from datetime import datetime, timedelta, timezone
         import time
 
+        # 重新設計頂部介面：採用深藍色背景，搭配醒目的黃色與白色粗體字，解決原本白色字看不清的問題
         st.markdown(
             '''
-            <div style="text-align:center; margin-bottom:2rem;">
-                <h1 style="color:#60A5FA !important; font-weight:900 !important; font-size: 3.5rem !important; display:inline-block;">
+            <div style="background-color: #1E3A8A; padding: 2rem; border-radius: 12px; text-align: center; border: 1px solid #3B82F6; margin-bottom: 2rem;">
+                <h1 style="color: #FBBF24 !important; font-weight: 900 !important; font-size: 3.5rem !important; margin: 0; display: inline-block;">
                     📋 每日 6S 任務回報中心
                 </h1>
-                <p style="color:#9CA3AF;">完成今日現場回報，即可領取 1 點自由屬性點數！</p>
+                <p style="color: #FFFFFF !important; font-size: 1.2rem; margin-top: 12px; margin-bottom: 0; font-weight: bold;">
+                    💡 完成今日現場回報，即可領取 <span style="color: #FBBF24; font-size: 1.5rem; font-weight: 900;">1</span> 點自由屬性點數！
+                </p>
             </div>
             ''',
             unsafe_allow_html=True
