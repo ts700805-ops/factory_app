@@ -785,7 +785,7 @@ else:
             else:
                 st.info("💡 目前無資產資料")
 
-   # --- 🧾 組長待辦事項 ---
+# --- 🧾 組長待辦事項 ---
     elif st.session_state.menu_selection == "🧾組長待辦事項":
         import io
 
@@ -803,39 +803,27 @@ else:
                 TODO_DB_URL = f"{DB_BASE_URL}/todo_tasks"
                 TODO_DONE_URL = f"{DB_BASE_URL}/todo_completed"
             else:
-                TODO_DB_URL = "https://your-firebase-url/todo_tasks" # 防護備用機制
+                TODO_DB_URL = "https://your-firebase-url/todo_tasks" 
                 TODO_DONE_URL = "https://your-firebase-url/todo_completed"
 
-        # 注入優化 CSS：字體全面放大、改用顯眼的亮天藍色與冰藍色，確保深色背景清晰可讀
+        # 注入優化 CSS：字體全面放大、確保深色背景清晰可讀
         st.markdown("""
             <style>
-            /* 1. 讓表單內所有的普通文字、欄位標題、滑桿名稱、列表文字放大並變亮藍色 */
             div[data-testid="stMarkdownContainer"] p, 
             label, 
             .stWidgetLabel p,
             span,
             li {
-                color: #7DD3FC !important; /* 高亮度冰藍色 */
-                font-size: 1.15rem !important; /* 字體放大 */
+                color: #7DD3FC !important; 
+                font-size: 1.15rem !important; 
                 font-weight: 800 !important;
             }
-            
-            /* 2. 讓區域大標題更亮、更大 */
             h3 {
-                color: #38BDF8 !important; /* 亮天藍色 */
-                font-size: 1.6rem !important; /* 標題放大 */
+                color: #38BDF8 !important; 
+                font-size: 1.6rem !important; 
                 font-weight: 900 !important;
                 margin-top: 1rem !important;
             }
-            
-            /* 3. 修正明細折疊區塊 (st.expander) 的標題文字（放大且清晰） */
-            div[data-testid="stExpander"] details summary p {
-                color: #38BDF8 !important;
-                font-weight: 900 !important;
-                font-size: 1.25rem !important;
-            }
-            
-            /* 4. 修正匯出按鈕的文字與外框 */
             div.stDownloadButton button p {
                 color: #7DD3FC !important;
                 font-weight: 900 !important;
@@ -845,58 +833,21 @@ else:
                 border: 2px solid #38BDF8 !important;
                 background-color: #052e16 !important;
             }
-            div.stDownloadButton button:hover {
-                background-color: #14532d !important;
-            }
-            
-            /* 5. 輸入框與文字區域內的文字 */
             div[data-baseweb="select"] > div, 
             div[data-testid="stTextInput"] div div input, 
             div[data-testid="stTextArea"] textarea {
-                background-color: #052e16 !important; /* 維持深綠底 */
-                color: #ffffff !important;           /* 輸入的文字用純白，最好讀 */
-                border: 1px solid #38BDF8 !important; /* 改用天藍色邊框圍繞 */
+                background-color: #052e16 !important; 
+                color: #ffffff !important;           
+                border: 1px solid #38BDF8 !important; 
                 font-size: 1.1rem !important;
                 font-weight: 700 !important;
             }
-
-            /* 6. 下拉選單點開後的浮動視窗內部選項 */
-            div[data-baseweb="menu"], 
-            div[role="listbox"], 
-            ul[role="listbox"],
-            div[data-baseweb="popover"] ul {
-                background-color: #052e16 !important;
-                border: 1px solid #38BDF8 !important;
-            }
-
-            /* 選單內的每一行字體放大、變亮藍色 */
-            div[role="option"], 
-            li[role="option"],
-            div[data-baseweb="menu"] li,
-            div[data-baseweb="menu"] div {
-                background-color: #052e16 !important;
-                color: #7DD3FC !important;
-                font-size: 1.1rem !important;
-                font-weight: 700 !important;
-            }
-
-            /* 當滑鼠移到下拉選單選項上時 */
-            div[role="option"]:hover, 
-            li[role="option"]:hover,
-            div[data-baseweb="menu"] li:hover,
-            div[aria-selected="true"] {
-                background-color: #38BDF8 !important; 
-                color: #052e16 !important; /* 反白時字體變深綠色以利閱讀 */
-            }
-
-            /* 7. 「儲存」按鈕內的文字放大、變亮藍色 */
             div[data-testid="stForm"] div.stButton > button {
                 background-color: #052e16 !important;
                 color: #38BDF8 !important;
                 border: 2px solid #38BDF8 !important;
                 font-size: 1.2rem !important;
                 font-weight: 900 !important;
-                opacity: 1 !important; 
             }
             div[data-testid="stForm"] div.stButton > button:hover {
                 background-color: #38BDF8 !important; 
@@ -912,7 +863,6 @@ else:
         if 'staff_map' in globals() or 'staff_map' in locals():
             all_leaders_list = sorted([str(k).strip() for k in staff_map.keys() if k])
         
-        # 防呆：如果名單是空的，至少要有當前登入者
         if not all_leaders_list:
             all_leaders_list = [str(current_leader).strip()]
         elif str(current_leader).strip() not in all_leaders_list:
@@ -923,46 +873,28 @@ else:
         done_raw = requests.get(f"{TODO_DONE_URL}.json").json() or {}
 
         # ==========================================
-        # 第一區：🔍 歷史交辦事項查詢與總覽
+        # 第一區：🔍 歷史交辦事項查詢與總覽 (移至最上方)
         # ==========================================
         st.markdown("### 🔍 歷史交辦事項查詢")
-        fc1, fc2, fc3 = st.columns(3)
-        with fc1:
-            filter_leader = st.selectbox("篩選負責組長", ["全部"] + all_leaders_list, key="todo_filter_leader")
-        with fc2:
-            all_deadlines = []
-            if todo_raw:
-                all_deadlines = sorted(list(set([
-                    str(v.get("預計完成日期", ""))
-                    for v in todo_raw.values()
-                    if v.get("預計完成日期")
-                ])), reverse=True)
-            filter_deadline = st.selectbox("篩選完成日期", ["全部"] + all_deadlines, key="todo_filter_deadline")
-        with fc3:
-            keyword = st.text_input("關鍵字搜尋", key="todo_keyword")
+        
+        # 已移除不需要的日期與關鍵字篩選欄位，只保留組長篩選
+        filter_leader = st.selectbox("篩選負責組長", ["全部"] + all_leaders_list, key="todo_filter_leader")
 
         if todo_raw:
             todo_list = []
             for k, v in todo_raw.items():
                 row = v.copy()
                 row["db_id"] = k
+                # 新增按鈕欄位的預設值
+                row["✅ 完成"] = False
+                row["🗑️ 刪除"] = False
                 todo_list.append(row)
 
             todo_df = pd.DataFrame(todo_list)
 
-            # 進行資料過濾篩選
+            # 進行組長過濾篩選
             if not todo_df.empty and filter_leader != "全部" and "組長" in todo_df.columns:
                 todo_df = todo_df[todo_df["組長"] == filter_leader]
-
-            if not todo_df.empty and filter_deadline != "全部" and "預計完成日期" in todo_df.columns:
-                todo_df = todo_df[todo_df["預計完成日期"] == filter_deadline]
-
-            if not todo_df.empty and keyword:
-                todo_df = todo_df[
-                    todo_df.astype(str).apply(
-                        lambda x: x.str.contains(keyword, case=False, na=False)
-                    ).any(axis=1)
-                ]
 
             if not todo_df.empty:
                 # 匯出 CSV 功能
@@ -975,63 +907,72 @@ else:
                 )
 
                 st.markdown("### 📊 未完成事項總覽")
-                show_cols = ["組長", "交辦事項", "預計完成日期", "指派人", "建立時間"]
+                
+                # 調整欄位順序，把按鈕放在最右側
+                show_cols = ["組長", "交辦事項", "預計完成日期", "指派人", "建立時間", "✅ 完成", "🗑️ 刪除"]
                 available_cols = [c for c in show_cols if c in todo_df.columns]
                 
-                st.dataframe(
-                    todo_df[available_cols],
+                # 排序：最新建立的在最上方
+                display_df = todo_df[available_cols].sort_values(by="建立時間", ascending=False).reset_index(drop=True)
+
+                # 使用 st.data_editor 讓按鈕可以直接在表格內點擊
+                edited_df = st.data_editor(
+                    display_df,
                     use_container_width=True,
-                    hide_index=True
+                    hide_index=True,
+                    column_config={
+                        "✅ 完成": st.column_config.CheckboxColumn("✅ 完成", help="勾選以將此事項標記為完成", default=False),
+                        "🗑️ 刪除": st.column_config.CheckboxColumn("🗑️ 刪除", help="勾選以刪除此事項", default=False),
+                        "組長": st.column_config.TextColumn("組長", disabled=True),
+                        "交辦事項": st.column_config.TextColumn("交辦事項", disabled=True),
+                        "預計完成日期": st.column_config.TextColumn("預計完成日期", disabled=True),
+                        "指派人": st.column_config.TextColumn("指派人", disabled=True),
+                        "建立時間": st.column_config.TextColumn("建立時間", disabled=True),
+                    },
+                    key="todo_editable_table"
                 )
 
-                st.markdown("### 👁️ 明細檢視 / 完成與刪除操作")
-                # 排序將最新建立的待辦事項顯示在最上方
-                for _, row in todo_df.sort_values(by="建立時間", ascending=False).iterrows():
-                    with st.expander(f"👤 負責：{row.get('組長', '未知')} ｜ 📅 期限：{row.get('預計完成日期', '')} ｜ 📝 內容：{str(row.get('交辦事項',''))[:15]}..."):
-                        st.markdown(f"""
-                        - **負責組長：** {row.get('組長', '-')}
-                        - **交辦事項：** {row.get('交辦事項', '-')}
-                        - **預計完成日期：** {row.get('預計完成日期', '-')}
-                        - **指派人：** {row.get('指派人', '-')}
-                        - **建立時間：** {row.get('建立時間', '-')}
-                        """)
+                # 偵測是否有勾選動作
+                for idx, row in edited_df.iterrows():
+                    # 找到對應的原始資料庫金鑰 db_id
+                    orig_row = todo_df[todo_df["建立時間"] == row["建立時間"]].iloc[0]
+                    db_key = orig_row["db_id"]
 
-                        btn_col1, btn_col2, btn_col3 = st.columns([2, 1, 1])
+                    # 處理邏輯 1：點擊完成
+                    if row["✅ 完成"]:
+                        raw_dict = orig_row.to_dict()
+                        done_payload = {}
+                        for key, val in raw_dict.items():
+                            if pd.isna(val):
+                                done_payload[str(key)] = ""
+                            else:
+                                done_payload[str(key)] = str(val)
+
+                        done_payload["完成時間"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        done_payload.pop("db_id", None)
+                        done_payload.pop("✅ 完成", None)
+                        done_payload.pop("🗑️ 刪除", None)
                         
-                        # 按鈕：標記為完成 (已修正 JSON 轉型錯誤)
-                        with btn_col2:
-                            if st.button("✅ 完成", key=f"done_todo_{row['db_id']}", use_container_width=True):
-                                # 【核心修正】將 pandas row 物件轉為標準 Python dict，並將內容轉成標準字串，防止 JSON 轉型出錯
-                                raw_dict = row.to_dict()
-                                done_payload = {}
-                                for key, val in raw_dict.items():
-                                    if pd.isna(val):
-                                        done_payload[str(key)] = ""
-                                    else:
-                                        done_payload[str(key)] = str(val)
+                        requests.post(f"{TODO_DONE_URL}.json", data=json.dumps(done_payload))
+                        requests.delete(f"{TODO_DB_URL}/{db_key}.json")
+                        
+                        st.success("🎉 太棒了！該事項已標記為完成並移入歷史紀錄！")
+                        time.sleep(0.5)
+                        st.rerun()
 
-                                # 額外附加完成時間
-                                done_payload["完成時間"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                                
-                                # 移除非必要的 db_id 主鍵欄位
-                                db_key = done_payload.pop("db_id", None)
-                                
-                                if db_key:
-                                    # 推送到已完成資料庫，再從原資料庫刪除
-                                    requests.post(f"{TODO_DONE_URL}.json", data=json.dumps(done_payload))
-                                    requests.delete(f"{TODO_DB_URL}/{db_key}.json")
-                                    
-                                    st.success("🎉 太棒了！該事項已標記為完成並移入歷史紀錄！")
-                                    time.sleep(0.5)
-                                    st.rerun()
+                    # 處理邏輯 2：點擊刪除 (觸發 0000 密碼驗證)
+                    if row["🗑️ 刪除"]:
+                        st.warning(f"⚠️ 您正在嘗試刪除由【{row['指派人']}】指派給【{row['組長']}】的事項")
+                        pwd_input = st.text_input("🔒 請輸入刪除權限密碼：", type="password", key=f"pwd_{db_key}")
+                        
+                        if pwd_input == "0000":
+                            requests.delete(f"{TODO_DB_URL}/{db_key}.json")
+                            st.success("已成功刪除該筆交辦事項！")
+                            time.sleep(0.5)
+                            st.rerun()
+                        elif pwd_input != "":
+                            st.error("❌ 密碼錯誤，拒絕刪除！")
 
-                        # 按鈕：直接刪除
-                        with btn_col3:
-                            if st.button("🗑️ 刪除", key=f"del_todo_{row['db_id']}", use_container_width=True):
-                                requests.delete(f"{TODO_DB_URL}/{row['db_id']}.json")
-                                st.success("已成功刪除該筆交辦事項！")
-                                time.sleep(0.5)
-                                st.rerun()
             else:
                 st.info("💡 查無符合條件的待辦事項")
         else:
@@ -1040,7 +981,7 @@ else:
         st.divider()
 
         # ==========================================
-        # 第二區：✍️ 新增組長交辦事項表單
+        # 第二區：✍️ 新增組長交辦事項表單 (移至中間)
         # ==========================================
         st.markdown("### ✍️ 新增組長交辦事項")
         with st.form("todo_input_form"):
@@ -1088,23 +1029,19 @@ else:
             
             done_df = pd.DataFrame(done_list)
             
-            # 過濾僅顯示當前篩選負責組長的完成紀錄 (若有篩選的話)
             if not done_df.empty and filter_leader != "全部" and "組長" in done_df.columns:
                 done_df = done_df[done_df["組長"] == filter_leader]
                 
             if not done_df.empty:
-                # 重新整理顯示欄位，加上「完成時間」
                 done_cols = ["組長", "交辦事項", "預計完成日期", "完成時間", "指派人"]
                 avail_done_cols = [c for c in done_cols if c in done_df.columns]
                 
-                # 顯示已完成表格
                 st.dataframe(
                     done_df[avail_done_cols].sort_values(by="完成時間", ascending=False),
                     use_container_width=True,
                     hide_index=True
                 )
                 
-                # 提供清除歷史紀錄按鈕 (選填防呆)
                 with st.expander("⚙️ 歷史紀錄清理區"):
                     for _, d_row in done_df.sort_values(by="完成時間", ascending=False).iterrows():
                         st.text(f"✔ {d_row.get('完成時間')} - 【{d_row.get('組長')}】{d_row.get('交辦事項')[:20]}...")
@@ -1116,7 +1053,7 @@ else:
             else:
                 st.info("💡 目前沒有對應組長的已完成事項紀錄。")
         else:
-            st.info("💡 尚無任何已點選完成的事項紀錄，繼續加油！")
+            st.info("💡 尚無任何已點選完成的事項紀錄，繼續加油！")  
             
     
 # --- ⚙️ 編輯手工具清單 (修正 Duplicate ID 版本) ---
