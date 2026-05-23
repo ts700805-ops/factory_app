@@ -789,11 +789,17 @@ else:
     elif st.session_state.menu_selection == "🧾組長待辦事項":
         import io
 
+        # 【核心修正】加入 !important 關鍵字，強制突破全域 CSS 限制，把中間主標題真正放大！
         st.markdown(
-       '<h1 style="text-align:center; color:#7DD3FC; font-weight:900; font-size:5.5rem; margin-bottom:2rem;">🧾 組長待辦事項</h1>',
+            '''
+            <div style="text-align:center; margin-bottom:2rem;">
+                <h1 style="color:#7DD3FC !important; font-weight:900 !important; font-size: 5.5rem !important; display:inline-block;">
+                    🧾 組長待辦事項
+                </h1>
+            </div>
+            ''',
             unsafe_allow_html=True
         )
-
         # 【安全修正】檢查並確保 URL 存在，防止 NameError 報錯
         if 'TODO_DB_URL' not in globals() and 'TODO_DB_URL' not in locals():
             if 'DB_URL' in globals() or 'DB_URL' in locals():
