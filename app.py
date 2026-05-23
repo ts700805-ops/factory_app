@@ -411,7 +411,7 @@ else:
 # ==========================================
 # 🎮 頁面二：6S 戰境養成與決鬥系統
 # ==========================================
-    elif st.session_state.menu_selection == "🎮6S戰境養成":
+ elif st.session_state.menu_selection == "🎮6S戰境養成":
         import random
         import time
         import json # 確保有載入 json 模組
@@ -431,193 +431,211 @@ else:
         if 'DB_URL' in globals() or 'DB_URL' in locals():
             GAME_DB_URL = f"{DB_URL}/game_rpg_data"
             GAME_CONFIG_URL = f"{DB_URL}/game_config"
+            BASE_URL = DB_URL
         elif 'DB_BASE_URL' in globals() or 'DB_BASE_URL' in locals():
             GAME_DB_URL = f"{DB_BASE_URL}/game_rpg_data"
             GAME_CONFIG_URL = f"{DB_BASE_URL}/game_config"
+            BASE_URL = DB_BASE_URL
         else:
             GAME_DB_URL = "https://your-firebase-url/game_rpg_data"
             GAME_CONFIG_URL = "https://your-firebase-url/game_config"
+            BASE_URL = "https://your-firebase-url"
 
-        # 讀取後台設定稱謂門檻
-        config_data = requests.get(f"{GAME_CONFIG_URL}.json").json() or {}
-        lv1_pts = int(config_data.get("lv1_pts", 0))
-        lv2_pts = int(config_data.get("lv2_pts", 10))
-        lv3_pts = int(config_data.get("lv3_pts", 30))
-        lv4_pts = int(config_data.get("lv4_pts", 60))
+        # 1. 取得當前登入者 (配合回報中心傳遞的 user)
+        current_user = str(st.session_state.get("user", "未登入同仁")).strip()
         
-        lv1_name = str(config_data.get("lv1_name", "🌾 平民"))
-        lv2_name = str(config_data.get("lv2_name", "🧹 6S見習騎士"))
-        lv3_name = str(config_data.get("lv3_name", "⚔️ 現場巡檢戰士"))
-        lv4_name = str(config_data.get("lv4_name", "👑 乾淨整潔大宗師"))
-
-        # 獲取當前連動登入同仁
-        current_user = str(st.session_state.user).strip() if st.session_state.get("user") else "未登入同仁"
+        # 2. 讀取目前玩家的 RPG 資料庫
         all_players_data = requests.get(f"{GAME_DB_URL}.json").json() or {}
-        
-        # 新玩家自動無痛初始化
-        if current_user != "未登入同仁" and current_user not in all_players_data:
-            init_payload = {"str": 0, "vit": 0, "agi": 0, "cha": 0, "avail_pts": 5}
-            requests.put(f"{GAME_DB_URL}/{current_user}.json", data=json.dumps(init_payload))
-            all_players_data[current_user] = init_payload
+        user_stats = all_players_data.get(current_user, {"str": 0, "vit": 0, "agi": 0, "cha": 0, "avail_pts": 0, "level_name": "🌾 平民"})
 
-        user_stats = all_players_data.get(current_user, {"str": 0, "vit": 0, "agi": 0, "cha": 0, "avail_pts": 0})
+        # 防呆確保數值是數字
         u_str = int(user_stats.get("str", 0))
         u_vit = int(user_stats.get("vit", 0))
         u_agi = int(user_stats.get("agi", 0))
         u_cha = int(user_stats.get("cha", 0))
         u_pts = int(user_stats.get("avail_pts", 0))
-        u_total = u_str + u_vit + u_agi + u_cha
+        u_title = user_stats.get("level_name", "🌾 平民")
 
-        def get_title(total_pts):
-            if total_pts >= lv4_pts: return lv4_name
-            elif total_pts >= lv3_pts: return lv3_name
-            elif total_pts >= lv2_pts: return lv2_name
-            else: return lv1_name
+        st.markdown(f"### 🥷 我的個人戰力面板：【{u_title}】 — 身份：【{current_user}】")
 
-        current_title = get_title(u_total)
+        # 3. 渲染屬性點數配點面板
+        col_str, col_vit, col_agi, col_cha, col_pool = st.columns([2, 2, 2, 2, 3])
 
-        st.markdown(f"### 👤 我的個人戰力面板：【{current_title}】— 身份：【{current_user}】")
-        
-        col1, col2, col3, col4, col5 = st.columns(5)
-        with col1:
-            st.metric(label="💪 力量 (攻擊力)", value=f"{u_str} 點", delta=f"+{u_str * 5} ATK")
-            if u_pts > 0 and current_user != "未登入同仁":
-                if st.button("➕ 加力量", key="add_str"):
-                    requests.patch(f"{GAME_DB_URL}/{current_user}.json", data=json.dumps({"str": u_str+1, "avail_pts": u_pts-1}))
-                    st.rerun()
-        with col2:
-            st.metric(label="🔋 體力 (生命值)", value=f"{u_vit} 點", delta=f"+{u_vit * 30} HP")
-            if u_pts > 0 and current_user != "未登入同仁":
-                if st.button("➕ 加體力", key="add_vit"):
-                    requests.patch(f"{GAME_DB_URL}/{current_user}.json", data=json.dumps({"vit": u_vit+1, "avail_pts": u_pts-1}))
-                    st.rerun()
-        with col3:
-            st.metric(label="⚡ 敏捷 (閃避率)", value=f"{u_agi} 點", delta=f"+{u_agi * 2} %")
-            if u_pts > 0 and current_user != "未登入同仁":
-                if st.button("➕ 加敏捷", key="add_agi"):
-                    requests.patch(f"{GAME_DB_URL}/{current_user}.json", data=json.dumps({"agi": u_agi+1, "avail_pts": u_pts-1}))
-                    st.rerun()
-        with col4:
-            st.metric(label="✨ 魅力 (召喚率)", value=f"{u_cha} 點", delta=f"+{u_cha * 5} %")
-            if u_pts > 0 and current_user != "未登入同仁":
-                if st.button("➕ 加魅力", key="add_cha"):
-                    requests.patch(f"{GAME_DB_URL}/{current_user}.json", data=json.dumps({"cha": u_cha+1, "avail_pts": u_pts-1}))
-                    st.rerun()
-        with col5:
-            st.markdown(f"<div style='background-color:#1e3a8a; padding:10px; border-radius:5px; text-align:center;'><b style='color:#FBBF24;'>剩餘自由點數</b><br><span style='font-size:2rem; font-weight:900; color:#fff;'>{u_pts}</span></div>", unsafe_allow_html=True)
+        with col_str:
+            st.metric("💪 力量 (攻擊力)", f"{u_str} 點", f"+{u_str * 2} ATK")
+            if u_pts > 0 and st.button("➕ 加力量", key="add_str_btn"):
+                user_stats["str"] = u_str + 1
+                user_stats["avail_pts"] = u_pts - 1
+                requests.put(f"{GAME_DB_URL}/{current_user}.json", data=json.dumps(user_stats))
+                st.rerun()
+
+        with col_vit:
+            st.metric("🔋 體力 (生命值)", f"{u_vit} 點", f"+{u_vit * 30} HP")
+            if u_pts > 0 and st.button("➕ 加體力", key="add_vit_btn"):
+                user_stats["vit"] = u_vit + 1
+                user_stats["avail_pts"] = u_pts - 1
+                requests.put(f"{GAME_DB_URL}/{current_user}.json", data=json.dumps(user_stats))
+                st.rerun()
+
+        with col_agi:
+            st.metric("⚡ 敏捷 (閃避率)", f"{u_agi} 點", f"+{u_agi * 2}%")
+            if u_pts > 0 and st.button("➕ 加敏捷", key="add_agi_btn"):
+                user_stats["agi"] = u_agi + 1
+                user_stats["avail_pts"] = u_pts - 1
+                requests.put(f"{GAME_DB_URL}/{current_user}.json", data=json.dumps(user_stats))
+                st.rerun()
+
+        with col_cha:
+            st.metric("✨ 魅力 (加成率)", f"{u_cha} 點", f"+{u_cha * 5}%")
+            if u_pts > 0 and st.button("➕ 加魅力", key="add_cha_btn"):
+                user_stats["cha"] = u_cha + 1
+                user_stats["avail_pts"] = u_pts - 1
+                requests.put(f"{GAME_DB_URL}/{current_user}.json", data=json.dumps(user_stats))
+                st.rerun()
+
+        with col_pool:
+            st.markdown(
+                f'''
+                <div style="background-color:#1E3A8A; padding:1.5rem; border-radius:10px; text-align:center;">
+                    <span style="color:#FFF; font-weight:bold; font-size:1.1rem;">剩餘自由點數</span><br>
+                    <span style="color:#FBBF24; font-size:2.5rem; font-weight:900;">{u_pts}</span>
+                </div>
+                ''',
+                unsafe_allow_html=True
+            )
 
         st.divider()
 
-# ==========================================
-        # ⚔️ 擂台決鬥 PK 場 (修正版)
+        # ==========================================
+        # ⚔️ 尋找現場同仁發起決鬥系統
         # ==========================================
         st.markdown("### ⚔️ 尋找現場同仁發起決鬥")
 
-        # 1. 抓取資料並嘗試解析人員配置
-        mapping_raw = requests.get(f"{DB_BASE_URL}/config/employee_mapping.json").json()
-        all_staff = set()
+        # 讀取對照表以抓取所有可能同仁名單
+        raw_staff = requests.get(f"{BASE_URL}/leader_members.json").json() or ""
+        all_opponents = []
+        if isinstance(raw_staff, str):
+            for line in raw_staff.splitlines():
+                if ":" in line:
+                    parts = line.split(":")
+                    if len(parts) > 1:
+                        members = [m.strip() for m in parts[1].split(",") if m.strip()]
+                        all_opponents.extend(members)
         
-        # 嘗試從文字中提取人名
-        if isinstance(mapping_raw, str):
-            # 針對每一行，尋找冒號後的內容
-            for line in mapping_raw.split('\n'):
-                if ':' in line:
-                    parts = line.split(':', 1)[1] # 取得冒號後方的所有文字
-                    # 分割逗號或頓號
-                    names = parts.replace('，', ',').replace('、', ',').split(',')
-                    for name in names:
-                        if name.strip():
-                            all_staff.add(name.strip())
-        
-        # 如果解析出來的人數太少，或者資料結構不同，備援抓取已建立 RPG 角色的玩家
-        if len(all_staff) < 2:
-            all_staff.update(all_players_data.keys())
+        # 移除重複與自己
+        all_opponents = sorted(list(set(all_opponents)))
+        if current_user in all_opponents:
+            all_opponents.remove(current_user)
 
-        # 2. 過濾自己與無效名稱
-        opponents = sorted([n for n in all_staff if n != current_user and n != "未登入同仁" and n.strip()])
-        
-        if not opponents:
-            st.warning("💡 目前暫無其他同仁名單可進行決鬥。")
+        if not all_opponents:
+            st.info("💡 目前在人員配置資料中找不到其他同仁可進行決鬥。")
         else:
-            c_sel, c_btn = st.columns([3, 1])
-            with c_sel:
-                target_opp = st.selectbox("🎯 選擇決鬥目標對手：", opponents)
-            with c_btn:
-                st.write("")
-                st.write("")
-                start_battle = st.button("💥 發起決鬥！", use_container_width=True)
-
-            if start_battle and current_user != "未登入同仁":
-                # 自動初始化對手數據
-                if target_opp not in all_players_data:
-                    init_payload = {"str": 0, "vit": 0, "agi": 0, "cha": 0, "avail_pts": 5}
-                    requests.put(f"{GAME_DB_URL}/{target_opp}.json", data=json.dumps(init_payload))
-                    all_players_data[target_opp] = init_payload
+            target_user = st.selectbox("🎯 選擇決鬥對手同仁：", all_opponents, key="duel_target_select")
+            
+            # 點擊按鈕跳出裝飾視窗 (強制定調文字為黑色防止白底瞎眼)
+            if st.button(f"💥 與 【{target_user}】 展開 6S 實力對決！", use_container_width=True, type="primary"):
+                target_stats = all_players_data.get(target_user, {"str": 0, "vit": 0, "agi": 0, "cha": 0, "level_name": "🌾 平民"})
                 
-                target_data = all_players_data.get(target_opp)
+                # 計算戰鬥屬性 (基礎值 + 點數加成)
+                p1_hp = 100 + int(user_stats.get("vit", 0)) * 30
+                p1_atk = 15 + int(user_stats.get("str", 0)) * 2
+                p1_title = user_stats.get("level_name", "🌾 平民")
+                
+                p2_hp = 100 + int(target_stats.get("vit", 0)) * 30
+                p2_atk = 15 + int(target_stats.get("str", 0)) * 2
+                p2_title = target_stats.get("level_name", "🌾 平民")
 
-                # 執行戰鬥模擬
-                @st.dialog("⚔️ 戰境決鬥場 ⚔️")
-                def run_battle_simulation(p1, p2, p1_data, p2_data):
-                    st.markdown("<style>div[data-modal-container] * { color: black !important; }</style>", unsafe_allow_html=True)
+                # 對話框宣告：用強制的 style="color: #111827 !important;" 鎖定黑字
+                @st.dialog("⚔️ 戰境決鬥場 ⚔️", width="large")
+                def show_battle_logs():
+                    st.markdown(
+                        f'''
+                        <div style="color: #111827 !important; font-family: sans-serif;">
+                            <h3 style="color: #1E40AF !important; margin-bottom: 5px;">🥊 雙方數據就緒！</h3>
+                            <p style="margin: 3px 0; font-size: 1.1rem; color: #111827 !important;">🔴 <b>【{p1_title}】{current_user}</b> (HP: {p1_hp} / ATK: {p1_atk})</p>
+                            <p style="margin: 3px 0; font-size: 1.1rem; color: #111827 !important;">🔵 <b>【{p2_title}】{target_user}</b> (HP: {p2_hp} / ATK: {p2_atk})</p>
+                            <hr style="border-top: 1px solid #CCC; margin: 10px 0;">
+                        </div>
+                        ''', 
+                        unsafe_allow_html=True
+                    )
                     
-                    # 計算數值邏輯...
-                    p1_total = int(p1_data.get("str",0))+int(p1_data.get("vit",0))+int(p1_data.get("agi",0))+int(p1_data.get("cha",0))
-                    p2_total = int(p2_data.get("str",0))+int(p2_data.get("vit",0))+int(p2_data.get("agi",0))+int(p2_data.get("cha",0))
+                    hp1, hp2 = p1_hp, p2_hp
+                    round_num = 1
+                    logs_html = '<div style="color: #111827 !important; font-size: 1rem; line-height: 1.6;">'
+
+                    while hp1 > 0 and hp2 > 0 and round_num <= 10:
+                        # 隨機波動攻擊力
+                        dmg1 = max(1, p1_atk + random.randint(-3, 3))
+                        hp2 -= dmg1
+                        logs_html += f"⚔️ <b>第 {round_num} 回合</b>：【{p1_title}】{current_user} 攻擊，對 【{p2_title}】{target_user} 造成 <span style='color:#DC2626;'><b>{dmg1}</b></span> 點傷害！<br>"
+                        if hp2 <= 0: break
+                        
+                        dmg2 = max(1, p2_atk + random.randint(-3, 3))
+                        hp1 -= dmg2
+                        logs_html += f"🛡️ <b>第 {round_num} 回合</b>：【{p2_title}】{target_user} 反擊，對 【{p1_title}】{current_user} 造成 <span style='color:#2563EB;'><b>{dmg2}</b></span> 點傷害！<br>"
+                        logs_html += "<div style='margin-bottom: 8px;'></div>"
+                        round_num += 1
+
+                    logs_html += "</div>"
+                    st.markdown(logs_html, unsafe_allow_html=True)
                     
-                    p1_name = f"【{get_title(p1_total)}】{p1}"
-                    p2_name = f"【{get_title(p2_total)}】{p2}"
+                    # 判定勝負結果
+                    if hp1 > hp2:
+                        winner_text = f"🏆 【{p1_title}】{current_user} 獲勝！"
+                        bg_color = "#DCFCE7"
+                        text_color = "#166534"
+                    else:
+                        winner_text = f"🏆 【{p2_title}】{target_user} 獲勝！"
+                        bg_color = "#FEE2E2"
+                        text_color = "#991B1B"
+                        
+                    st.markdown(
+                        f'''
+                        <div style="background-color: {bg_color}; border: 1px solid {text_color}; padding: 1rem; border-radius: 8px; margin-top: 15px; text-align: center;">
+                            <h3 style="color: {text_color} !important; margin: 0; font-size: 1.5rem; font-weight: bold;">{winner_text}</h3>
+                        </div>
+                        ''', 
+                        unsafe_allow_html=True
+                    )
 
-                    p1_hp = 100 + (int(p1_data.get("vit", 0)) * 30)
-                    p1_atk = 15 + (int(p1_data.get("str", 0)) * 5)
-                    p2_hp = 100 + (int(p2_data.get("vit", 0)) * 30)
-                    p2_atk = 15 + (int(p2_data.get("str", 0)) * 5)
+                show_battle_logs()
 
-                    st.markdown("### 🥊 雙方數據就緒！")
-                    st.write(f"🔴 **{p1_name}** (HP: {p1_hp} / ATK: {p1_atk})")
-                    st.write(f"🔵 **{p2_name}** (HP: {p2_hp} / ATK: {p2_atk})")
-                    st.divider()
-
-                    battle_log = []
-                    for r in range(1, 6):
-                        dmg1 = random.randint(p1_atk-3, p1_atk+5)
-                        p2_hp -= dmg1
-                        battle_log.append(f"⚔️ 第 {r} 回合：{p1_name} 攻擊 {p2_name} 造成 {max(0, dmg1)} 點傷害！")
-                        if p2_hp <= 0: break
-                    
-                    for log in battle_log: st.write(log)
-                    if p2_hp <= 0: st.success(f"🏆 {p1_name} 獲勝！")
-                    else: st.info("🤝 戰鬥平手收場！")
-
-                run_battle_simulation(current_user, target_opp, user_stats, target_data)
-        
         # ==========================================
-        # ⚙️ 後台稱謂門檻設定區
+        # ⚙️ 6S 戰境養成管理後台 (調整階級與自訂功能)
         # ==========================================
-        st.markdown("### ⚙️ 6S 戰境養成管理後台")
-        with st.expander("🔒 稱謂晉升門檻點數自訂"):
-            f_col1, f_col2 = st.columns(2)
-            with f_col1:
-                in_lv1 = st.text_input("等級1名稱", value=lv1_name)
-                in_lv2 = st.text_input("等級2名稱", value=lv2_name)
-                in_lv3 = st.text_input("等級3名稱", value=lv3_name)
-                in_lv4 = st.text_input("等級4名稱", value=lv4_name)
-            with f_col2:
-                pt_lv1 = st.number_input("等級1所需配點總數", value=lv1_pts)
-                pt_lv2 = st.number_input("等級2所需配點總數", value=lv2_pts)
-                pt_lv3 = st.number_input("等級3所需配點總數", value=lv3_pts)
-                pt_lv4 = st.number_input("等級4所需配點總數", value=lv4_pts)
-
-            if st.button("💾 儲存後台配置設定", use_container_width=True):
-                save_payload = {
-                    "lv1_name": str(in_lv1), "lv1_pts": int(pt_lv1),
-                    "lv2_name": str(in_lv2), "lv2_pts": int(pt_lv2),
-                    "lv3_name": str(in_lv3), "lv3_pts": int(pt_lv3),
-                    "lv4_name": str(in_lv4), "lv4_pts": int(pt_lv4),
-                }
-                requests.put(f"{GAME_CONFIG_URL}.json", data=json.dumps(save_payload))
-                st.success("後台晉升設定更新完成！")
-                time.sleep(0.5)
+        st.write("")
+        st.write("")
+        with st.expander("⚙️ 6S 戰境養成管理後台"):
+            st.markdown("##### 👑 稱號與升級門檻點數自訂")
+            
+            # 從配置檔下載目前的稱號設定或給予初始值
+            config_data = requests.get(f"{GAME_CONFIG_URL}.json").json() or {}
+            titles_list = config_data.get("titles", ["🌾 平民", "⚔️ 驍勇新兵", "🛡️ 堅毅騎士", "🦅 戰境領主", "👑 傳奇戰神"])
+            
+            t1 = st.text_input("階級 1 稱號 (初始)：", value=titles_list[0])
+            t2 = st.text_input("階級 2 稱號 (總點數達 10)：", value=titles_list[1])
+            t3 = st.text_input("階級 3 稱號 (總點數達 30)：", value=titles_list[2])
+            t4 = st.text_input("階級 4 稱號 (總點數達 60)：", value=titles_list[3])
+            t5 = st.text_input("階級 5 稱號 (總點數達 100)：", value=titles_list[4])
+            
+            if st.button("💾 儲存後台配置", use_container_width=True, key="save_config_btn"):
+                new_titles = [t1.strip(), t2.strip(), t3.strip(), t4.strip(), t5.strip()]
+                config_data["titles"] = new_titles
+                requests.put(f"{GAME_CONFIG_URL}.json", data=json.dumps(config_data))
+                
+                # 自動重新批次計算所有在線玩家的頭銜更新
+                for player, p_data in all_players_data.items():
+                    total_pts = int(p_data.get("str", 0)) + int(p_data.get("vit", 0)) + int(p_data.get("agi", 0)) + int(p_data.get("cha", 0))
+                    if total_pts >= 100: p_data["level_name"] = new_titles[5-1]
+                    elif total_pts >= 60: p_data["level_name"] = new_titles[4-1]
+                    elif total_pts >= 30: p_data["level_name"] = new_titles[3-1]
+                    elif total_pts >= 10: p_data["level_name"] = new_titles[2-1]
+                    else: p_data["level_name"] = new_titles[0]
+                    requests.put(f"{GAME_DB_URL}/{player}.json", data=json.dumps(p_data))
+                
+                st.success("✅ 階級稱號更新成功！系統已將所有人員名單頭銜同步洗牌。")
+                time.sleep(1)
                 st.rerun()
     
 # --- 📊 製造部派工專區 ---
