@@ -387,9 +387,9 @@ else:
             # 💡 增加錯誤偵測，幫助開發者看到真正的問題
             st.error(f"系統偵測到錯誤：{str(e)}")
             st.warning("目前系統資料緩衝中，請稍後再試。")
-# --- 📈 工時統計分析 ---
+# --- 📈 工時統計分析 (已修改為 📊 技能評核表) ---
     elif st.session_state.menu_selection == "📈 工時統計分析":
-        st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">⏱️ 生產工時管理系統</h1>', unsafe_allow_html=True)
+        st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📊 員工技能評核表</h1>', unsafe_allow_html=True)
         
         # 1. 取得當前組長名字 (例如: 陳德文)
         current_leader = st.session_state.user 
@@ -402,117 +402,53 @@ else:
             if map_res.status_code == 200:
                 staff_data = map_res.json() or {}
                 
-                # --- 關鍵修正：直接用組長名字當 Key 抓取組員列表 ---
-                # 您的資料結構是： "陳德文": ["徐梓翔", "牟育玄", ...]
+                # --- 直接用組長名字當 Key 抓取組員列表 ---
                 my_team = staff_data.get(current_leader, [])
                 
                 if isinstance(my_team, list):
                     display_list = [str(member).strip() for member in my_team]
                 
-            # 保險：如果沒抓到，讓組長選自己
+            # 保險：如果沒抓到，讓組長看到自己
             if not display_list:
                 display_list = [current_leader]
         except Exception as e:
             st.error(f"連線失敗: {e}")
             display_list = [current_leader]
 
-        # 3. 顯示下拉選單 (大字體標題)
-        st.markdown('<p style="font-size:1.2rem; font-weight:bold; color:#1e3a8a;">👤 請選擇執行組員 (您的成員)</p>', unsafe_allow_html=True)
-        selected_worker = st.selectbox("", sorted(display_list), label_visibility="collapsed", key="active_worker_select")
+        st.markdown(f'<p style="font-size:1.2rem; font-weight:bold; color:#1e3a8a;">👥 {current_leader} 組長 的成員技能考核進度：</p>', unsafe_allow_html=True)
         st.divider()
 
-        # --- 加入看板區域 ---
-        with st.container():
-            st.markdown('<div style="background-color:#f1f5f9; padding:20px; border-radius:15px; border:2px solid #cbd5e1; margin-bottom:20px;">', unsafe_allow_html=True)
-            c1, c2, c3 = st.columns([2, 2, 1])
-            with c1:
-                t_oid = st.selectbox("📦 選擇製令編號", sorted([str(o).strip() for o in order_list]), key="t_oid_select") if order_list else st.text_input("📦 手動輸入製令")
-            with c2:
-                t_proc = st.selectbox("🛠️ 選擇執行工序", process_list if process_list else ["預設工序"])
-            with c3:
-                st.write(" ")
-                if st.button("➕ 加入看板", type="primary", use_container_width=True):
-                    TIMER_DB_URL = f"{DB_BASE_URL}/active_timers"
-                    new_timer = {
-                        "製令": t_oid, "工序": t_proc, "status": "stop", 
-                        "accumulated": 0, "start_time": 0, "人員1": selected_worker 
-                    }
-                    requests.post(f"{TIMER_DB_URL}.json", data=json.dumps(new_timer))
-                    st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        # --- 顯示計時看板 (執行人員名字放大) ---
-        TIMER_DB_URL = f"{DB_BASE_URL}/active_timers"
-        active_timers_res = requests.get(f"{TIMER_DB_URL}.json")
-        active_timers = active_timers_res.json() if active_timers_res.status_code == 200 else {}
-        
-        if active_timers and isinstance(active_timers, dict):
-            for db_id, task in active_timers.items():
-                oid = task.get("製令", "未知")
-                p_name = task.get("工序", "未知")
-                status = task.get("status")
-                acc = task.get("accumulated", 0)
-                start = task.get("start_time", 0)
-                worker_name = task.get("人員1", "未指定")
-
-                st.markdown(f'<div style="background:#1e3a8a; color:white; padding:10px 15px; border-radius:10px 10px 0 0; font-weight:bold; font-size:1.1rem; border:1px solid #1e3a8a; border-bottom:none;">📦 製令：{oid}</div>', unsafe_allow_html=True)
-                with st.container(border=True):
-                    # --- HTML 區塊：優化字體大小、顏色與對比度，確保文字極度清晰 ---
-                    st.components.v1.html(f"""
-                        <div style="background:#ffffff; padding:12px 15px; border-radius:8px; border:2px solid #cbd5e1; border-left:10px solid #1e40af; display:flex; justify-content:space-between; align-items:center; font-family: 'Microsoft JhengHei', sans-serif;">
-                            <div style="flex: 1; min-width: 0; padding-right: 10px;">
-                                <div style="font-weight:900; color:#000000; font-size:1.3rem; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                    🛠️ 工序：{p_name}
-                                </div>
-                                <div style="font-size:1.6rem; color:#1e3a8a; font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                    👤 人員：{worker_name}
-                                </div>
-                            </div>
-                            <div id="timer_{db_id}" style="color:#b91c1c; font-family:monospace; font-size:2.3rem; font-weight:900; background:#fee2e2; padding:5px 15px; border-radius:8px; border:2px solid #fca5a5; min-width:160px; text-align:center; flex-shrink: 0;">
-                                00:00:00
-                            </div>
-                        </div>
-                        <script>
-                            (function() {{
-                                var acc = {acc}, start = {start}, status = '{status}', display = document.getElementById('timer_{db_id}');
-                                function update() {{
-                                    var total = acc + (status === 'running' ? (Date.now() / 1000) - start : 0);
-                                    var h = Math.floor(total / 3600).toString().padStart(2, '0');
-                                    var m = Math.floor((total % 3600) / 60).toString().padStart(2, '0');
-                                    var s = Math.floor(total % 60).toString().padStart(2, '0');
-                                    display.innerText = h + ":" + m + ":" + s;
-                                }}
-                                setInterval(update, 1000); update();
-                            }})();
-                        </script>
-                    """, height=130)
+        # 3. 並列由上往下列出該組所有員工，並顯示考核完成程度百分比表
+        if display_list:
+            for member in sorted(display_list):
+                # 建立一個乾淨的員工區塊容器
+                with st.container():
+                    col1, col2 = st.columns([1, 3])
                     
-                    b1, b2, b3 = st.columns([1, 1, 1])
-                    with b1:
-                        if status != 'running':
-                            if st.button("▶️ 開始", key=f"s_{db_id}", use_container_width=True):
-                                requests.patch(f"{TIMER_DB_URL}/{db_id}.json", data=json.dumps({"status": "running", "start_time": time.time()}))
-                                st.rerun()
-                        else:
-                            if st.button("⏸️ 暫停", key=f"p_{db_id}", use_container_width=True):
-                                requests.patch(f"{TIMER_DB_URL}/{db_id}.json", data=json.dumps({"status": "paused", "accumulated": acc + (time.time() - start), "start_time": 0}))
-                                st.rerun()
-                    with b2:
-                        if st.button("⏹️ 結束", key=f"e_{db_id}", use_container_width=True, type="primary"):
-                            final_sec = acc + (time.time() - start if status == 'running' else 0)
-                            # --- 關鍵修正：確保結束時寫入 FINISH_URL，使歷史完工紀錄同步抓得到 ---
-                            requests.post(f"{FINISH_URL}.json", data=json.dumps({
-                                "製令": oid, "工序": p_name, "秒數": final_sec, 
-                                "完工時間": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "人員1": worker_name
-                            }))
-                            requests.delete(f"{TIMER_DB_URL}/{db_id}.json")
-                            st.rerun()
-                    with b3:
-                        if st.button("🗑️ 刪除", key=f"d_{db_id}", use_container_width=True):
-                            requests.delete(f"{TIMER_DB_URL}/{db_id}.json")
-                            st.rerun()
+                    with col1:
+                        # 放大顯示員工姓名
+                        st.markdown(f'<p style="font-size:1.3rem; font-weight:900; color:#000000; margin-top:5px;">👤 {member}</p>', unsafe_allow_html=True)
+                    
+                    with col2:
+                        # 這裡使用 slider 當作範例百分比控鍵（範圍 0-100%），之後您也可以直接綁定 Firebase 數值
+                        # 為了避免 key 重複，使用 member 名字作為 key
+                        score = st.slider(
+                            "考核完成度", 
+                            min_value=0, 
+                            max_value=100, 
+                            value=50,  # 預設 50%，您可以依照需求調整
+                            step=5,
+                            key=f"skill_{member}",
+                            label_visibility="collapsed" # 隱藏欄位小標題讓畫面更乾淨
+                        )
+                        
+                        # 顯示美觀的進度條
+                        st.progress(score / 100)
+                        st.markdown(f'<p style="text-align:right; font-weight:bold; color:#1e40af; margin-top:-10px;">目前進度: {score}%</p>', unsafe_allow_html=True)
+                
+                st.markdown('<hr style="margin:10px 0; border-top:1px dashed #cbd5e1;">', unsafe_allow_html=True)
         else:
-            st.info("💡 目前無進行中任務。")
+            st.info("💡 目前此組別無成員資料。")
 
 # --- 📜 完工紀錄查詢 ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
