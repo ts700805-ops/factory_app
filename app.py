@@ -557,8 +557,6 @@ else:
                     # 數據顯示區塊：深紫色背景，白色文字
                     st.markdown(
                         f"""
-                        st.markdown(
-        f"""
                         <div style="color:#ffffff !important; font-family:sans-serif; background-color: #4C1D95; border: 4px solid #2E1065; padding: 20px; border-radius: 12px;">
                             <h3 style="color:#ffffff !important; margin-bottom:10px;">🥊 雙方數據就緒！</h3>
                             <p style="margin:5px 0; font-size:1.1rem; color:#ffffff !important;">
