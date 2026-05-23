@@ -789,30 +789,20 @@ else:
     elif st.session_state.menu_selection == "🧾組長待辦事項":
         import io
 
-        # 1. 注入專屬標題放大 CSS 與網格優化樣式（突破全域鎖定）
+        # 1. 注入專屬設定，徹底移除會波及到左側選單的全局 CSS，只針對單一標題標籤進行強制放大
         st.markdown("""
             <style>
-            /* 【關鍵修正】建立專屬的獨立類別，強制將標題設定為 80px 巨大字體 */
-            .my-giant-title {
-                font-size: 60px !important;
-                font-weight: 900 !important;
+            /* 【核心修正】僅針對 #my-giant-main-title 這個專屬識別碼進行放大，絕對不會影響到左側導航與其他文字 */
+            #my-giant-main-title {
                 color: #7DD3FC !important;
+                font-size: 3.5rem !important; /* 如果覺得不夠大，可以自行調整為 4.0rem 或 4.5rem */
+                font-weight: 900 !important;
                 text-align: center !important;
-                margin-bottom: 20px !important;
+                margin-bottom: 2rem !important;
                 display: block !important;
             }
             
-            /* 針對一般段落、標籤、下拉選單文字 */
-            div[data-testid="stMarkdownContainer"] p, 
-            label, 
-            .stWidgetLabel p,
-            span,
-            li {
-                color: #7DD3FC !important; 
-                font-size: 1.3rem !important; 
-                font-weight: 800 !important;
-            }
-            /* 針對各區段的中標題 */
+            /* 針對各區段的中標題保持系統原樣 */
             h3 {
                 color: #38BDF8 !important; 
                 font-size: 1.8rem !important; 
@@ -857,8 +847,8 @@ else:
             </style>
         """, unsafe_allow_html=True)
 
-        # 2. 【關鍵修正】套用全新專屬類別 my-giant-title 的主標題，保證變大
-        st.markdown('<span class="my-giant-title">🧾 組長待辦事項</span>', unsafe_allow_html=True)
+        # 2. 【核心修正】套用專屬識別碼，確保只有此行中間主標題放大
+        st.markdown('<span id="my-giant-main-title">🧾 組長待辦事項</span>', unsafe_allow_html=True)
 
         # 【安全修正】檢查並確保 URL 存在，防止 NameError 報錯
         if 'TODO_DB_URL' not in globals() and 'TODO_DB_URL' not in locals():
@@ -1068,7 +1058,7 @@ else:
             else:
                 st.info("💡 目前沒有對應組長的已完成事項紀錄。")
         else:
-            st.info("💡 尚無任何已點選完成的事項紀錄，繼續加油！")
+            st.info("💡 尚無任何已點選完成的事項紀錄，繼續大家辛苦了！")
     
 # --- ⚙️ 編輯手工具清單 (修正 Duplicate ID 版本) ---
     elif st.session_state.menu_selection == "⚙️ 資產編輯清單":
