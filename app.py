@@ -387,9 +387,9 @@ else:
             # 💡 增加錯誤偵測，幫助開發者看到真正的問題
             st.error(f"系統偵測到錯誤：{str(e)}")
             st.warning("目前系統資料緩衝中，請稍後再試。")
-# --- 📈 工時統計分析 (已修改為 📊 全員技能評核表終極安全版) ---
+# --- 📈 工時統計分析 (已修改為 📊 8人並列圓形技能評核表) ---
     elif st.session_state.menu_selection == "📈 工時統計分析":
-        st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📋 員工技能評核表</h1>', unsafe_allow_html=True)
+        st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📋 員工技能考核表</h1>', unsafe_allow_html=True)
         
         # 1. 取得當前組長名字 (例如: 陳德文)
         current_leader = st.session_state.user 
@@ -397,116 +397,100 @@ else:
         # 2. 針對您的 Firebase 結構做抓取與嚴格文字清洗
         display_list = []
         try:
-            # 抓取 staff_map.json
             map_res = requests.get(f"{DB_BASE_URL}/settings/staff_map.json")
             if map_res.status_code == 200:
                 staff_data = map_res.json() or {}
-                
-                # 抓取該組長下的原始資料
                 raw_team_data = staff_data.get(current_leader, [])
                 
-                # --- 核心修正：相容字串（逗號隔開）與 清單 結構 ---
                 if isinstance(raw_team_data, list):
-                    # 如果原本就是 list，逐一清理字串
                     for item in raw_team_data:
                         item_str = str(item).strip()
                         if "," in item_str:
-                            # 防呆：如果 list 裡面又包了逗號字串
                             display_list.extend([x.strip() for x in item_str.split(",") if x.strip()])
                         else:
-                            if item_str:
-                                display_list.append(item_str)
+                            if item_str: display_list.append(item_str)
                 elif isinstance(raw_team_data, str):
-                    # 如果後台抓出來是整串用逗號隔開的文字
                     display_list = [x.strip() for x in raw_team_data.split(",") if x.strip()]
                 
-            # 保險防呆：如果都沒抓到，至少顯示組長自己
             if not display_list:
                 display_list = [str(current_leader).strip()]
         except Exception as e:
             st.error(f"連線或解析失敗: {e}")
             display_list = [str(current_leader).strip()]
 
-        # 去除重覆的人員名稱，確保迴圈絕對乾淨
+        # 去除重覆的人員名稱
         display_list = sorted(list(set(display_list)))
 
-        st.markdown(f'<p style="font-size:1.2rem; font-weight:bold; color:#1e3a8a;">👥 {current_leader} 組長 的全體組員考核表：</p>', unsafe_allow_html=True)
+        st.markdown(f'<p style="font-size:1.2rem; font-weight:bold; color:#1e3a8a;">👥 {current_leader} 組長 的組員技能考核狀態 (每格刻度 10%)：</p>', unsafe_allow_html=True)
         st.divider()
 
-        # 3. 並列由上往下列出該組所有員工
+        # 3. 一個畫面左右與上下並列顯示（2列 × 4欄 = 8個人）
         if display_list:
-            for member in display_list:
-                m_name = str(member).strip()
+            # 每 4 個人切換成一橫列
+            for i in range(0, len(display_list), 4):
+                chunk = display_list[i:i+4]
+                cols = st.columns(4)  # 建立左右 4 個欄位
                 
-                # 避免空字串影響 UI
-                if not m_name:
-                    continue
+                for idx, member in enumerate(chunk):
+                    m_name = str(member).strip()
+                    if not m_name: continue
                     
-                # 建立外層精美的大外框，把每位員工隔開
-                st.markdown(f'<div style="background:#1e3a8a; color:white; padding:10px 15px; border-radius:10px 10px 0 0; font-weight:bold; font-size:1.2rem;">👤 評核人員：{m_name}</div>', unsafe_allow_html=True)
-                
-                with st.container(border=True):
-                    # 第一排：三個滑桿 (出勤、工作效率、紀律) - 採用最無害的標準字串相加產生唯一的 Key
-                    c1, c2, c3 = st.columns(3)
-                    with c1:
-                        st.markdown('<p style="color:#1e3a8a; font-weight:bold; margin-bottom:-5px;">📋 出勤表現</p>', unsafe_allow_html=True)
-                        score_attendance = st.slider("出勤", 1, 10, 8, key="score_attend_" + m_name, label_visibility="collapsed")
-                    with c2:
-                        st.markdown('<p style="color:#1e3a8a; font-weight:bold; margin-bottom:-5px;">⚡ 工作效率</p>', unsafe_allow_html=True)
-                        score_efficiency = st.slider("效率", 1, 10, 8, key="score_eff_" + m_name, label_visibility="collapsed")
-                    with c3:
-                        st.markdown('<p style="color:#1e3a8a; font-weight:bold; margin-bottom:-5px;">🛡️ 紀律態度</p>', unsafe_allow_html=True)
-                        score_discipline = st.slider("紀律", 1, 10, 8, key="score_disc_" + m_name, label_visibility="collapsed")
-                    
-                    # 第二排：三個滑桿 (品質、團隊、5S)
-                    c4, c5, c6 = st.columns(3)
-                    with c4:
-                        st.markdown('<p style="color:#1e3a8a; font-weight:bold; margin-bottom:-5px;">💎 品質表現</p>', unsafe_allow_html=True)
-                        score_quality = st.slider("品質", 1, 10, 8, key="score_qual_" + m_name, label_visibility="collapsed")
-                    with c5:
-                        st.markdown('<p style="color:#1e3a8a; font-weight:bold; margin-bottom:-5px;">🤝 團隊配合</p>', unsafe_allow_html=True)
-                        score_team = st.slider("團隊", 1, 10, 8, key="score_team_" + m_name, label_visibility="collapsed")
-                    with c6:
-                        st.markdown('<p style="color:#1e3a8a; font-weight:bold; margin-bottom:-5px;">🧹 5S維護</p>', unsafe_allow_html=True)
-                        score_5s = st.slider("5S", 1, 10, 8, key="score_5s_" + m_name, label_visibility="collapsed")
-                    
-                    # 評語輸入框
-                    st.markdown('<p style="color:#1e3a8a; font-weight:bold; margin-bottom:-5px;">📝 評語 / 改善建議</p>', unsafe_allow_html=True)
-                    eval_comment = st.text_area("評語", value="", placeholder="請輸入評語...", key="comment_" + m_name, label_visibility="collapsed")
-                    
-                    # 計算該員工目前的完成度百分比總分 (以 6 項 10 分滿分為 100% 換算)
-                    total_score = score_attendance + score_efficiency + score_discipline + score_quality + score_team + score_5s
-                    percentage = int((total_score / 60) * 100)
-                    
-                    st.progress(percentage / 100)
-                    st.markdown(f'<p style="text-align:right; font-weight:bold; color:#1e40af; margin-top:-10px;">📊 考核完成程度：{percentage}%</p>', unsafe_allow_html=True)
-                    
-                    # 獨立的儲存按鈕
-                    if st.button("💾 儲存 " + m_name + " 評核", key="save_btn_" + m_name, use_container_width=True, type="primary"):
-                        eval_db_url = f"{DB_BASE_URL}/skills_evaluations"
-                        new_eval = {
-                            "人員": m_name,
-                            "評核月份": datetime.datetime.now().strftime("%Y-%m"),
-                            "出勤表現": score_attendance,
-                            "工作效率": score_efficiency,
-                            "紀律態度": score_discipline,
-                            "品質表現": score_quality,
-                            "團隊配合": score_team,
-                            "5S維護": score_5s,
-                            "評語": eval_comment,
-                            "完成百分比": percentage,
-                            "評核時間": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        }
-                        try:
-                            res = requests.post(f"{eval_db_url}.json", data=json.dumps(new_eval))
-                            if res.status_code == 200:
-                                st.success(f"🎉 {m_name} 的評核資料已成功儲存！")
+                    with cols[idx]:
+                        # 精美黑框卡片外觀
+                        st.markdown(f'<div style="background:#1e3a8a; color:white; padding:8px 10px; border-radius:10px 10px 0 0; font-weight:bold; font-size:1.1rem; text-align:center;">👤 {m_name}</div>', unsafe_allow_html=True)
+                        
+                        with st.container(border=True):
+                            # 下拉式選單：嚴格限制每刻度為 10%
+                            options_10 = [f"{x}%" for x in range(0, 101, 10)]
+                            selected_str = st.selectbox(
+                                "技能考核進度",
+                                options=options_10,
+                                index=5,  # 預設 50%
+                                key="pct_select_" + m_name,
+                                label_visibility="collapsed"
+                            )
+                            # 轉回純數字
+                            pct_val = int(selected_str.replace("%", ""))
+                            
+                            # 根據百分比動態決定彩色圓形的顏色 (低於40紅, 40-70橘, 80以上綠)
+                            if pct_val <= 30:
+                                circle_color = "#ef4444"  # 紅色
+                            elif pct_val <= 70:
+                                circle_color = "#f97316"  # 橘色
                             else:
-                                st.error("儲存失敗，請檢查資料庫連線。")
-                        except Exception as save_err:
-                            st.error(f"儲存出錯: {save_err}")
+                                circle_color = "#22c55e"  # 綠色
+                                
+                            # 用 HTML/CSS 畫出彩色的圓形百分比圖表
+                            st.components.v1.html(f"""
+                                <div style="display: flex; justify-content: center; align-items: center; height: 110px; font-family: sans-serif;">
+                                    <div style="position: relative; width: 90px; height: 90px; border-radius: 50%; background: conic-gradient({circle_color} {pct_val * 3.6}deg, #e2e8f0 0deg); display: flex; justify-content: center; align-items: center;">
+                                        <div style="position: absolute; width: 72px; height: 72px; border-radius: 50%; background: white; display: flex; justify-content: center; align-items: center; flex-direction: column;">
+                                            <span style="font-size: 1.4rem; font-weight: 900; color: #1e3a8a;">{pct_val}%</span>
+                                            <span style="font-size: 0.65rem; color: #64748b; font-weight: bold; margin-top: 2px;">技能考核</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            """, height=110)
+                            
+                            # 獨立的儲存按鈕
+                            if st.button("💾 儲存", key="save_btn_" + m_name, use_container_width=True, type="primary"):
+                                eval_db_url = f"{DB_BASE_URL}/skills_evaluations"
+                                new_eval = {
+                                    "人員": m_name,
+                                    "技能考核完成度": pct_val,
+                                    "評核月份": datetime.datetime.now().strftime("%Y-%m"),
+                                    "評核時間": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                }
+                                try:
+                                    res = requests.post(f"{eval_db_url}.json", data=json.dumps(new_eval))
+                                    if res.status_code == 200:
+                                        st.success(f"{m_name} OK!")
+                                    else:
+                                        st.error("錯誤")
+                                catch Exception as save_err:
+                                    st.error(f"出錯: {save_err}")
                 
-                st.markdown('<br>', unsafe_allow_html=True)
+                st.markdown('<div style="margin-bottom:15px;"></div>', unsafe_allow_html=True)
         else:
             st.info("💡 目前此組別無成員資料。")
 
