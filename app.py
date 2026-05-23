@@ -790,7 +790,7 @@ else:
         import io
 
         st.markdown(
-            '<h1 style="text-align:center; color:#7DD3FC; font-weight:900; font-size:10.5rem;">🧾 組長待辦事項</h1>',
+       '<h1 style="text-align:center; color:#7DD3FC; font-weight:900; font-size:5.5rem; margin-bottom:2rem;">🧾 組長待辦事項</h1>',
             unsafe_allow_html=True
         )
 
