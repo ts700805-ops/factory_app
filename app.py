@@ -789,33 +789,19 @@ else:
     elif st.session_state.menu_selection == "🧾組長待辦事項":
         import io
 
-        # 【核心修正】加入 !important 關鍵字，強制突破全域 CSS 限制，把中間主標題真正放大！
-        st.markdown(
-            '''
-            <div style="text-align:center; margin-bottom:2rem;">
-                <h1 style="color:#7DD3FC !important; font-weight:900 !important; font-size: 5.5rem !important; display:inline-block;">
-                    🧾 組長待辦事項
-                </h1>
-            </div>
-            ''',
-            unsafe_allow_html=True
-        )
-
-        # 【安全修正】檢查並確保 URL 存在，防止 NameError 報錯
-        if 'TODO_DB_URL' not in globals() and 'TODO_DB_URL' not in locals():
-            if 'DB_URL' in globals() or 'DB_URL' in locals():
-                TODO_DB_URL = f"{DB_URL}/todo_tasks"
-                TODO_DONE_URL = f"{DB_URL}/todo_completed"
-            elif 'DB_BASE_URL' in globals() or 'DB_BASE_URL' in locals():
-                TODO_DB_URL = f"{DB_BASE_URL}/todo_tasks"
-                TODO_DONE_URL = f"{DB_BASE_URL}/todo_completed"
-            else:
-                TODO_DB_URL = "https://your-firebase-url/todo_tasks" 
-                TODO_DONE_URL = "https://your-firebase-url/todo_completed"
-
-        # 注入優化 CSS：維護網格與輸入框的清晰度
+        # 1. 注入專屬標題放大 CSS 與網格優化樣式（突破全域鎖定）
         st.markdown("""
             <style>
+            /* 【關鍵修正】建立專屬的獨立類別，強制將標題設定為 80px 巨大字體 */
+            .my-giant-title {
+                font-size: 80px !important;
+                font-weight: 900 !important;
+                color: #7DD3FC !important;
+                text-align: center !important;
+                margin-bottom: 25px !important;
+                display: block !important;
+            }
+            
             /* 針對一般段落、標籤、下拉選單文字 */
             div[data-testid="stMarkdownContainer"] p, 
             label, 
@@ -870,6 +856,21 @@ else:
             }
             </style>
         """, unsafe_allow_html=True)
+
+        # 2. 【關鍵修正】套用全新專屬類別 my-giant-title 的主標題，保證變大
+        st.markdown('<span class="my-giant-title">🧾 組長待辦事項</span>', unsafe_allow_html=True)
+
+        # 【安全修正】檢查並確保 URL 存在，防止 NameError 報錯
+        if 'TODO_DB_URL' not in globals() and 'TODO_DB_URL' not in locals():
+            if 'DB_URL' in globals() or 'DB_URL' in locals():
+                TODO_DB_URL = f"{DB_URL}/todo_tasks"
+                TODO_DONE_URL = f"{DB_URL}/todo_completed"
+            elif 'DB_BASE_URL' in globals() or 'DB_BASE_URL' in locals():
+                TODO_DB_URL = f"{DB_BASE_URL}/todo_tasks"
+                TODO_DONE_URL = f"{DB_BASE_URL}/todo_completed"
+            else:
+                TODO_DB_URL = "https://your-firebase-url/todo_tasks" 
+                TODO_DONE_URL = "https://your-firebase-url/todo_completed"
 
         current_leader = st.session_state.user
 
