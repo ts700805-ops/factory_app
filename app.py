@@ -476,7 +476,7 @@ else:
                     if not m_name: continue
                     
                     # 優先從資料庫歷史紀錄讀取百分比，如果資料庫沒紀錄，預設才顯示 50%
-                    member_score_in_db = db_saved_scores.get(m_name, {}).get("技能考核完成度", 50)
+                    member_score_in_db = db_saved_scores.get(m_name, {}).get("技能考核完成度", 0)
                     default_str = f"{member_score_in_db}%"
                     
                     # 確保數值在選單內，防呆機制
