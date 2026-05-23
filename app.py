@@ -388,102 +388,55 @@ else:
             st.error(f"系統偵測到錯誤：{str(e)}")
             st.warning("目前系統資料緩衝中，請稍後再試。")
 
-# --- 📈 員工技能評核表 (💡 修正：將判斷字串從 工時統計分析 改為 員工技能評核表) ---
-    elif st.session_state.menu_selection == "📈 員工技能評核表":
-        st.markdown(
-            '<h1 style="text-align:center; color:#7DD3FC; font-weight:900; font-size:2.5rem;">📈 員工技能評核表</h1>',
-            unsafe_allow_html=True
-        )
+elif page == "員工技能評核表":
+    st.title("👤 員工技能評核表")
+    st.markdown("---")
+
+    # 1. 自動取得當前登入使用者的「組別」
+    # 這裡假設你在登入時有把組別存進 st.session_state.user_group (例如 "組別一")
+    # 如果你原本的變數名稱不同，請把下面的名稱改成你原本的變數
+    user_group = st.session_state.get("user_group", "組別一")
+    
+    st.markdown(f"#### 📁 目前檢視組別：`{user_group}`")
+    st.markdown("以下由上往下列出本組所有員工之技能考核完成程度百分表：")
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # 2. 讀取或設定該組別的員工與技能進度資料
+    # 【新手教學】：這裡的資料未來你可以對接你的資料庫或 Google Sheets。
+    # 這裡我們先設定好一組範例資料，直接包含所有人名與對應的百分比。
+    if "group_members_skills" not in st.session_state:
+        st.session_state.group_members_skills = {
+            "傑米": 90,
+            "吉米": 75,
+            "呂委儒": 45,
+            "周昫震": 80,
+            "周炫震": 60,
+            "張晴媗": 95,
+            "張晴繪": 30
+        }
+
+    # 3. 使用迴圈直接「由上往下一列一列」呈現所有員工，完全不用下拉式選單、製令與工序
+    for member_name, progress_value in st.session_state.group_members_skills.items():
         
-        # 1. 取得當前組長名字 (例如: 陳德文)
-        current_leader = st.session_state.user 
+        # 建立兩欄：左欄 col1 放員工姓名，右欄 col2 放進度條
+        col1, col2 = st.columns([1, 4])
         
-        # 2. 抓取 staff_map.json 取得當前組長的專屬組員名單
-        display_list = []
-        try:
-            map_res = requests.get(f"{DB_BASE_URL}/settings/staff_map.json", timeout=10)
-            if map_res.status_code == 200:
-                staff_data = map_res.json() or {}
-                my_team = staff_data.get(current_leader, [])
-                if isinstance(my_team, list):
-                    display_list = [str(member).strip() for member in my_team]
+        with col1:
+            # 顯示員工姓名，利用 HTML 的 padding-top 讓名字跟右邊的進度條能完美平行對齊
+            st.markdown(f"<div style='padding-top: 5px; font-weight: bold; font-size: 16px;'>👤 {member_name}</div>", unsafe_allow_html=True)
             
-            if not display_list:
-                display_list = [current_leader]
-        except Exception as e:
-            display_list = [current_leader]
+        with col2:
+            # 將 0-100 的百分比數字轉成 Streamlit 進度條需要的 0.0-1.0 小數
+            progress_float = min(max(float(progress_value) / 100.0, 0.0), 1.0)
+            
+            # 渲染進度條，並在上面直接顯示目前的百分比文字
+            st.progress(progress_float, text=f"考核完成度：{progress_value}%")
+            
+        # 在每位員工之間加上一條淡淡的虛線，讓畫面上下分隔更清晰
+        st.markdown("<div style='margin: 15px 0; border-bottom: 1px dashed #cccccc;'></div>", unsafe_allow_html=True)
 
-        # 注入專屬 CSS：確保表單與滑桿、文字呈現大字體與清晰天藍色調
-        st.markdown("""
-            <style>
-            div[data-testid="stMarkdownContainer"] p, 
-            label, 
-            .stWidgetLabel p,
-            span {
-                color: #7DD3FC !important;
-                font-size: 1.15rem !important;
-                font-weight: 800 !important;
-            }
-            h3 {
-                color: #38BDF8 !important;
-                font-size: 1.6rem !important;
-                font-weight: 900;
-            }
-            div[data-baseweb="select"] > div, 
-            div[data-testid="stTextInput"] div div input {
-                background-color: #052e16 !important;
-                color: #ffffff !important;
-                border: 1px solid #38BDF8 !important;
-                font-size: 1.1rem !important;
-                font-weight: 700 !important;
-            }
-            /* 讓進度條數值放大顯示 */
-            div[data-testid="stSlider"] div {
-                color: #ffffff !important;
-                font-weight: 700 !important;
-            }
-            </style>
-        """, unsafe_allow_html=True)
-
-        st.markdown("### ✍️ 填寫組員技能與工序完成進度")
-        
-        # 建立 Firebase 儲存路徑
-        SKILL_DB_URL = f"{DB_BASE_URL}/staff_skills"
-
-        with st.form("staff_skill_form"):
-            c1, c2 = st.columns(2)
-            with c1:
-                selected_worker = st.selectbox("👤 選擇執行組員", sorted(display_list), key="skill_worker_select")
-                t_oid = st.selectbox("📦 選擇製令編號", sorted([str(o).strip() for o in order_list]), key="skill_oid_select") if order_list else st.text_input("📦 手動輸入製令")
-            with c2:
-                t_proc = st.selectbox("🛠️ 選擇執行工序", process_list if process_list else ["預設工序"], key="skill_proc_select")
-                skill_level = st.selectbox("📊 專業熟練度評定", ["獨立作業(特優)", "熟練作業(優秀)", "需人指導(尚可)", "學徒建立中(待加強)"], key="skill_level_select")
-            
-            st.divider()
-            
-            # 圖片核心需求：完成進度百分比填寫
-            progress_pct = st.slider("🎯 工序目前完成進度 (%)", min_value=0, max_value=100, value=50, step=5, key="skill_progress_slider")
-            
-            st.write(" ")
-            submit_skill = st.form_submit_button("💾 儲存評核與進度", use_container_width=True)
-            
-            if submit_skill:
-                payload = {
-                    "組長": current_leader,
-                    "人員": selected_worker,
-                    "製令": t_oid,
-                    "工序": t_proc,
-                    "熟練度": skill_level,
-                    "完成進度": f"{progress_pct}%",
-                    "更新時間": get_now_str()
-                }
-                # 將紀錄寫入 Firebase 
-                requests.post(f"{SKILL_DB_URL}.json", data=json.dumps(payload))
-                st.success(f"✅ 已成功更新 {selected_worker} 的項目進度至 {progress_pct}%！")
-                time.sleep(0.5)
-                st.rerun()
-
-        st.divider()
+    # 4. 底部加上一個小備註
+    st.caption("💡 提示：本頁面依據您所屬的組別自動列出全員名單，進度條為即時考核完成百分比。")
 
         # --- 技能進度看板查詢區 ---
         st.markdown("### 🔍 當前組員技能進度總覽")
