@@ -537,7 +537,6 @@ else:
             # 建立內嵌對話框
             @st.dialog("⚔️ 戰境決鬥場 ⚔️", width="large")
             def run_duel_popup(p1_title, p1_name, p1_hp, p1_atk, p2_title, p2_name, p2_hp, p2_atk):
-               bg_color = "#000000"
                 # 頂部數據區塊：使用 CSS 強制將所有文字設為純黑色（#000000），並加上強大覆蓋力 !important
                 st.markdown(
                     f'''
