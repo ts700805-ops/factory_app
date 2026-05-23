@@ -388,20 +388,48 @@ else:
             st.error(f"系統偵測到錯誤：{str(e)}")
             st.warning("目前系統資料緩衝中，請稍後再試。")
             
-# --- 📈 工時統計分析 (已修改為 📊 8人並列圓形技能評核表-雲端永久鎖定版) ---
+# --- 📈 工時統計分析 (已修改為 📊 8人並列圓形技能評核表-可切換組長鎖定版) ---
     elif st.session_state.menu_selection == "📈 工時統計分析":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📋 員工技能考核表</h1>', unsafe_allow_html=True)
         
-        # 1. 取得當前組長名字 (例如: 陳德文)
-        current_leader = st.session_state.user 
+        # 1. 取得當前登入的組長名字
+        logged_in_user = st.session_state.user 
         
-        # 2. 針對您的 Firebase 結構做抓取與嚴格文字清洗
-        display_list = []
+        # 2. 先從資料庫抓取全體組長清單，做為切換選單的選項
+        leader_options = []
         try:
             map_res = requests.get(f"{DB_BASE_URL}/settings/staff_map.json")
             if map_res.status_code == 200:
                 staff_data = map_res.json() or {}
-                raw_team_data = staff_data.get(current_leader, [])
+                # 抓出所有的組長鍵值 (Key)
+                leader_options = sorted([str(k).strip() for k in staff_data.keys() if k])
+        except Exception as e:
+            st.error(f"無法讀取組長清單: {e}")
+            
+        # 防呆：如果資料庫撈不到，至少包含當前登入者
+        if not leader_options:
+            leader_options = [str(logged_in_user).strip()]
+        elif str(logged_in_user).strip() not in leader_options:
+            leader_options.insert(0, str(logged_in_user).strip())
+
+        # --- 👑 【新增功能：切換組長選單】 ---
+        try:
+            default_leader_idx = leader_options.index(str(logged_in_user).strip())
+        except:
+            default_leader_idx = 0
+
+        selected_leader = st.selectbox(
+            "👑 請選擇要檢視/評核的組長：",
+            options=leader_options,
+            index=default_leader_idx,
+            key="global_leader_selector"
+        )
+
+        # 3. 根據選定的組長，嚴格清洗並抓取該組長的組員名單
+        display_list = []
+        try:
+            if map_res.status_code == 200:
+                raw_team_data = staff_data.get(selected_leader, [])
                 
                 if isinstance(raw_team_data, list):
                     for item in raw_team_data:
@@ -414,15 +442,14 @@ else:
                     display_list = [x.strip() for x in raw_team_data.split(",") if x.strip()]
                 
             if not display_list:
-                display_list = [str(current_leader).strip()]
-        except Exception as e:
-            st.error(f"連線或解析失敗: {e}")
-            display_list = [str(current_leader).strip()]
+                display_list = [str(selected_leader).strip()]
+        except:
+            display_list = [str(selected_leader).strip()]
 
-        # 去除重覆的人員名稱
+        # 去除重複的人員名稱
         display_list = sorted(list(set(display_list)))
 
-        # --- 🌐 核心修正：從 Firebase 讀取目前全體員工的最新考核分數 (讓資料永久存在) ---
+        # --- 🌐 核心讀取：從 Firebase 讀取目前全體員工的最新考核分數 (讓資料永久存在) ---
         db_saved_scores = {}
         try:
             latest_eval_res = requests.get(f"{DB_BASE_URL}/skills_current_status.json")
@@ -431,13 +458,13 @@ else:
         except:
             pass
 
-        st.markdown(f'<p style="font-size:1.2rem; font-weight:bold; color:#1e3a8a;">👥 {current_leader} 組長 的組員技能考核狀態 (每格刻度 10%)：</p>', unsafe_allow_html=True)
+        st.markdown(f'<p style="font-size:1.2rem; font-weight:bold; color:#1e3a8a;">👥 正在檢視：【{selected_leader} 組長】的組員技能考核狀態 (每格刻度 10%)：</p>', unsafe_allow_html=True)
         st.divider()
 
         # 固定 0% 到 100% 的選單選項
         options_10 = [f"{x}%" for x in range(0, 101, 10)]
 
-        # 3. 一個畫面左右與上下並列顯示（2列 × 4欄 = 8個人）
+        # 4. 一個畫面左右與上下並列顯示（2列 × 4欄 = 8個人）
         if display_list:
             # 每 4 個人切換成一橫列
             for i in range(0, len(display_list), 4):
@@ -462,7 +489,7 @@ else:
                         st.markdown(f'<div style="background:#1e3a8a; color:white; padding:8px 10px; border-radius:10px 10px 0 0; font-weight:bold; font-size:1.1rem; text-align:center;">👤 {m_name}</div>', unsafe_allow_html=True)
                         
                         with st.container(border=True):
-                            # 下拉式選單：綁定資料庫撈出來的 index
+                            # 下拉式選單
                             selected_str = st.selectbox(
                                 "技能考核進度",
                                 options=options_10,
