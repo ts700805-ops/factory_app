@@ -401,6 +401,7 @@ else:
     elif st.session_state.menu_selection == "🎮6S戰境養成":
         import random
         import time
+        import json # 確保有載入 json 模組
 
         st.markdown(
             '''
@@ -514,11 +515,12 @@ else:
             if start_battle and current_user != "未登入同仁":
                 @st.dialog("⚔️ 戰境決鬥場 ⚔️")
                 def run_battle_simulation(p1, p2, p1_data, p2_data):
-                    # --- 強制設定黑色文字，對整個對話框有效 ---
+                    # --- 強制將所有視窗內的文字顏色改為黑色 ---
                     st.markdown("""
                         <style>
-                        [data-modal-container] * { color: black !important; }
-                        [data-testid="stMarkdownContainer"] { color: black !important; }
+                        div[data-modal-container] { color: black !important; }
+                        div[data-modal-container] * { color: black !important; }
+                        p, div, span, h1, h2, h3, h4 { color: black !important; }
                         </style>
                     """, unsafe_allow_html=True)
                     
@@ -586,6 +588,7 @@ else:
 
         st.divider()
 
+        
         # ==========================================
         # ⚙️ 後台稱謂門檻設定區
         # ==========================================
