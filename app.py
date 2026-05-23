@@ -388,7 +388,7 @@ else:
             st.error(f"系統偵測到錯誤：{str(e)}")
             st.warning("目前系統資料緩衝中，請稍後再試。")
             
-# --- 📈 工時統計分析 (已修改為 📊 8人並列圓形技能評核表) ---
+# --- 📈 工時統計分析 (已修改為 📊 8人並列圓形技能評核表-雲端永久鎖定版) ---
     elif st.session_state.menu_selection == "📈 工時統計分析":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📋 員工技能考核表</h1>', unsafe_allow_html=True)
         
@@ -422,8 +422,20 @@ else:
         # 去除重覆的人員名稱
         display_list = sorted(list(set(display_list)))
 
+        # --- 🌐 核心修正：從 Firebase 讀取目前全體員工的最新考核分數 (讓資料永久存在) ---
+        db_saved_scores = {}
+        try:
+            latest_eval_res = requests.get(f"{DB_BASE_URL}/skills_current_status.json")
+            if latest_eval_res.status_code == 200:
+                db_saved_scores = latest_eval_res.json() or {}
+        except:
+            pass
+
         st.markdown(f'<p style="font-size:1.2rem; font-weight:bold; color:#1e3a8a;">👥 {current_leader} 組長 的組員技能考核狀態 (每格刻度 10%)：</p>', unsafe_allow_html=True)
         st.divider()
+
+        # 固定 0% 到 100% 的選單選項
+        options_10 = [f"{x}%" for x in range(0, 101, 10)]
 
         # 3. 一個畫面左右與上下並列顯示（2列 × 4欄 = 8個人）
         if display_list:
@@ -436,22 +448,41 @@ else:
                     m_name = str(member).strip()
                     if not m_name: continue
                     
+                    # 優先從資料庫歷史紀錄讀取百分比，如果資料庫沒紀錄，預設才顯示 50%
+                    member_score_in_db = db_saved_scores.get(m_name, {}).get("技能考核完成度", 50)
+                    default_str = f"{member_score_in_db}%"
+                    
+                    # 確保數值在選單內，防呆機制
+                    if default_str not in options_10:
+                        default_str = "50%"
+                    current_index = options_10.index(default_str)
+                    
                     with cols[idx]:
                         # 精美黑框卡片外觀
                         st.markdown(f'<div style="background:#1e3a8a; color:white; padding:8px 10px; border-radius:10px 10px 0 0; font-weight:bold; font-size:1.1rem; text-align:center;">👤 {m_name}</div>', unsafe_allow_html=True)
                         
                         with st.container(border=True):
-                            # 下拉式選單：嚴格限制每刻度為 10%
-                            options_10 = [f"{x}%" for x in range(0, 101, 10)]
+                            # 下拉式選單：綁定資料庫撈出來的 index
                             selected_str = st.selectbox(
                                 "技能考核進度",
                                 options=options_10,
-                                index=5,  # 預設 50%
+                                index=current_index,
                                 key="pct_select_" + m_name,
                                 label_visibility="collapsed"
                             )
-                            # 轉回純數字
+                            
+                            # 轉回純數字供圖表使用
                             pct_val = int(selected_str.replace("%", ""))
+                            
+                            # 【核心聯動】如果使用者調整了選單數值，立刻自動同步寫入 Firebase 更新，達到永久保存
+                            if pct_val != member_score_in_db:
+                                sync_url = f"{DB_BASE_URL}/skills_current_status/{m_name}.json"
+                                sync_data = {
+                                    "技能考核完成度": pct_val,
+                                    "更新時間": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                }
+                                requests.put(sync_url, data=json.dumps(sync_data))
+                                st.rerun()
                             
                             # 根據百分比動態決定彩色圓形的顏色 (低於40紅, 40-70橘, 80以上綠)
                             if pct_val <= 30:
@@ -473,8 +504,8 @@ else:
                                 </div>
                             """, height=110)
                             
-                            # 獨立的儲存按鈕
-                            if st.button("💾 儲存", key="save_btn_" + m_name, use_container_width=True, type="primary"):
+                            # 獨立的儲存核准歷史按鈕 (按下即發送一筆正式報表到歷史資料庫)
+                            if st.button("💾 儲存歷史", key="save_btn_" + m_name, use_container_width=True, type="primary"):
                                 eval_db_url = f"{DB_BASE_URL}/skills_evaluations"
                                 new_eval = {
                                     "人員": m_name,
@@ -485,7 +516,7 @@ else:
                                 try:
                                     res = requests.post(f"{eval_db_url}.json", data=json.dumps(new_eval))
                                     if res.status_code == 200:
-                                        st.success(f"{m_name} OK!")
+                                        st.success(f"{m_name} 已存檔!")
                                     else:
                                         st.error("錯誤")
                                 except Exception as save_err:
@@ -495,7 +526,7 @@ else:
         else:
             st.info("💡 目前此組別無成員資料。")
 
-# --- 📜 完工紀錄查詢 (原功能保留，一律不修改) ---
+# --- 📜 完工紀錄查詢 (原功能完全保留，一律不修改) ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📜 歷史完工紀錄</h1>', unsafe_allow_html=True)
         
@@ -537,6 +568,8 @@ else:
                             st.rerun()
             else: st.warning("查無紀錄。")
         else: st.info("💡 目前尚無紀錄。")
+
+
             
 # --- 🔧 人員手工具紀錄表 (修正版：恢復資產匯出 + 移除重複) ---
     elif st.session_state.menu_selection == "🔧 固資&手工具紀錄表":
