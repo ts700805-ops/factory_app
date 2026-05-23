@@ -842,6 +842,9 @@ else:
                 font-size: 1.1rem !important;
                 font-weight: 700 !important;
             }
+            div.stButton > button {
+                font-weight: 900 !important;
+            }
             div[data-testid="stForm"] div.stButton > button {
                 background-color: #052e16 !important;
                 color: #38BDF8 !important;
@@ -876,8 +879,6 @@ else:
         # 第一區：🔍 歷史交辦事項查詢與總覽 (移至最上方)
         # ==========================================
         st.markdown("### 🔍 歷史交辦事項查詢")
-        
-        # 已移除不需要的日期與關鍵字篩選欄位，只保留組長篩選
         filter_leader = st.selectbox("篩選負責組長", ["全部"] + all_leaders_list, key="todo_filter_leader")
 
         if todo_raw:
@@ -885,9 +886,6 @@ else:
             for k, v in todo_raw.items():
                 row = v.copy()
                 row["db_id"] = k
-                # 新增按鈕欄位的預設值
-                row["✅ 完成"] = False
-                row["🗑️ 刪除"] = False
                 todo_list.append(row)
 
             todo_df = pd.DataFrame(todo_list)
@@ -897,6 +895,10 @@ else:
                 todo_df = todo_df[todo_df["組長"] == filter_leader]
 
             if not todo_df.empty:
+                # 移除任何可能殘留的指派人欄位，確保資料不輸出
+                if "指派人" in todo_df.columns:
+                    todo_df = todo_df.drop(columns=["指派人"])
+
                 # 匯出 CSV 功能
                 csv_data = todo_df.to_csv(index=False).encode("utf-8-sig")
                 st.download_button(
@@ -908,71 +910,67 @@ else:
 
                 st.markdown("### 📊 未完成事項總覽")
                 
-                # 調整欄位順序，把按鈕放在最右側
-                show_cols = ["組長", "交辦事項", "預計完成日期", "指派人", "建立時間", "✅ 完成", "🗑️ 刪除"]
+                # 排序：最新建立的在最上方
+                todo_df = todo_df.sort_values(by="建立時間", ascending=False).reset_index(drop=True)
+
+                # 呈現表格本體（不包含按鈕，按鈕獨立在下方一列列呈現，確保排版完美且不會有型態錯誤）
+                show_cols = ["組長", "交辦事項", "預計完成日期", "建立時間"]
                 available_cols = [c for c in show_cols if c in todo_df.columns]
                 
-                # 排序：最新建立的在最上方
-                display_df = todo_df[available_cols].sort_values(by="建立時間", ascending=False).reset_index(drop=True)
-
-                # 使用 st.data_editor 讓按鈕可以直接在表格內點擊
-                edited_df = st.data_editor(
-                    display_df,
+                st.dataframe(
+                    todo_df[available_cols],
                     use_container_width=True,
-                    hide_index=True,
-                    column_config={
-                        "✅ 完成": st.column_config.CheckboxColumn("✅ 完成", help="勾選以將此事項標記為完成", default=False),
-                        "🗑️ 刪除": st.column_config.CheckboxColumn("🗑️ 刪除", help="勾選以刪除此事項", default=False),
-                        "組長": st.column_config.TextColumn("組長", disabled=True),
-                        "交辦事項": st.column_config.TextColumn("交辦事項", disabled=True),
-                        "預計完成日期": st.column_config.TextColumn("預計完成日期", disabled=True),
-                        "指派人": st.column_config.TextColumn("指派人", disabled=True),
-                        "建立時間": st.column_config.TextColumn("建立時間", disabled=True),
-                    },
-                    key="todo_editable_table"
+                    hide_index=True
                 )
 
-                # 偵測是否有勾選動作
-                for idx, row in edited_df.iterrows():
-                    # 找到對應的原始資料庫金鑰 db_id
-                    orig_row = todo_df[todo_df["建立時間"] == row["建立時間"]].iloc[0]
-                    db_key = orig_row["db_id"]
+                # 綠色框框對應實體化按鈕區
+                st.markdown("### ⚡ 事項快速操作面板")
+                for idx, row in todo_df.iterrows():
+                    db_key = row["db_id"]
+                    
+                    # 每一筆資料做成一個小橫條橫排，並擺放按鈕
+                    c_info, c_btn1, c_btn2 = st.columns([5, 1, 1])
+                    with c_info:
+                        st.markdown(f"📌 **【{row.get('組長','')}】** {row.get('交辦事項','')[:25]}...")
+                    
+                    with c_btn1:
+                        if st.button("✅ 完成", key=f"btn_done_{db_key}", use_container_width=True):
+                            raw_dict = row.to_dict()
+                            done_payload = {}
+                            for key, val in raw_dict.items():
+                                if pd.isna(val):
+                                    done_payload[str(key)] = ""
+                                else:
+                                    done_payload[str(key)] = str(val)
 
-                    # 處理邏輯 1：點擊完成
-                    if row["✅ 完成"]:
-                        raw_dict = orig_row.to_dict()
-                        done_payload = {}
-                        for key, val in raw_dict.items():
-                            if pd.isna(val):
-                                done_payload[str(key)] = ""
-                            else:
-                                done_payload[str(key)] = str(val)
-
-                        done_payload["完成時間"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        done_payload.pop("db_id", None)
-                        done_payload.pop("✅ 完成", None)
-                        done_payload.pop("🗑️ 刪除", None)
-                        
-                        requests.post(f"{TODO_DONE_URL}.json", data=json.dumps(done_payload))
-                        requests.delete(f"{TODO_DB_URL}/{db_key}.json")
-                        
-                        st.success("🎉 太棒了！該事項已標記為完成並移入歷史紀錄！")
-                        time.sleep(0.5)
-                        st.rerun()
-
-                    # 處理邏輯 2：點擊刪除 (觸發 0000 密碼驗證)
-                    if row["🗑️ 刪除"]:
-                        st.warning(f"⚠️ 您正在嘗試刪除由【{row['指派人']}】指派給【{row['組長']}】的事項")
-                        pwd_input = st.text_input("🔒 請輸入刪除權限密碼：", type="password", key=f"pwd_{db_key}")
-                        
-                        if pwd_input == "0000":
+                            done_payload["完成時間"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            done_payload.pop("db_id", None)
+                            done_payload.pop("指派人", None) # 確保移除指派人資訊
+                            
+                            requests.post(f"{TODO_DONE_URL}.json", data=json.dumps(done_payload))
                             requests.delete(f"{TODO_DB_URL}/{db_key}.json")
-                            st.success("已成功刪除該筆交辦事項！")
+                            
+                            st.success("🎉 事項已完成並移入歷史紀錄！")
                             time.sleep(0.5)
                             st.rerun()
-                        elif pwd_input != "":
-                            st.error("❌ 密碼錯誤，拒絕刪除！")
 
+                    with c_btn2:
+                        if st.button("🗑️ 刪除", key=f"btn_del_{db_key}", use_container_width=True):
+                            st.session_state[f"show_pwd_{db_key}"] = True
+
+                    # 若觸發刪除，在該欄位下方立刻跳出密碼驗證輸入框
+                    if st.session_state.get(f"show_pwd_{db_key}", False):
+                        pwd_col1, pwd_col2 = st.columns([3, 4])
+                        with pwd_col1:
+                            pwd_input = st.text_input("🔒 請輸入刪除權限密碼：", type="password", key=f"pwd_input_{db_key}")
+                            if pwd_input == "0000":
+                                requests.delete(f"{TODO_DB_URL}/{db_key}.json")
+                                st.success("已成功刪除該筆交辦事項！")
+                                st.session_state[f"show_pwd_{db_key}"] = False
+                                time.sleep(0.5)
+                                st.rerun()
+                            elif pwd_input != "":
+                                st.error("❌ 密碼錯誤！")
             else:
                 st.info("💡 查無符合條件的待辦事項")
         else:
@@ -1006,7 +1004,6 @@ else:
                         "組長": target_leader,
                         "交辦事項": todo_content.strip(),
                         "預計完成日期": target_deadline,
-                        "指派人": current_leader,
                         "建立時間": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     }
                     requests.post(f"{TODO_DB_URL}.json", data=json.dumps(payload))
@@ -1033,7 +1030,8 @@ else:
                 done_df = done_df[done_df["組長"] == filter_leader]
                 
             if not done_df.empty:
-                done_cols = ["組長", "交辦事項", "預計完成日期", "完成時間", "指派人"]
+                # 徹底排除「指派人」欄位
+                done_cols = ["組長", "交辦事項", "預計完成日期", "完成時間"]
                 avail_done_cols = [c for c in done_cols if c in done_df.columns]
                 
                 st.dataframe(
@@ -1053,7 +1051,7 @@ else:
             else:
                 st.info("💡 目前沒有對應組長的已完成事項紀錄。")
         else:
-            st.info("💡 尚無任何已點選完成的事項紀錄，繼續加油！")  
+            st.info("💡 尚無任何已點選完成的事項紀錄，繼續加油！")
             
     
 # --- ⚙️ 編輯手工具清單 (修正 Duplicate ID 版本) ---
