@@ -494,34 +494,37 @@ else:
             st.markdown(f"<div style='background-color:#1e3a8a; padding:10px; border-radius:5px; text-align:center;'><b style='color:#FBBF24;'>剩餘自由點數</b><br><span style='font-size:2rem; font-weight:900; color:#fff;'>{u_pts}</span></div>", unsafe_allow_html=True)
 
         st.divider()
+
 # ==========================================
-        # ⚔️ 擂台決鬥 PK 場
+        # ⚔️ 擂台決鬥 PK 場 (修正版)
         # ==========================================
         st.markdown("### ⚔️ 尋找現場同仁發起決鬥")
 
-        # 1. 直接抓取您在「編輯對照表」中維護的人員配置資料
-        # 請確認您的資料庫中，編輯對照表的儲存路徑 (假設為 /config/employee_mapping)
-        mapping_data = requests.get(f"{DB_BASE_URL}/config/employee_mapping.json").json() or ""
-        
-        # 2. 解析文字資料，將所有人員提取出來
+        # 1. 抓取資料並嘗試解析人員配置
+        mapping_raw = requests.get(f"{DB_BASE_URL}/config/employee_mapping.json").json()
         all_staff = set()
-        if isinstance(mapping_data, str):
-            for line in mapping_data.split('\n'):
+        
+        # 嘗試從文字中提取人名
+        if isinstance(mapping_raw, str):
+            # 針對每一行，尋找冒號後的內容
+            for line in mapping_raw.split('\n'):
                 if ':' in line:
-                    names = line.split(':')[1].split(',')
+                    parts = line.split(':', 1)[1] # 取得冒號後方的所有文字
+                    # 分割逗號或頓號
+                    names = parts.replace('，', ',').replace('、', ',').split(',')
                     for name in names:
                         if name.strip():
                             all_staff.add(name.strip())
+        
+        # 如果解析出來的人數太少，或者資料結構不同，備援抓取已建立 RPG 角色的玩家
+        if len(all_staff) < 2:
+            all_staff.update(all_players_data.keys())
 
-        # 3. 過濾掉自己與未登入者
-        opponents = sorted(list(all_staff))
-        if current_user in opponents:
-            opponents.remove(current_user)
-        if "未登入同仁" in opponents:
-            opponents.remove("未登入同仁")
+        # 2. 過濾自己與無效名稱
+        opponents = sorted([n for n in all_staff if n != current_user and n != "未登入同仁" and n.strip()])
         
         if not opponents:
-            st.warning("💡 目前在人員配置資料中找不到其他同仁。")
+            st.warning("💡 目前暫無其他同仁名單可進行決鬥。")
         else:
             c_sel, c_btn = st.columns([3, 1])
             with c_sel:
@@ -532,23 +535,20 @@ else:
                 start_battle = st.button("💥 發起決鬥！", use_container_width=True)
 
             if start_battle and current_user != "未登入同仁":
-                # 若對手尚未有遊戲數據，自動初始化
+                # 自動初始化對手數據
                 if target_opp not in all_players_data:
                     init_payload = {"str": 0, "vit": 0, "agi": 0, "cha": 0, "avail_pts": 5}
                     requests.put(f"{GAME_DB_URL}/{target_opp}.json", data=json.dumps(init_payload))
                     all_players_data[target_opp] = init_payload
                 
-                # 執行戰鬥模擬 (保持原有的 @st.dialog 邏輯)
-                # ... (此處放入您原有的 run_battle_simulation 函數與呼叫)
-                
                 target_data = all_players_data.get(target_opp)
 
+                # 執行戰鬥模擬
                 @st.dialog("⚔️ 戰境決鬥場 ⚔️")
                 def run_battle_simulation(p1, p2, p1_data, p2_data):
-                    # 強制字體顯示為黑色
                     st.markdown("<style>div[data-modal-container] * { color: black !important; }</style>", unsafe_allow_html=True)
                     
-                    # 戰鬥數值計算
+                    # 計算數值邏輯...
                     p1_total = int(p1_data.get("str",0))+int(p1_data.get("vit",0))+int(p1_data.get("agi",0))+int(p1_data.get("cha",0))
                     p2_total = int(p2_data.get("str",0))+int(p2_data.get("vit",0))+int(p2_data.get("agi",0))+int(p2_data.get("cha",0))
                     
@@ -565,16 +565,16 @@ else:
                     st.write(f"🔵 **{p2_name}** (HP: {p2_hp} / ATK: {p2_atk})")
                     st.divider()
 
-                    # 模擬決鬥迴圈
                     battle_log = []
-                    for r in range(1, 6): # 示範 5 回合
+                    for r in range(1, 6):
                         dmg1 = random.randint(p1_atk-3, p1_atk+5)
                         p2_hp -= dmg1
-                        battle_log.append(f"⚔️ 第 {r} 回合：{p1_name} 攻擊 {p2_name} 造成 {dmg1} 點傷害！")
+                        battle_log.append(f"⚔️ 第 {r} 回合：{p1_name} 攻擊 {p2_name} 造成 {max(0, dmg1)} 點傷害！")
                         if p2_hp <= 0: break
                     
                     for log in battle_log: st.write(log)
                     if p2_hp <= 0: st.success(f"🏆 {p1_name} 獲勝！")
+                    else: st.info("🤝 戰鬥平手收場！")
 
                 run_battle_simulation(current_user, target_opp, user_stats, target_data)
         
