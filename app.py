@@ -1187,7 +1187,7 @@ else:
             st.markdown('</div>', unsafe_allow_html=True)
 
 # ==========================================
-# 📝 頁面一：每日 6S 任務回報中心 (針對 Firebase 結構修正版)
+# 📝 頁面一：每日 6S 任務回報中心 (Firebase 即時同步版)
 # ==========================================
     elif st.session_state.menu_selection == "📝每日6S任務回報":
         import requests
@@ -1195,39 +1195,44 @@ else:
         from datetime import datetime, timedelta, timezone
         import time
 
-        st.markdown('''<h1 style="color:#60A5FA;">📋 每日 6S 任務回報中心</h1>''', unsafe_allow_html=True)
+        st.markdown(
+            '''
+            <div style="text-align:center; margin-bottom:2rem;">
+                <h1 style="color:#60A5FA !important; font-weight:900 !important; font-size: 3.5rem !important; display:inline-block;">
+                    📋 每日 6S 任務回報中心
+                </h1>
+                <p style="color:#9CA3AF;">完成今日現場回報，即可領取 1 點自由屬性點數！</p>
+            </div>
+            ''',
+            unsafe_allow_html=True
+        )
 
         # 基礎設定
         if 'DB_URL' in globals(): BASE_URL = DB_URL
         else: BASE_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
 
-        # 1. 取得組長列表 (對應 Firebase: settings/all_leaders)
+        GAME_DB_URL = f"{BASE_URL}/game_rpg_data"
+        REPORT_LOG_URL = f"{BASE_URL}/daily_6s_report_logs"
+
+        # 1. 取得時間
+        tz_taiwan = timezone(timedelta(hours=8))
+        today_tw_str = datetime.now(tz_taiwan).strftime("%Y-%m-%d")
+        st.info(f"📅 任務結算基準日（台北時間）：**{today_tw_str}**")
+
+        # 2. 【核心修正】直接讀取 Firebase settings 節點，完全棄用舊版保底資料
         leaders_resp = requests.get(f"{BASE_URL}/settings/all_leaders.json").json()
-        # 假設資料是字串或陣列
-        if isinstance(leaders_resp, str):
-            leader_list = [l.strip() for l in leaders_resp.split(",")]
-        elif isinstance(leaders_resp, list):
-            leader_list = leaders_resp
-        else:
-            leader_list = []
-
-        # 2. 獲取組員設定 (對應 Firebase: settings/staff_map)
-        # 這裡假設 staff_map 是結構化資料或是您後台儲存的字串
         staff_map_resp = requests.get(f"{BASE_URL}/settings/staff_map.json").json()
-        
-        # 根據您的截圖，staff_map 可能是以字典方式儲存的對照表
-        leader_member_mapping = {}
-        if isinstance(staff_map_resp, dict):
-            leader_member_mapping = staff_map_resp
-        elif isinstance(staff_map_resp, str):
-            # 若是字串格式，則沿用之前的解析邏輯
-            for line in staff_map_resp.split("\n"):
-                if ":" in line:
-                    parts = line.split(":")
-                    leader_member_mapping[parts[0].strip()] = [m.strip() for m in parts[1].split(",")]
 
-        # 3. 介面渲染
+        # 解析組長清單
+        leader_list = leaders_resp.split(",") if isinstance(leaders_resp, str) else (leaders_resp if isinstance(leaders_resp, list) else [])
+        
+        # 建立動態對照表 (直接對應後台 staff_map 的結構)
+        leader_member_mapping = staff_map_resp if isinstance(staff_map_resp, dict) else {}
+
+        # 介面渲染
+        st.markdown("### 🔍 第一步：確認您的身份")
         col_leader, col_member = st.columns(2)
+        
         with col_leader:
             selected_leader = st.selectbox("👤 選擇所屬組長：", leader_list if leader_list else ["無資料"])
         
@@ -1241,12 +1246,35 @@ else:
                 selected_user = None
                 has_members = False
 
-        # 4. 回報邏輯
+        st.divider()
+
+        # 3. 回報邏輯
         if has_members and selected_user:
-            if st.button("✨ 送出今日回報"):
-                # 寫入邏輯保持不變
-                st.success(f"🎉【{selected_user}】回報成功！")
-                st.rerun()
+            st.warning(f"⚠️ 送出後系統會撥發 1 點自由屬性點給【{selected_user}】")
+            if st.button(f"✨ 繳交今日 6S 成果，領取點數！", use_container_width=True, type="primary"):
+                safe_user_key = str(selected_user).strip()
+                check_exist = requests.get(f"{REPORT_LOG_URL}/{today_tw_str}/{safe_user_key}.json").json()
+
+                if check_exist is not None:
+                    st.error(f"❌ 提示：【{selected_user}】您今天 ({today_tw_str}) 已經完成過任務回報囉！")
+                else:
+                    # 寫入紀錄
+                    report_payload = {"reported_at": str(datetime.now(tz_taiwan).strftime("%H:%M:%S")), "leader": str(selected_leader), "status": "已完成"}
+                    requests.put(f"{REPORT_LOG_URL}/{today_tw_str}/{safe_user_key}.json", data=json.dumps(report_payload))
+                    
+                    # 更新點數
+                    player_rpg_data = requests.get(f"{GAME_DB_URL}/{safe_user_key}.json").json() or {}
+                    new_pts = int(player_rpg_data.get("avail_pts", 0)) + 1
+                    requests.patch(f"{GAME_DB_URL}/{safe_user_key}.json", data=json.dumps({"avail_pts": new_pts}))
+
+                    st.session_state.user = safe_user_key
+                    st.balloons()
+                    st.success(f"🎉 大成功！【{selected_user}】今日 6S 回報完畢！")
+                    time.sleep(1)
+                    st.session_state.menu_selection = "🎮6S戰境養成"
+                    st.rerun()
+        else:
+            st.error("❌ 無法回報：請確認後台設定管理是否已正確填寫組員清單。")
 
 
     
