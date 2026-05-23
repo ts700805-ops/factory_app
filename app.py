@@ -563,33 +563,55 @@ else:
 # ==========================================
 # 🎮 頁面二：6S 戰境養成與決鬥系統
 # ==========================================
-    elif st.session_state.menu_selection == "🎮6S戰境養成":
-        import random
-        import time
-        import json # 確保有載入 json 模組
+ elif st.session_state.menu_selection == "🎮6S戰境養成":
+        import requests
+        import json
+        import streamlit as st
 
-        st.markdown(
-            '''
-            <div style="text-align:center; margin-bottom:2rem;">
-                <h1 style="color:#FBBF24 !important; font-weight:900 !important; font-size: 4.5rem !important; display:inline-block;">
-                    🎮 6S 戰境養成系統
-                </h1>
-            </div>
-            ''',
-            unsafe_allow_html=True
-        )
+        st.markdown('<h1 style="color:#FBBF24; text-align:center;">🎮 6S 戰境養成系統</h1>', unsafe_allow_html=True)
 
-        # 【安全路徑自適應】
-        if 'DB_URL' in globals() or 'DB_URL' in locals():
-            GAME_DB_URL = f"{DB_URL}/game_rpg_data"
-            GAME_CONFIG_URL = f"{DB_URL}/game_config"
-        elif 'DB_BASE_URL' in globals() or 'DB_BASE_URL' in locals():
-            GAME_DB_URL = f"{DB_BASE_URL}/game_rpg_data"
-            GAME_CONFIG_URL = f"{DB_BASE_URL}/game_config"
+        # 設定路徑
+        BASE_URL = globals().get('DB_URL') or globals().get('DB_BASE_URL') or "https://your-firebase-url"
+        GAME_DB_URL = f"{BASE_URL}/game_rpg_data"
+
+        # 1. 取得所有人員名單 (修正名單讀取錯誤)
+        raw_data = requests.get(f"{BASE_URL}/leader_members.json").json() or ""
+        all_staff = []
+        if isinstance(raw_data, str):
+            for line in raw_data.splitlines():
+                if ':' in line:
+                    members = line.split(":", 1)[1].split(",")
+                    all_staff.extend([m.strip() for m in members if m.strip()])
+
+        # 2. 獲取當前用戶與資料
+        current_user = str(st.session_state.get("user", "未登入同仁")).strip()
+        all_players_data = requests.get(f"{GAME_DB_URL}.json").json() or {}
+        user_stats = all_players_data.get(current_user, {"str": 0, "vit": 0, "agi": 0, "cha": 0, "avail_pts": 0})
+
+        # 顯示面板
+        st.write(f"### 👤 我的個人戰力面板：【{current_user}】")
+        col1, col2, col3, col4, col5 = st.columns(5)
+        col1.metric("💪 力量", f"{user_stats.get('str',0)} 點")
+        col2.metric("🔋 體力", f"{user_stats.get('vit',0)} 點")
+        col3.metric("⚡ 敏捷", f"{user_stats.get('agi',0)} 點")
+        col4.metric("✨ 魅力", f"{user_stats.get('cha',0)} 點")
+        col5.metric("剩餘點數", f"{user_stats.get('avail_pts', 0)}")
+
+        st.divider()
+
+        # 3. 決鬥區塊 (修正 IndentationError)
+        st.markdown("### ⚔️ 尋找現場同仁發起決鬥")
+        
+        # 篩選掉自己，列出其他同仁
+        opponents = [name for name in all_staff if name != current_user]
+        
+        if not opponents:
+            st.warning("⚠️ 目前暫無其他同仁名單可進行決鬥。")
         else:
-            GAME_DB_URL = "https://your-firebase-url/game_rpg_data"
-            GAME_CONFIG_URL = "https://your-firebase-url/game_config"
-
+            target_opp = st.selectbox("🎯 選擇決鬥對手：", opponents)
+            if st.button("💥 發起決鬥！"):
+                st.success(f"與 {target_opp} 的決鬥已準備就緒！")
+                # 這裡銜接你原本的決鬥模擬函數
         # 讀取後台設定稱謂門檻
         config_data = requests.get(f"{GAME_CONFIG_URL}.json").json() or {}
         lv1_pts = int(config_data.get("lv1_pts", 0))
