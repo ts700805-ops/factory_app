@@ -183,7 +183,7 @@ else:
     nav = st.sidebar.radio("功能導航", [
    
     "📊 製造部派工專區", 
-    "📈 工時統計分析", 
+    "📈 員工技能評核表", 
     "📜 完工紀錄查詢", 
     "🔧 固資&手工具紀錄表",
     "🧾 人員評核表",
@@ -387,175 +387,150 @@ else:
             # 💡 增加錯誤偵測，幫助開發者看到真正的問題
             st.error(f"系統偵測到錯誤：{str(e)}")
             st.warning("目前系統資料緩衝中，請稍後再試。")
-# --- 📈 工時統計分析 ---
+# --- 📈 員工技能評核表 ---
     elif st.session_state.menu_selection == "📈 工時統計分析":
-        st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">⏱️ 生產工時管理系統</h1>', unsafe_allow_html=True)
+        st.markdown(
+            '<h1 style="text-align:center; color:#7DD3FC; font-weight:900; font-size:2.5rem;">📈 員工技能評核表</h1>',
+            unsafe_allow_html=True
+        )
         
         # 1. 取得當前組長名字 (例如: 陳德文)
         current_leader = st.session_state.user 
         
-        # 2. 針對您的 Firebase 結構做抓取
+        # 2. 抓取 staff_map.json 取得當前組長的專屬組員名單
         display_list = []
         try:
-            # 抓取 staff_map.json
-            map_res = requests.get(f"{DB_BASE_URL}/settings/staff_map.json")
+            map_res = requests.get(f"{DB_BASE_URL}/settings/staff_map.json", timeout=10)
             if map_res.status_code == 200:
                 staff_data = map_res.json() or {}
-                
-                # --- 關鍵修正：直接用組長名字當 Key 抓取組員列表 ---
-                # 您的資料結構是： "陳德文": ["徐梓翔", "牟育玄", ...]
                 my_team = staff_data.get(current_leader, [])
-                
                 if isinstance(my_team, list):
                     display_list = [str(member).strip() for member in my_team]
-                
-            # 保險：如果沒抓到，讓組長選自己
+            
             if not display_list:
                 display_list = [current_leader]
         except Exception as e:
-            st.error(f"連線失敗: {e}")
             display_list = [current_leader]
 
-        # 3. 顯示下拉選單 (大字體標題)
-        st.markdown('<p style="font-size:1.2rem; font-weight:bold; color:#1e3a8a;">👤 請選擇執行組員 (您的成員)</p>', unsafe_allow_html=True)
-        selected_worker = st.selectbox("", sorted(display_list), label_visibility="collapsed", key="active_worker_select")
+        # 注入專屬 CSS：確保表單與滑桿、文字呈現大字體與清晰天藍色調
+        st.markdown("""
+            <style>
+            div[data-testid="stMarkdownContainer"] p, 
+            label, 
+            .stWidgetLabel p,
+            span {
+                color: #7DD3FC !important;
+                font-size: 1.15rem !important;
+                font-weight: 800 !important;
+            }
+            h3 {
+                color: #38BDF8 !important;
+                font-size: 1.6rem !important;
+                font-weight: 900;
+            }
+            div[data-baseweb="select"] > div, 
+            div[data-testid="stTextInput"] div div input {
+                background-color: #052e16 !important;
+                color: #ffffff !important;
+                border: 1px solid #38BDF8 !important;
+                font-size: 1.1rem !important;
+                font-weight: 700 !important;
+            }
+            /* 讓進度條數值放大顯示 */
+            div[data-testid="stSlider"] div {
+                color: #ffffff !important;
+                font-weight: 700 !important;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+
+        st.markdown("### ✍️ 填寫組員技能與工序完成進度")
+        
+        # 建立 Firebase 儲存路徑
+        SKILL_DB_URL = f"{DB_BASE_URL}/staff_skills"
+
+        with st.form("staff_skill_form"):
+            c1, c2 = st.columns(2)
+            with c1:
+                selected_worker = st.selectbox("👤 選擇執行組員", sorted(display_list), key="skill_worker_select")
+                t_oid = st.selectbox("📦 選擇製令編號", sorted([str(o).strip() for o in order_list]), key="skill_oid_select") if order_list else st.text_input("📦 手動輸入製令")
+            with c2:
+                t_proc = st.selectbox("🛠️ 選擇執行工序", process_list if process_list else ["預設工序"], key="skill_proc_select")
+                skill_level = st.selectbox("📊 專業熟練度評定", ["獨立作業(特優)", "熟練作業(優秀)", "需人指導(尚可)", "學徒建立中(待加強)"], key="skill_level_select")
+            
+            st.divider()
+            
+            # 圖片核心需求：完成進度百分比填寫
+            progress_pct = st.slider("🎯 工序目前完成進度 (%)", min_value=0, max_value=100, value=50, step=5, key="skill_progress_slider")
+            
+            st.write(" ")
+            submit_skill = st.form_submit_button("💾 儲存評核與進度", use_container_width=True)
+            
+            if submit_skill:
+                payload = {
+                    "組長": current_leader,
+                    "人員": selected_worker,
+                    "製令": t_oid,
+                    "工序": t_proc,
+                    "熟練度": skill_level,
+                    "完成進度": f"{progress_pct}%",
+                    "更新時間": get_now_str()
+                }
+                # 將紀錄寫入 Firebase 
+                requests.post(f"{SKILL_DB_URL}.json", data=json.dumps(payload))
+                st.success(f"✅ 已成功更新 {selected_worker} 的項目進度至 {progress_pct}%！")
+                time.sleep(0.5)
+                st.rerun()
+
         st.divider()
 
-        # --- 加入看板區域 ---
-        with st.container():
-            st.markdown('<div style="background-color:#f1f5f9; padding:20px; border-radius:15px; border:2px solid #cbd5e1; margin-bottom:20px;">', unsafe_allow_html=True)
-            c1, c2, c3 = st.columns([2, 2, 1])
-            with c1:
-                t_oid = st.selectbox("📦 選擇製令編號", sorted([str(o).strip() for o in order_list]), key="t_oid_select") if order_list else st.text_input("📦 手動輸入製令")
-            with c2:
-                t_proc = st.selectbox("🛠️ 選擇執行工序", process_list if process_list else ["預設工序"])
-            with c3:
-                st.write(" ")
-                if st.button("➕ 加入看板", type="primary", use_container_width=True):
-                    TIMER_DB_URL = f"{DB_BASE_URL}/active_timers"
-                    new_timer = {
-                        "製令": t_oid, "工序": t_proc, "status": "stop", 
-                        "accumulated": 0, "start_time": 0, "人員1": selected_worker 
-                    }
-                    requests.post(f"{TIMER_DB_URL}.json", data=json.dumps(new_timer))
-                    st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        # --- 顯示計時看板 (執行人員名字放大) ---
-        TIMER_DB_URL = f"{DB_BASE_URL}/active_timers"
-        active_timers_res = requests.get(f"{TIMER_DB_URL}.json")
-        active_timers = active_timers_res.json() if active_timers_res.status_code == 200 else {}
-        
-        if active_timers and isinstance(active_timers, dict):
-            for db_id, task in active_timers.items():
-                oid = task.get("製令", "未知")
-                p_name = task.get("工序", "未知")
-                status = task.get("status")
-                acc = task.get("accumulated", 0)
-                start = task.get("start_time", 0)
-                worker_name = task.get("人員1", "未指定")
-
-                st.markdown(f'<div style="background:#1e3a8a; color:white; padding:10px 15px; border-radius:10px 10px 0 0; font-weight:bold; font-size:1.1rem; border:1px solid #1e3a8a; border-bottom:none;">📦 製令：{oid}</div>', unsafe_allow_html=True)
-                with st.container(border=True):
-                    # --- HTML 區塊：優化字體大小、顏色與對比度，確保文字極度清晰 ---
-                    st.components.v1.html(f"""
-                        <div style="background:#ffffff; padding:12px 15px; border-radius:8px; border:2px solid #cbd5e1; border-left:10px solid #1e40af; display:flex; justify-content:space-between; align-items:center; font-family: 'Microsoft JhengHei', sans-serif;">
-                            <div style="flex: 1; min-width: 0; padding-right: 10px;">
-                                <div style="font-weight:900; color:#000000; font-size:1.3rem; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                    🛠️ 工序：{p_name}
-                                </div>
-                                <div style="font-size:1.6rem; color:#1e3a8a; font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                    👤 人員：{worker_name}
-                                </div>
-                            </div>
-                            <div id="timer_{db_id}" style="color:#b91c1c; font-family:monospace; font-size:2.3rem; font-weight:900; background:#fee2e2; padding:5px 15px; border-radius:8px; border:2px solid #fca5a5; min-width:160px; text-align:center; flex-shrink: 0;">
-                                00:00:00
-                            </div>
-                        </div>
-                        <script>
-                            (function() {{
-                                var acc = {acc}, start = {start}, status = '{status}', display = document.getElementById('timer_{db_id}');
-                                function update() {{
-                                    var total = acc + (status === 'running' ? (Date.now() / 1000) - start : 0);
-                                    var h = Math.floor(total / 3600).toString().padStart(2, '0');
-                                    var m = Math.floor((total % 3600) / 60).toString().padStart(2, '0');
-                                    var s = Math.floor(total % 60).toString().padStart(2, '0');
-                                    display.innerText = h + ":" + m + ":" + s;
-                                }}
-                                setInterval(update, 1000); update();
-                            }})();
-                        </script>
-                    """, height=130)
+        # --- 技能進度看板查詢區 ---
+        st.markdown("### 🔍 當前組員技能進度總覽")
+        try:
+            r_skills = requests.get(f"{SKILL_DB_URL}.json").json()
+            if r_skills and isinstance(r_skills, dict):
+                skill_list = []
+                for k, v in r_skills.items():
+                    row = v.copy()
+                    row["db_id"] = k
+                    skill_list.append(row)
+                
+                df_skills = pd.DataFrame(skill_list)
+                
+                # 僅篩選出當前組長管轄的紀錄
+                if not df_skills.empty and "組長" in df_skills.columns:
+                    df_skills = df_skills[df_skills["組長"] == current_leader]
+                
+                if not df_skills.empty:
+                    # 重新排列欄位順序以利閱讀
+                    show_cols = ["人員", "製令", "工序", "熟練度", "完成進度", "更新時間"]
+                    available_cols = [c for c in show_cols if c in df_skills.columns]
                     
-                    b1, b2, b3 = st.columns([1, 1, 1])
-                    with b1:
-                        if status != 'running':
-                            if st.button("▶️ 開始", key=f"s_{db_id}", use_container_width=True):
-                                requests.patch(f"{TIMER_DB_URL}/{db_id}.json", data=json.dumps({"status": "running", "start_time": time.time()}))
-                                st.rerun()
-                        else:
-                            if st.button("⏸️ 暫停", key=f"p_{db_id}", use_container_width=True):
-                                requests.patch(f"{TIMER_DB_URL}/{db_id}.json", data=json.dumps({"status": "paused", "accumulated": acc + (time.time() - start), "start_time": 0}))
-                                st.rerun()
-                    with b2:
-                        if st.button("⏹️ 結束", key=f"e_{db_id}", use_container_width=True, type="primary"):
-                            final_sec = acc + (time.time() - start if status == 'running' else 0)
-                            # --- 關鍵修正：確保結束時寫入 FINISH_URL，使歷史完工紀錄同步抓得到 ---
-                            requests.post(f"{FINISH_URL}.json", data=json.dumps({
-                                "製令": oid, "工序": p_name, "秒數": final_sec, 
-                                "完工時間": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "人員1": worker_name
-                            }))
-                            requests.delete(f"{TIMER_DB_URL}/{db_id}.json")
-                            st.rerun()
-                    with b3:
-                        if st.button("🗑️ 刪除", key=f"d_{db_id}", use_container_width=True):
-                            requests.delete(f"{TIMER_DB_URL}/{db_id}.json")
-                            st.rerun()
-        else:
-            st.info("💡 目前無進行中任務。")
-
-# --- 📜 完工紀錄查詢 ---
-    elif st.session_state.menu_selection == "📜 完工紀錄查詢":
-        st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📜 歷史完工紀錄</h1>', unsafe_allow_html=True)
-        
-        all_logs = requests.get(f"{FINISH_URL}.json").json()
-        if all_logs:
-            df = pd.DataFrame([dict(v, db_id=k) for k, v in all_logs.items()])
-            search_q = st.text_input("🔍 搜尋紀錄")
-            if search_q: 
-                df = df[df.astype(str).apply(lambda x: x.str.contains(search_q, case=False)).any(axis=1)]
-            
-            if not df.empty:
-                for o_id, group in df.groupby("製令"):
-                    display_df = group.copy()
+                    st.dataframe(
+                        df_skills[available_cols],
+                        use_container_width=True,
+                        hide_index=True
+                    )
                     
-                    # 1. 計算每筆工時(分)與總工時(分鐘數相加)
-                    total_all_minutes = 0.0
-                    if '秒數' in display_df.columns:
-                        display_df['工時(分)'] = (display_df['秒數'] / 60).round(2)
-                        total_all_minutes = round(display_df['工時(分)'].sum(), 2) # 找回原本 Minutes 相加功能
-                        
-                        # 2. 逆推開始時間
-                        try:
-                            temp_finish = pd.to_datetime(display_df['完工時間'])
-                            display_df['開始時間'] = (temp_finish - pd.to_timedelta(display_df['秒數'], unit='s')).dt.strftime('%Y-%m-%d %H:%M:%S')
-                        except:
-                            display_df['開始時間'] = "計算失敗"
-
-                    # 3. 在標題顯示 (找回原本的 總工時：xx 分鐘 顯示格式)
-                    with st.expander(f"📦 製令：{o_id} ({len(group)} 項 | 總工時：{total_all_minutes} 分鐘)"):
-                        
-                        # 設定表格順序
-                        cols = ["工序", "開始時間", "完工時間", "工時(分)"]
-                        existing_cols = [c for c in cols if c in display_df.columns]
-                        
-                        st.table(display_df[existing_cols])
-                        
-                        if st.button(f"🗑️ 刪除紀錄", key=f"del_{o_id}"):
-                            for d_id in group['db_id']: requests.delete(f"{FINISH_URL}/{d_id}.json")
-                            st.rerun()
-            else: st.warning("查無紀錄。")
-        else: st.info("💡 目前尚無紀錄。")
+                    # 提供刪除錯誤紀錄的按鈕
+                    st.markdown("### 👁️ 明細管理")
+                    for _, row in df_skills.sort_values(by="更新時間", ascending=False).iterrows():
+                        with st.expander(f"👤 {row.get('人員')} ｜ 📦 製令: {row.get('製令')} ｜ 🎯 進度: {row.get('完成進度')}"):
+                            st.write(f"• **執行工序：** {row.get('工序')}")
+                            st.write(f"• **熟練度判定：** {row.get('熟練度')}")
+                            st.write(f"• **最後更新時間：** {row.get('更新時間')}")
+                            
+                            if st.button("🗑️ 刪除此筆進度", key=f"del_skill_{row['db_id']}", type="primary"):
+                                requests.delete(f"{SKILL_DB_URL}/{row['db_id']}.json")
+                                st.success("已成功刪除該筆進度紀錄")
+                                time.sleep(0.5)
+                                st.rerun()
+                else:
+                    st.info("💡 目前尚無此組長的組員技能評核紀錄。")
+            else:
+                st.info("💡 目前尚無資料，請於上方填寫第一筆紀錄。")
+        except Exception as e:
+            st.error(f"讀取進度看板時發生錯誤: {str(e)}")
 
 # --- 🔧 人員手工具紀錄表 (修正版：恢復資產匯出 + 移除重複) ---
     elif st.session_state.menu_selection == "🔧 固資&手工具紀錄表":
