@@ -238,7 +238,7 @@ else:
         st.markdown(
             '''
             <div style="text-align:center; margin-bottom:2rem;">
-                <h1 style="color:#60A5FA !important; font-weight:900 !important; font-size: 3.5rem !important; display:inline-block;">
+                <h1 style="color: #000000 !important; font-weight:900 !important; font-size: 3.5rem !important; display:inline-block;">
                     📋 每日 6S 任務回報中心
                 </h1>
                 <p style="color:#9CA3AF;">完成今日現場回報，即可領取 1 點自由屬性點數！</p>
