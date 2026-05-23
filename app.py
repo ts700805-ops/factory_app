@@ -229,7 +229,7 @@ else:
 # ==========================================
 # 📝 頁面一：每日 6S 任務回報中心 (後台優先同步版)
 # ==========================================
- elif st.session_state.menu_selection == "📝每日6S任務回報":
+elif st.session_state.menu_selection == "📝每日6S任務回報":
         import requests
         import json
         from datetime import datetime, timedelta, timezone
@@ -383,6 +383,10 @@ else:
                     time.sleep(1.2)
                     st.session_state.menu_selection = "🎮6S戰境養成"
                     st.rerun()
+
+
+
+
         # ==========================================
         # ⚙️ 後台管理專區：維護組員名單 (紅框處功能)
         # ==========================================
