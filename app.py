@@ -387,6 +387,7 @@ else:
             # 💡 增加錯誤偵測，幫助開發者看到真正的問題
             st.error(f"系統偵測到錯誤：{str(e)}")
             st.warning("目前系統資料緩衝中，請稍後再試。")
+            
 # --- 📈 工時統計分析 (已修改為 📊 8人並列圓形技能評核表) ---
     elif st.session_state.menu_selection == "📈 工時統計分析":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📋 員工技能考核表</h1>', unsafe_allow_html=True)
@@ -487,14 +488,14 @@ else:
                                         st.success(f"{m_name} OK!")
                                     else:
                                         st.error("錯誤")
-                                catch Exception as save_err:
+                                except Exception as save_err:
                                     st.error(f"出錯: {save_err}")
                 
                 st.markdown('<div style="margin-bottom:15px;"></div>', unsafe_allow_html=True)
         else:
             st.info("💡 目前此組別無成員資料。")
 
-# --- 📜 完工紀錄查詢 ---
+# --- 📜 完工紀錄查詢 (原功能保留，一律不修改) ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📜 歷史完工紀錄</h1>', unsafe_allow_html=True)
         
