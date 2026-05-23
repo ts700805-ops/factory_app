@@ -417,7 +417,7 @@ else:
 # ==========================================
     # 🎮 6S 戰境養成功能區塊
     # ==========================================
-   # 更改為獨立 if 判定，徹底解決 elif 造成的 SyntaxError 語法錯誤
+  # 更改為獨立 if 判定，徹底解決 elif 造成的 SyntaxError 語法錯誤
     if st.session_state.get("menu_selection") and "6S戰境養成" in str(st.session_state.menu_selection):
         import random
         import time
@@ -552,34 +552,20 @@ else:
                 p2_atk = 15 + int(target_stats.get("str", 0)) * 2
                 p2_title = target_stats.get("level_name", "🌾 平民")
 
-                # 對話框宣告：用強制的 style="color: #000000 !important;" 鎖定黑字
-   @st.dialog("⚔️ 戰境決鬥場 ⚔️", width="large")
-   def show_battle_logs():
-
-    st.markdown(
-        f"""
-        <div style="color:#000000 !important; font-family:sans-serif;">
-
-            <h3 style="color:#000000 !important; margin-bottom:5px;">
-                🥊 雙方數據就緒！
-            </h3>
-
-            <p style="margin:3px 0; font-size:1.1rem; color:#000000 !important;">
-                🔴 <b>【{p1_title}】{current_user}</b>
-                (HP: {p1_hp} / ATK: {p1_atk})
-            </p>
-
-            <p style="margin:3px 0; font-size:1.1rem; color:#000000 !important;">
-                🔵 <b>【{p2_title}】{target_user}</b>
-                (HP: {p2_hp} / ATK: {p2_atk})
-            </p>
-
-            <hr style="border-top:1px solid #000000; margin:10px 0;">
-
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+                # 對話框宣告：用強制的 style="color: #111827 !important;" 鎖定黑字
+                @st.dialog("⚔️ 戰境決鬥場 ⚔️", width="large")
+                def show_battle_logs():
+                    st.markdown(
+                        f'''
+                        <div style="color: #111827 !important; font-family: sans-serif;">
+                            <h3 style="color: #1E40AF !important; margin-bottom: 5px;">🥊 雙方數據就緒！</h3>
+                            <p style="margin: 3px 0; font-size: 1.1rem; color: #111827 !important;">🔴 <b>【{p1_title}】{current_user}</b> (HP: {p1_hp} / ATK: {p1_atk})</p>
+                            <p style="margin: 3px 0; font-size: 1.1rem; color: #111827 !important;">🔵 <b>【{p2_title}】{target_user}</b> (HP: {p2_hp} / ATK: {p2_atk})</p>
+                            <hr style="border-top: 1px solid #CCC; margin: 10px 0;">
+                        </div>
+                        ''', 
+                        unsafe_allow_html=True
+                    )
                     
                     hp1, hp2 = p1_hp, p2_hp
                     round_num = 1
@@ -604,11 +590,11 @@ else:
                     # 判定勝負結果
                     if hp1 > hp2:
                         winner_text = f"🏆 【{p1_title}】{current_user} 獲勝！"
-                        bg_color = "#000000"
-                        text_color = "#991B1B"
+                        bg_color = "#DCFCE7"
+                        text_color = "#166534"
                     else:
                         winner_text = f"🏆 【{p2_title}】{target_user} 獲勝！"
-                        bg_color = "#000000"
+                        bg_color = "#FEE2E2"
                         text_color = "#991B1B"
                         
                     st.markdown(
