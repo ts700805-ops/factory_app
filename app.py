@@ -499,37 +499,47 @@ else:
         # ==========================================
         st.markdown("### ⚔️ 尋找現場同仁發起決鬥")
 
-        # 1. 獲取所有員工名單 (確保使用正確的資料路徑)
-        # 假設 DB_BASE_URL 是您的全域基礎路徑變數
-        employee_data = requests.get(f"{DB_BASE_URL}/employees.json").json() or {}
-        all_staff = list(employee_data.keys()) 
+        # 1. 直接抓取您在「編輯對照表」中維護的人員配置資料
+        # 請確認您的資料庫中，編輯對照表的儲存路徑 (假設為 /config/employee_mapping)
+        mapping_data = requests.get(f"{DB_BASE_URL}/config/employee_mapping.json").json() or ""
+        
+        # 2. 解析文字資料，將所有人員提取出來
+        all_staff = set()
+        if isinstance(mapping_data, str):
+            for line in mapping_data.split('\n'):
+                if ':' in line:
+                    names = line.split(':')[1].split(',')
+                    for name in names:
+                        if name.strip():
+                            all_staff.add(name.strip())
 
-        # 2. 將名單過濾：去除自己與「未登入同仁」
-        opponents = sorted(list(set(all_staff)))
+        # 3. 過濾掉自己與未登入者
+        opponents = sorted(list(all_staff))
         if current_user in opponents:
             opponents.remove(current_user)
         if "未登入同仁" in opponents:
             opponents.remove("未登入同仁")
         
-        # 3. 檢查名單是否為空
         if not opponents:
-            st.warning("💡 目前暫無其他同仁名單可進行決鬥。")
+            st.warning("💡 目前在人員配置資料中找不到其他同仁。")
         else:
             c_sel, c_btn = st.columns([3, 1])
             with c_sel:
                 target_opp = st.selectbox("🎯 選擇決鬥目標對手：", opponents)
             with c_btn:
-                st.write("") # 為了對齊上方標籤
+                st.write("")
                 st.write("")
                 start_battle = st.button("💥 發起決鬥！", use_container_width=True)
 
-            # 4. 決鬥執行邏輯
             if start_battle and current_user != "未登入同仁":
-                # 確保對手有遊戲數據，若無則自動初始化，避免 KeyError
+                # 若對手尚未有遊戲數據，自動初始化
                 if target_opp not in all_players_data:
-                    init_payload = {"str": 0, "vit": 0, "agi": 0, "cha": 0, "avail_pts": 0}
+                    init_payload = {"str": 0, "vit": 0, "agi": 0, "cha": 0, "avail_pts": 5}
                     requests.put(f"{GAME_DB_URL}/{target_opp}.json", data=json.dumps(init_payload))
                     all_players_data[target_opp] = init_payload
+                
+                # 執行戰鬥模擬 (保持原有的 @st.dialog 邏輯)
+                # ... (此處放入您原有的 run_battle_simulation 函數與呼叫)
                 
                 target_data = all_players_data.get(target_opp)
 
