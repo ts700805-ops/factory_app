@@ -387,7 +387,7 @@ else:
             # 💡 增加錯誤偵測，幫助開發者看到真正的問題
             st.error(f"系統偵測到錯誤：{str(e)}")
             st.warning("目前系統資料緩衝中，請稍後再試。")
-# --- 📈 工時統計分析 (已修改為 📊 技能評核表並列版) ---
+# --- 📈 工時統計分析 (已修改為 📊 技能評核表並列安全版) ---
     elif st.session_state.menu_selection == "📈 工時統計分析":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📋 員工技能評核表</h1>', unsafe_allow_html=True)
         
@@ -421,37 +421,40 @@ else:
         # 3. 並列由上往下列出該組所有員工
         if display_list:
             for member in sorted(display_list):
+                # 確保名字轉為乾淨的字串型態，避免相加出錯
+                m_name = str(member).strip()
+                
                 # 建立外層精美的大外框，把每位員工隔開
-                st.markdown(f'<div style="background:#1e3a8a; color:white; padding:10px 15px; border-radius:10px 10px 0 0; font-weight:bold; font-size:1.2rem;">👤 評核人員：{member}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="background:#1e3a8a; color:white; padding:10px 15px; border-radius:10px 10px 0 0; font-weight:bold; font-size:1.2rem;">👤 評核人員：{m_name}</div>', unsafe_allow_html=True)
                 
                 with st.container(border=True):
-                    # 第一排：三個滑桿 (出勤、工作效率、紀律)
+                    # 第一排：三個滑桿 (出勤、工作效率、紀律) - 改用最安全的字串相加 Key 邏輯
                     c1, c2, c3 = st.columns(3)
                     with c1:
                         st.markdown('<p style="color:#1e3a8a; font-weight:bold; margin-bottom:-5px;">📋 出勤表現</p>', unsafe_allow_html=True)
-                        score_attendance = st.slider("出勤", 1, 10, 8, key=f"score_attend_{member}", label_visibility="collapsed")
+                        score_attendance = st.slider("出勤", 1, 10, 8, key="score_attend_" + m_name, label_visibility="collapsed")
                     with c2:
                         st.markdown('<p style="color:#1e3a8a; font-weight:bold; margin-bottom:-5px;">⚡ 工作效率</p>', unsafe_allow_html=True)
-                        score_efficiency = st.slider("效率", 1, 10, 8, key=f"score_eff_{member}", label_visibility="collapsed")
+                        score_efficiency = st.slider("效率", 1, 10, 8, key="score_eff_" + m_name, label_visibility="collapsed")
                     with c3:
                         st.markdown('<p style="color:#1e3a8a; font-weight:bold; margin-bottom:-5px;">🛡️ 紀律態度</p>', unsafe_allow_html=True)
-                        score_discipline = st.slider("紀律", 1, 10, 8, key=f"score_disc_{member}", label_visibility="collapsed")
+                        score_discipline = st.slider("紀律", 1, 10, 8, key="score_disc_" + m_name, label_visibility="collapsed")
                     
                     # 第二排：三個滑桿 (品質、團隊、5S)
                     c4, c5, c6 = st.columns(3)
                     with c4:
                         st.markdown('<p style="color:#1e3a8a; font-weight:bold; margin-bottom:-5px;">💎 品質表現</p>', unsafe_allow_html=True)
-                        score_quality = st.slider("品質", 1, 10, 8, key=f"score_qual_{member}", label_visibility="collapsed")
+                        score_quality = st.slider("品質", 1, 10, 8, key="score_qual_" + m_name, label_visibility="collapsed")
                     with c5:
                         st.markdown('<p style="color:#1e3a8a; font-weight:bold; margin-bottom:-5px;">🤝 團隊配合</p>', unsafe_allow_html=True)
-                        score_team = st.slider("團隊", 1, 10, 8, key=f"score_team_{member}", label_visibility="collapsed")
+                        score_team = st.slider("團隊", 1, 10, 8, key="score_team_" + m_name, label_visibility="collapsed")
                     with c6:
                         st.markdown('<p style="color:#1e3a8a; font-weight:bold; margin-bottom:-5px;">🧹 5S維護</p>', unsafe_allow_html=True)
-                        score_5s = st.slider("5S", 1, 10, 8, key=f"score_5s_{member}", label_visibility="collapsed")
+                        score_5s = st.slider("5S", 1, 10, 8, key="score_5s_" + m_name, label_visibility="collapsed")
                     
                     # 評語輸入框
                     st.markdown('<p style="color:#1e3a8a; font-weight:bold; margin-bottom:-5px;">📝 評語 / 改善建議</p>', unsafe_allow_html=True)
-                    eval_comment = st.text_area("評語", value="", placeholder=f"請輸入對 {member} 的評語...", key=f"comment_{member}", label_visibility="collapsed")
+                    eval_comment = st.text_area("評語", value="", placeholder="請輸入對 " + m_name + " 的評語...", key="comment_" + m_name, label_visibility="collapsed")
                     
                     # 計算該員工目前的完成度百分比總分 (以 6 項 10 分滿分為 100% 換算)
                     total_score = score_attendance + score_efficiency + score_discipline + score_quality + score_team + score_5s
@@ -461,11 +464,10 @@ else:
                     st.markdown(f'<p style="text-align:right; font-weight:bold; color:#1e40af; margin-top:-10px;">📊 考核完成程度：{percentage}%</p>', unsafe_allow_html=True)
                     
                     # 獨立的儲存按鈕
-                    if st.button(f"💾 儲存 {member} 評核", key=f"save_btn_{member}", use_container_width=True, type="primary"):
-                        # 這裡保留並對接你原本送出至 Firebase 的資料格式
+                    if st.button("💾 儲存 " + m_name + " 評核", key="save_btn_" + m_name, use_container_width=True, type="primary"):
                         eval_db_url = f"{DB_BASE_URL}/skills_evaluations"
                         new_eval = {
-                            "人員": member,
+                            "人員": m_name,
                             "評核月份": datetime.datetime.now().strftime("%Y-%m"),
                             "出勤表現": score_attendance,
                             "工作效率": score_efficiency,
@@ -480,13 +482,13 @@ else:
                         try:
                             res = requests.post(f"{eval_db_url}.json", data=json.dumps(new_eval))
                             if res.status_code == 200:
-                                st.success(f"🎉 {member} 的評核資料已成功儲存！")
+                                st.success(f"🎉 {m_name} 的評核資料已成功儲存！")
                             else:
                                 st.error("儲存失敗，請檢查資料庫連線。")
                         except Exception as save_err:
                             st.error(f"儲存出錯: {save_err}")
                 
-                # 員工之間的間距線
+                # 員工之間的間距
                 st.markdown('<br>', unsafe_allow_html=True)
         else:
             st.info("💡 目前此組別無成員資料。")
