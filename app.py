@@ -412,7 +412,8 @@ else:
 
 
  # ==========================================
-elif st.session_state.menu_selection and "6S戰境養成" in st.session_state.menu_selection:
+# 更改為獨立 if 判定，徹底解決 elif 造成的 SyntaxError 語法錯誤
+    if st.session_state.get("menu_selection") and "6S戰境養成" in str(st.session_state.menu_selection):
         import random
         import time
         import json # 確保有載入 json 模組
@@ -638,8 +639,6 @@ elif st.session_state.menu_selection and "6S戰境養成" in st.session_state.me
                 st.success("✅ 階級稱號更新成功！系統已將所有人員名單頭銜同步洗牌。")
                 time.sleep(1)
                 st.rerun()
-
-
 
 
 
