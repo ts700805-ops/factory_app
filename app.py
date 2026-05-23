@@ -536,20 +536,20 @@ else:
             
             # 建立內嵌對話框
 @st.dialog("⚔️ 戰境決鬥場 ⚔️", width="large")
-        def run_duel_popup(p1_title, p1_name, p1_hp, p1_atk, p2_title, p2_name, p2_hp, p2_atk):
-            # --- 1. 雙方初始數據顯示改為黑色字體 ---
-            st.markdown(
-                f'''
-                <div style="color: #000000 !important; line-height: 1.8; font-size: 1.1rem;">
-                    <p style="font-weight: 900; font-size: 1.3rem; margin-bottom: 8px;">🥊 雙方數據就緒！</p>
-                    <p>🔴 <b>【{p1_title}】{p1_name}</b> (HP: {p1_hp} / ATK: {p1_atk})</p>
-                    <p>🔵 <b>【{p2_title}】{p2_name}</b> (HP: {p2_hp} / ATK: {p2_atk})</p>
-                </div>
-                ''', 
-                unsafe_allow_html=True
-            )
-            
-            st.divider()
+def run_duel_popup(p1_title, p1_name, p1_hp, p1_atk, p2_title, p2_name, p2_hp, p2_atk):
+    # --- 1. 雙方初始數據顯示改為黑色字體 ---
+    st.markdown(
+        f'''
+        <div style="color: #000000 !important; line-height: 1.8; font-size: 1.1rem;">
+            <p style="font-weight: 900; font-size: 1.3rem; margin-bottom: 8px;">🥊 雙方數據就緒！</p>
+            <p>🔴 <b>【{p1_title}】{p1_name}</b> (HP: {p1_hp} / ATK: {p1_atk})</p>
+            <p>🔵 <b>【{p2_title}】{p2_name}</b> (HP: {p2_hp} / ATK: {p2_atk})</p>
+        </div>
+        ''', 
+        unsafe_allow_html=True
+    )
+    
+    st.divider()
 
         
         # --- 2. 接下來如果是跑戰鬥回合紀錄的迴圈 (範例) ---
