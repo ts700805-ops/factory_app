@@ -188,7 +188,7 @@ else:
     "📜 完工紀錄查詢", 
     "🔧 固資&手工具紀錄表",
     "⚙️ 資產編輯清單",
-    "📝 任務派發", 
+    "📝 每日6S回報區", 
     "⚙️ 設定管理"
 
     ])
@@ -1187,8 +1187,8 @@ else:
 
    
 
-    # --- 📝 任務派發 ---
-    elif st.session_state.menu_selection == "📝 任務派發":
+    # --- 📝 每日6S回報區---
+    elif st.session_state.menu_selection == "📝 每日6S回報區":
         st.title("📝 任務指派與編輯")
         current_leader = st.session_state.user
         my_team = staff_map.get(current_leader, all_staff)
