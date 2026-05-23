@@ -395,8 +395,7 @@ else:
                     except Exception as e:
                         st.error(f"❌ 錯誤：{e}")
 
-
-    # ==========================================
+# ==========================================
 # 🎮 頁面二：6S 戰境養成與決鬥系統
 # ==========================================
     elif st.session_state.menu_selection == "🎮6S戰境養成":
@@ -515,6 +514,9 @@ else:
             if start_battle and current_user != "未登入同仁":
                 @st.dialog("⚔️ 戰境決鬥場 ⚔️")
                 def run_battle_simulation(p1, p2, p1_data, p2_data):
+                    # --- 強制將對話視窗內文字改為黑色 ---
+                    st.markdown("""<style>[data-testid="stMarkdownContainer"] { color: black !important; }</style>""", unsafe_allow_html=True)
+                    
                     p1_total = int(p1_data.get("str",0))+int(p1_data.get("vit",0))+int(p1_data.get("agi",0))+int(p1_data.get("cha",0))
                     p2_total = int(p2_data.get("str",0))+int(p2_data.get("vit",0))+int(p2_data.get("agi",0))+int(p2_data.get("cha",0))
                     
@@ -531,7 +533,7 @@ else:
                     p2_eva = min(int(p2_data.get("agi", 0)) * 2, 40)
                     p2_cha = int(p2_data.get("cha", 0)) * 5
 
-                    st.markdown(f"### 🥊 雙方數據就緒！")
+                    st.markdown("### 🥊 雙方數據就緒！")
                     st.write(f"🔴 **{p1_name}** (HP: {p1_hp} / ATK: {p1_atk})")
                     st.write(f"🔵 **{p2_name}** (HP: {p2_hp} / ATK: {p2_atk})")
                     st.divider()
@@ -541,39 +543,32 @@ else:
                     
                     while p1_hp > 0 and p2_hp > 0 and round_cnt <= 20:
                         battle_log.append(f"⚔️ **--- 第 {round_cnt} 回合 ---**")
-                        
                         if random.randint(1, 100) <= p2_eva:
                             battle_log.append(f"💨 {p1_name} 發動猛烈攻擊！但 {p2_name} 【❌ 閃避成功】！")
                         else:
                             dmg = random.randint(p1_atk-3, p1_atk+5)
                             p2_hp -= dmg
                             battle_log.append(f"💥 {p1_name} 揮舞掃把重擊！對 {p2_name} 造成 **{dmg}** 點傷害！")
-                        
                         if p2_hp > 0 and random.randint(1, 100) <= p1_cha:
                             sub_dmg = 5 + (int(p1_data.get("cha", 0)) * 3)
                             p2_hp -= sub_dmg
                             battle_log.append(f"✨ {p1_name} 魅力爆發！召喚 **[抹布史萊姆]** 追擊，追加 **{sub_dmg}** 點傷害！")
-
                         if p2_hp <= 0: break
-
                         if random.randint(1, 100) <= p1_eva:
                             battle_log.append(f"💨 {p2_name} 前進反擊！但 {p1_name} 【❌ 閃避成功】！")
                         else:
                             dmg = random.randint(p2_atk-3, p2_atk+5)
                             p1_hp -= dmg
                             battle_log.append(f"💥 {p2_name} 使出高壓水槍反擊！對 {p1_name} 造成 **{dmg}** 點傷害！")
-
                         if p1_hp > 0 and random.randint(1, 100) <= p2_cha:
                             sub_dmg = 5 + (int(p2_data.get("cha", 0)) * 3)
                             p1_hp -= sub_dmg
                             battle_log.append(f"✨ {p2_name} 魅力爆發！召喚 **[紙箱混亂獸]** 撕咬，追加 **{sub_dmg}** 點傷害！")
-
                         round_cnt += 1
 
                     st.markdown("### 📜 戰鬥過程紀錄：")
                     for log in battle_log:
                         st.write(log)
-                    
                     st.divider()
                     if p1_hp > 0 and p2_hp <= 0:
                         st.success(f"🏆 決鬥結束！恭喜 **{p1_name}** 獲得了最終勝利！")
@@ -614,8 +609,6 @@ else:
                 st.success("後台晉升設定更新完成！")
                 time.sleep(0.5)
                 st.rerun()
-
-
     
 # --- 📊 製造部派工專區 ---
     if st.session_state.menu_selection == "📊 製造部派工專區":
