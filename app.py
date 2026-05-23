@@ -835,7 +835,8 @@ else:
             }
             div[data-baseweb="select"] > div, 
             div[data-testid="stTextInput"] div div input, 
-            div[data-testid="stTextArea"] textarea {
+            div[data-testid="stTextArea"] textarea,
+            div[data-testid="stDateInput"] input {
                 background-color: #052e16 !important; 
                 color: #ffffff !important;           
                 border: 1px solid #38BDF8 !important; 
@@ -876,7 +877,7 @@ else:
         done_raw = requests.get(f"{TODO_DONE_URL}.json").json() or {}
 
         # ==========================================
-        # 第一區：🔍 歷史交辦事項查詢與總覽 (移至最上方)
+        # 第一區：🔍 歷史交辦事項查詢與總覽
         # ==========================================
         st.markdown("### 🔍 歷史交辦事項查詢")
         filter_leader = st.selectbox("篩選負責組長", ["全部"] + all_leaders_list, key="todo_filter_leader")
@@ -895,7 +896,6 @@ else:
                 todo_df = todo_df[todo_df["組長"] == filter_leader]
 
             if not todo_df.empty:
-                # 移除任何可能殘留的指派人欄位，確保資料不輸出
                 if "指派人" in todo_df.columns:
                     todo_df = todo_df.drop(columns=["指派人"])
 
@@ -913,7 +913,6 @@ else:
                 # 排序：最新建立的在最上方
                 todo_df = todo_df.sort_values(by="建立時間", ascending=False).reset_index(drop=True)
 
-                # 呈現表格本體（不包含按鈕，按鈕獨立在下方一列列呈現，確保排版完美且不會有型態錯誤）
                 show_cols = ["組長", "交辦事項", "預計完成日期", "建立時間"]
                 available_cols = [c for c in show_cols if c in todo_df.columns]
                 
@@ -923,12 +922,10 @@ else:
                     hide_index=True
                 )
 
-                # 綠色框框對應實體化按鈕區
                 st.markdown("### ⚡ 事項快速操作面板")
                 for idx, row in todo_df.iterrows():
                     db_key = row["db_id"]
                     
-                    # 每一筆資料做成一個小橫條橫排，並擺放按鈕
                     c_info, c_btn1, c_btn2 = st.columns([5, 1, 1])
                     with c_info:
                         st.markdown(f"📌 **【{row.get('組長','')}】** {row.get('交辦事項','')[:25]}...")
@@ -945,7 +942,7 @@ else:
 
                             done_payload["完成時間"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                             done_payload.pop("db_id", None)
-                            done_payload.pop("指派人", None) # 確保移除指派人資訊
+                            done_payload.pop("指派人", None)
                             
                             requests.post(f"{TODO_DONE_URL}.json", data=json.dumps(done_payload))
                             requests.delete(f"{TODO_DB_URL}/{db_key}.json")
@@ -958,7 +955,6 @@ else:
                         if st.button("🗑️ 刪除", key=f"btn_del_{db_key}", use_container_width=True):
                             st.session_state[f"show_pwd_{db_key}"] = True
 
-                    # 若觸發刪除，在該欄位下方立刻跳出密碼驗證輸入框
                     if st.session_state.get(f"show_pwd_{db_key}", False):
                         pwd_col1, pwd_col2 = st.columns([3, 4])
                         with pwd_col1:
@@ -979,7 +975,7 @@ else:
         st.divider()
 
         # ==========================================
-        # 第二區：✍️ 新增組長交辦事項表單 (移至中間)
+        # 第二區：✍️ 新增組長交辦事項表單
         # ==========================================
         st.markdown("### ✍️ 新增組長交辦事項")
         with st.form("todo_input_form"):
@@ -991,7 +987,10 @@ else:
                     default_idx = 0
                 target_leader = st.selectbox("👤 負責組長", all_leaders_list, index=default_idx)
             with c2:
-                target_deadline = st.text_input("📅 預計完成日期", value=datetime.datetime.now().strftime("%Y-%m-%d"))
+                # 【核心修正】將原本的 st.text_input 改為 st.date_input，點選時會自動彈出日曆小窗供選擇
+                target_date_obj = st.date_input("📅 預計完成日期", value=datetime.date.today())
+                # 轉成字串格式以便後端資料庫統一儲存
+                target_deadline = target_date_obj.strftime("%Y-%m-%d")
 
             todo_content = st.text_area("📝 交辦事項內容 / 待辦備註", height=120, placeholder="請輸入需要交辦的事項內容...")
             submitted = st.form_submit_button("💾 儲存交辦事項", use_container_width=True)
@@ -1014,7 +1013,7 @@ else:
         st.divider()
 
         # ==========================================
-        # 第三區：🎉 已完成事項歷史紀錄 (顯示在最下方)
+        # 第三區：🎉 已完成事項歷史紀錄
         # ==========================================
         st.markdown("### 🎉 已完成事項歷史紀錄")
         if done_raw:
@@ -1030,7 +1029,6 @@ else:
                 done_df = done_df[done_df["組長"] == filter_leader]
                 
             if not done_df.empty:
-                # 徹底排除「指派人」欄位
                 done_cols = ["組長", "交辦事項", "預計完成日期", "完成時間"]
                 avail_done_cols = [c for c in done_cols if c in done_df.columns]
                 
