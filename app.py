@@ -552,7 +552,7 @@ else:
                 p2_atk = 15 + int(target_stats.get("str", 0)) * 2
                 p2_title = target_stats.get("level_name", "🌾 平民")
 
-                # 對話框宣告：用強制的 style="color: #111827 !important;" 鎖定黑字
+                # 對話框宣告：用強制的 style="color: #000000 !important;" 鎖定黑字
                 @st.dialog("⚔️ 戰境決鬥場 ⚔️", width="large")
                 def show_battle_logs():
                     st.markdown(
