@@ -1189,95 +1189,72 @@ else:
 # ==========================================
 # 📝 每日 6S 任務回報中心 (完整修正版)
 # ==========================================
-elif st.session_state.menu_selection == "📝每日6S任務回報":
+# 修正後的每日6S回報區塊
+elif st.session_state.menu_selection == "每日6S任務回報":
     import requests
     import json
     from datetime import datetime, timedelta, timezone
 
-    # --- 頁面標題 ---
-    st.markdown("## 📋 每日 6S 任務回報中心")
-    st.write("完成今日現場回報，即可領取 1 點自由屬性點數！")
+    # 設定時區與時間
+    tz_taiwan = timezone(timedelta(hours=8))
+    today_str = datetime.now(tz_taiwan).strftime("%Y-%m-%d")
     
-    # --- 基礎設定 ---
+    # 讀取 Firebase 資料
     BASE_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
-    TZ = timezone(timedelta(hours=8))
-    today_str = datetime.now(TZ).strftime("%Y-%m-%d")
-
-    # --- 讀取資料 ---
+    
+    # 讀取組長與員工對照表
     try:
-        # 讀取組長清單
-        leaders_req = requests.get(f"{BASE_URL}/settings/all_leaders.json") # 請確認此路徑與您的 Firebase 一致
-        leaders_data = leaders_req.json()
-        
-        # 讀取員工對照表
         staff_req = requests.get(f"{BASE_URL}/settings/staff_map.json")
-        staff_map = staff_req.json()
-        
-        if not leaders_data:
-            st.error("系統讀取不到組長清單，請檢查 Firebase 設定。")
-            st.stop()
+        staff_map = staff_req.json() or {}
+        leader_list = list(staff_map.keys())
     except Exception as e:
-        st.error(f"資料讀取失敗，請確認網路連線：{e}")
-        st.stop()
+        st.error(f"讀取資料失敗: {e}")
+        leader_list = []
+        staff_map = {}
 
-    # --- 第一步：選擇組長 ---
-    # 這裡強制指定 key="sel_leader"，解決 DuplicateElementId 錯誤
-    selected_leader = st.selectbox("👤 選擇所屬組長：", options=leaders_data, key="sel_leader")
-    
-    # --- 第二步：選擇組員 ---
-    # 處理 Firebase 字典結構 (處理 {0: "名字", 1: "名字"} 格式)
-    target_members_raw = staff_map.get(selected_leader, {})
-    
-    # 轉換成列表
-    if isinstance(target_members_raw, dict):
-        members_list = [v for v in target_members_raw.values() if isinstance(v, str)]
-    elif isinstance(target_members_raw, list):
-        members_list = target_members_raw
-    else:
-        members_list = []
+    st.header("每日 6S 任務回報中心")
+    st.write(f"今日日期：{today_str}")
 
-    if not members_list:
-        st.warning("⚠️ 此組長尚未在後台配置屬下同仁，請聯繫管理員。")
-        selected_user = None
-    else:
-        # 這裡強制指定 key="sel_member"
-        selected_user = st.selectbox("🎯 選擇回報同仁姓名：", options=members_list, key="sel_member")
+    # 第一步：選擇組長 (加上 key 防止錯誤)
+    selected_leader = st.selectbox("選擇所屬組長", options=leader_list, key="unique_leader_select")
 
-    st.divider()
-
-    # --- 第三步：領取獎勵邏輯 ---
-    if selected_user:
-        st.markdown(f"### 🚀 送出回報領取獎勵")
-        st.info(f"系統將發放點數給：**{selected_user}**")
+    # 第二步：選擇組員
+    if selected_leader:
+        members_dict = staff_map.get(selected_leader, {})
+        # 將字典格式 {0: "名字"} 轉成列表 ["名字"]
+        members_list = [str(v) for v in members_dict.values()]
         
-        # 檢查是否已完成
-        log_url = f"{BASE_URL}/work_logs/{today_str}/{selected_user}.json"
-        check_log = requests.get(log_url).json()
+        selected_user = st.selectbox("選擇回報同仁姓名", options=members_list, key="unique_user_select")
         
-        if check_log:
-            st.error(f"❌ 您今天 ({today_str}) 已經完成過任務回報囉！")
-        else:
-            if st.button("✨ 繳交今日 6S 成果，領取點數！", type="primary", use_container_width=True):
-                # 1. 寫入完成記錄
-                report_data = {
-                    "leader": selected_leader,
-                    "timestamp": datetime.now(TZ).strftime("%Y-%m-%d %H:%M:%S"),
-                    "status": "done"
-                }
-                requests.put(log_url, json=report_data)
+        if selected_user:
+            st.info(f"準備發放點數給：{selected_user}")
+            
+            # 回報按鈕
+            if st.button("確認繳交今日 6S 成果"):
+                # 檢查今日是否已領取
+                log_url = f"{BASE_URL}/work_logs/{today_str}/{selected_user}.json"
+                check_res = requests.get(log_url).json()
                 
-                # 2. 更新點數 (讀取現有數值)
-                player_url = f"{BASE_URL}/skills_current_status/{selected_user}.json"
-                player_data = requests.get(player_url).json() or {}
-                
-                # 確保數值為數字
-                current_pts = int(player_data.get("avail_pts", 0))
-                player_data["avail_pts"] = current_pts + 1
-                
-                requests.put(player_url, json=player_data)
-                
-                st.success(f"🎉 恭喜 {selected_user}！已領取 1 點自由點數！")
-                st.balloons()
+                if check_res:
+                    st.warning("今日已領取過，請勿重複回報。")
+                else:
+                    # 1. 寫入記錄
+                    requests.put(log_url, json={"status": "done", "time": str(datetime.now(tz_taiwan))})
+                    
+                    # 2. 更新點數
+                    user_url = f"{BASE_URL}/skills_current_status/{selected_user}.json"
+                    user_data = requests.get(user_url).json() or {}
+                    
+                    # 處理舊點數，確保為整數
+                    try:
+                        current_pts = int(user_data.get("avail_pts", 0))
+                    except:
+                        current_pts = 0
+                        
+                    user_data["avail_pts"] = current_pts + 1
+                    requests.put(user_url, json=user_data)
+                    
+                    st.success(f"成功！已為 {selected_user} 增加 1 點自由點數。")
       
     
     # --- ⚙️ 設定管理 ---
