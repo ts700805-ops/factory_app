@@ -514,8 +514,13 @@ else:
             if start_battle and current_user != "未登入同仁":
                 @st.dialog("⚔️ 戰境決鬥場 ⚔️")
                 def run_battle_simulation(p1, p2, p1_data, p2_data):
-                    # --- 強制將對話視窗內文字改為黑色 ---
-                    st.markdown("""<style>[data-testid="stMarkdownContainer"] { color: black !important; }</style>""", unsafe_allow_html=True)
+                    # --- 強制設定黑色文字，對整個對話框有效 ---
+                    st.markdown("""
+                        <style>
+                        [data-modal-container] * { color: black !important; }
+                        [data-testid="stMarkdownContainer"] { color: black !important; }
+                        </style>
+                    """, unsafe_allow_html=True)
                     
                     p1_total = int(p1_data.get("str",0))+int(p1_data.get("vit",0))+int(p1_data.get("agi",0))+int(p1_data.get("cha",0))
                     p2_total = int(p2_data.get("str",0))+int(p2_data.get("vit",0))+int(p2_data.get("agi",0))+int(p2_data.get("cha",0))
@@ -581,6 +586,34 @@ else:
 
         st.divider()
 
+        # ==========================================
+        # ⚙️ 後台稱謂門檻設定區
+        # ==========================================
+        st.markdown("### ⚙️ 6S 戰境養成管理後台")
+        with st.expander("🔒 稱謂晉升門檻點數自訂"):
+            f_col1, f_col2 = st.columns(2)
+            with f_col1:
+                in_lv1 = st.text_input("等級1名稱", value=lv1_name)
+                in_lv2 = st.text_input("等級2名稱", value=lv2_name)
+                in_lv3 = st.text_input("等級3名稱", value=lv3_name)
+                in_lv4 = st.text_input("等級4名稱", value=lv4_name)
+            with f_col2:
+                pt_lv1 = st.number_input("等級1所需配點總數", value=lv1_pts)
+                pt_lv2 = st.number_input("等級2所需配點總數", value=lv2_pts)
+                pt_lv3 = st.number_input("等級3所需配點總數", value=lv3_pts)
+                pt_lv4 = st.number_input("等級4所需配點總數", value=lv4_pts)
+
+            if st.button("💾 儲存後台配置設定", use_container_width=True):
+                save_payload = {
+                    "lv1_name": str(in_lv1), "lv1_pts": int(pt_lv1),
+                    "lv2_name": str(in_lv2), "lv2_pts": int(pt_lv2),
+                    "lv3_name": str(in_lv3), "lv3_pts": int(pt_lv3),
+                    "lv4_name": str(in_lv4), "lv4_pts": int(pt_lv4),
+                }
+                requests.put(f"{GAME_CONFIG_URL}.json", data=json.dumps(save_payload))
+                st.success("後台晉升設定更新完成！")
+                time.sleep(0.5)
+                st.rerun()
         # ==========================================
         # ⚙️ 後台稱謂門檻設定區
         # ==========================================
