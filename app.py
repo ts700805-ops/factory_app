@@ -1189,7 +1189,7 @@ else:
 
     # --- 📝 每日6S回報區---
     elif st.session_state.menu_selection == "📝 每日6S回報區":
-        st.title("📝 任務指派與編輯")
+        st.title("📝 每日6S回報區")
         current_leader = st.session_state.user
         my_team = staff_map.get(current_leader, all_staff)
         with st.form("dispatch_form"):
