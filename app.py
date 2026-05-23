@@ -182,7 +182,7 @@ else:
     st.sidebar.markdown(f"### 👤 當前人員：**{st.session_state.user}**")
     nav = st.sidebar.radio("功能導航", [
    
-    "📋 員工技能考核進度", 
+    "💡2o26上半年技能考核進度", 
     "📊 製造部派工專區", 
     "📜 完工紀錄查詢", 
     "🔧 固資&手工具紀錄表",
@@ -388,9 +388,9 @@ else:
             st.error(f"系統偵測到錯誤：{str(e)}")
             st.warning("目前系統資料緩衝中，請稍後再試。")
             
-# --- 📈 工時統計分析 (已修改為 📊 8人並列圓形技能評核表-可切換組長鎖定版) ---
-    elif st.session_state.menu_selection == "📋 員工技能考核進度":
-        st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📋 員工技能考核進度</h1>', unsafe_allow_html=True)
+# --- 📈💡2o26上半年技能考核進度 ---
+    elif st.session_state.menu_selection == "💡2o26上半年技能考核進度":
+        st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">💡2o26上半年技能考核進度</h1>', unsafe_allow_html=True)
         
         # 1. 取得當前登入的組長名字
         logged_in_user = st.session_state.user 
