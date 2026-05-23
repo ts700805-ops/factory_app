@@ -231,117 +231,77 @@ else:
 elif st.session_state.menu_selection == "每日6S任務回報":
     import requests
     import json
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timezone, timedelta
     import time
 
-    # 1. 頁面標題 (在這裡可以使用 emoji)
-    st.markdown('''
-        <div style="text-align:center; margin-bottom:2rem;">
-            <h1 style="color:#60A5FA !important; font-weight:900 !important; font-size: 3.5rem !important; display:inline-block;">
-                📋 每日 6S 任務回報中心
-            </h1>
-            <p style="color:#9CA3AF;">完成今日現場回報，即可領取 1 點自由屬性點數！</p>
-        </div>
-    ''', unsafe_allow_html=True)
+    # 顯示頁面標題
+    st.markdown("### 📋 每日 6S 任務回報中心")
+    st.write("完成今日現場回報，即可領取 1 點自由屬性點數！")
 
-    # 2. 基礎路徑設定
+    # 基礎設定
     BASE_URL = globals().get('DB_URL', "https://my-factory-system-default-rtdb.firebaseio.com")
     GAME_DB_URL = f"{BASE_URL}/game_rpg_data"
     REPORT_LOG_URL = f"{BASE_URL}/daily_6s_report_logs"
-
-    # 3. 時間與資料抓取
+    
     tz_taiwan = timezone(timedelta(hours=8))
     today_tw_str = datetime.now(tz_taiwan).strftime("%Y-%m-%d")
-    st.info(f"📅 任務結算基準日（台北時間）：**{today_tw_str}**")
 
-    # 讀取後台資料
+    # 抓取並解析資料
     try:
-        leaders_raw = requests.get(f"{BASE_URL}/leaders_list.json").json() or ""
-        leader_list = [l.strip() for l in leaders_raw.split(",")] if isinstance(leaders_raw, str) else []
+        leaders_data = requests.get(f"{BASE_URL}/leaders_list.json").json()
+        leader_list = [l.strip() for l in leaders_data.split(",")] if isinstance(leaders_data, str) else []
         
-        raw_data_1 = requests.get(f"{BASE_URL}/leader_members.json").json() or ""
-        raw_data_2 = requests.get(f"{BASE_URL}/leader_members_2.json").json() or ""
+        # 讀取人員對應表
+        raw_1 = requests.get(f"{BASE_URL}/leader_members.json").json() or ""
+        raw_2 = requests.get(f"{BASE_URL}/leader_members_2.json").json() or ""
         
-        combined_lines = []
-        if isinstance(raw_data_1, str): combined_lines.extend(raw_data_1.splitlines())
-        if isinstance(raw_data_2, str): combined_lines.extend(raw_data_2.splitlines())
-
-        leader_member_mapping = {}
-        for line in combined_lines:
-            line = line.strip().replace("：", ":")
+        lines = []
+        if isinstance(raw_1, str): lines.extend(raw_1.splitlines())
+        if isinstance(raw_2, str): lines.extend(raw_2.splitlines())
+        
+        leader_map = {}
+        for line in lines:
             if ":" in line:
                 parts = line.split(":", 1)
-                l_name = parts[0].strip()
-                m_list = [m.strip() for m in parts[1].split(",") if m.strip()]
-                if l_name: leader_member_mapping[l_name] = m_list
+                leader_map[parts[0].strip()] = [m.strip() for m in parts[1].split(",") if m.strip()]
     except:
         leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
-        leader_member_mapping = {}
+        leader_map = {}
 
-    if not leader_list: 
-        leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
-
-    # 4. 介面操作區 (每個元件都加上了唯一的 key)
-    st.markdown("### 🔍 第一步：確認您的身份")
-    col_leader, col_member = st.columns(2)
+    # 介面選擇 (已加入 key 防止 DuplicateElementId)
+    col1, col2 = st.columns(2)
+    with col1:
+        selected_leader = st.selectbox("選擇所屬組長：", leader_list, key="6s_key_leader_select")
     
-    with col_leader:
-        selected_leader = st.selectbox("👤 選擇所屬組長：", leader_list, key="6s_leader_input")
-    
-    with col_member:
-        available_members = leader_member_mapping.get(selected_leader, [])
-        if available_members:
-            selected_user = st.selectbox("🎯 選擇回報同仁姓名：", available_members, key="6s_member_input")
-            has_members = True
+    with col2:
+        members = leader_map.get(selected_leader, [])
+        if members:
+            selected_user = st.selectbox("選擇同仁姓名：", members, key="6s_key_member_select")
+            has_data = True
         else:
-            st.warning("⚠️ 此組長尚未配置同仁")
+            st.warning("該組長下無設定人員")
             selected_user = None
-            has_members = False
+            has_data = False
 
-    st.divider()
-
-    # 5. 回報邏輯 (使用了唯一的按鈕 key)
-    st.markdown("### 🚀 第二步：送出回報領取獎勵")
-    if not has_members:
-        st.error("❌ 無法回報：請確認後台設定")
-    else:
-        st.warning(f"⚠️ 請注意：每人每日限領取一次。撥發 1 點給【{selected_user}】")
-
-        if st.button(f"✨ 繳交今日 6S 成果，領取點數！", use_container_width=True, type="primary", key="6s_submit_button"):
-            safe_user_key = str(selected_user).strip()
-            
-            # 檢查是否已重複回報
-            check_exist = requests.get(f"{REPORT_LOG_URL}/{today_tw_str}/{safe_user_key}.json").json()
-
-            if check_exist is not None:
-                st.error(f"❌ 提示：【{selected_user}】今天 ({today_tw_str}) 已回報過囉！")
+    # 提交邏輯 (已加入 key)
+    if has_data:
+        if st.button(f"送出回報：{selected_user}", key="6s_key_submit_btn"):
+            # 檢查重複
+            check_url = f"{REPORT_LOG_URL}/{today_tw_str}/{selected_user}.json"
+            if requests.get(check_url).json() is not None:
+                st.error(f"【{selected_user}】今日已回報過！")
             else:
-                # 寫入回報紀錄
-                report_payload = {
-                    "reported_at": str(datetime.now(tz_taiwan).strftime("%Y-%m-%d %H:%M:%S")),
-                    "leader": str(selected_leader),
-                    "status": "已完成"
-                }
-                requests.put(f"{REPORT_LOG_URL}/{today_tw_str}/{safe_user_key}.json", json=report_payload)
-
-                # 更新點數
-                player_rpg_data = requests.get(f"{GAME_DB_URL}/{safe_user_key}.json").json() or {}
-                current_avail_pts = int(player_rpg_data.get("avail_pts", 0))
+                # 寫入回報
+                payload = {"time": datetime.now(tz_taiwan).strftime("%H:%M:%S"), "status": "done"}
+                requests.put(check_url, json=payload)
                 
-                update_rpg_payload = {
-                    "str": int(player_rpg_data.get("str", 0)),
-                    "vit": int(player_rpg_data.get("vit", 0)),
-                    "agi": int(player_rpg_data.get("agi", 0)),
-                    "cha": int(player_rpg_data.get("cha", 0)),
-                    "avail_pts": current_avail_pts + 1
-                }
-                requests.put(f"{GAME_DB_URL}/{safe_user_key}.json", json=update_rpg_payload)
-
-                # 成功提示與跳轉
-                st.balloons()
-                st.success(f"🎉 大成功！【{selected_user}】今日 6S 回報完畢！")
-                time.sleep(1.2)
-                st.session_state.menu_selection = "6S戰境養成" # 這裡也對應移除 emoji
+                # 增加點數
+                user_data = requests.get(f"{GAME_DB_URL}/{selected_user}.json").json() or {}
+                pts = int(user_data.get("avail_pts", 0)) + 1
+                user_data["avail_pts"] = pts
+                requests.put(f"{GAME_DB_URL}/{selected_user}.json", json=user_data)
+                
+                st.success("回報成功！")
                 st.rerun()
 
 
