@@ -1229,33 +1229,19 @@ else:
         leaders_raw = requests.get(f"{BASE_URL}/leaders_list.json").json() or ""
         leader_list = [l.strip() for l in leaders_raw.split(",") if l.strip()] if isinstance(leaders_raw, str) else []
 
-        # 3. 【核心修正】完全依照後台資料解析，不強制先套用保底
-        raw_data_1 = requests.get(f"{BASE_URL}/leader_members.json").json() or ""
-        raw_data_2 = requests.get(f"{BASE_URL}/leader_members_2.json").json() or "" 
-        
-        combined_lines = []
-        if isinstance(raw_data_1, str):
-            combined_lines.extend(raw_data_1.splitlines())
-        if isinstance(raw_data_2, str):
-            combined_lines.extend(raw_data_2.splitlines())
-
-        # 建立空的映射表
-        leader_member_mapping = {}
-
-        # 先解析後台設定，以確保後台是最高優先級
-        for line in combined_lines:
-            line = line.strip()
-            if not line: continue
-            line_fixed = line.replace("：", ":")
-            if ":" in line_fixed:
-                parts = line_fixed.split(":")
-                l_name = parts[0].strip()
-                m_list = [m.strip() for m in parts[1].split(",") if m.strip()]
-                if l_name and m_list:
-                    leader_member_mapping[l_name] = m_list
-
-        # 如果後台完全沒讀到任何資料，才啟用保底名單
-        if not leader_member_mapping:
+     # 3. 【核心修正】直接讀取 Firebase 的 staff_map 結構
+        # 這樣就不需要再去處理複雜的文字斷行，直接用現成的字典格式
+        try:
+            staff_data = requests.get(f"{BASE_URL}/staff_map.json").json()
+        except:
+            staff_data = None
+            
+        # 建立組長-組員對照表
+        if staff_data and isinstance(staff_data, dict):
+            # 直接使用後台的 staff_map 資料
+            leader_member_mapping = staff_data
+        else:
+            # 如果讀不到資料，才啟用保底名單
             leader_member_mapping = {
                 "陳德文": ["徐梓翔", "牟育玄", "林建安", "魏瑄毅", "羅立昕", "江金福", "呂是儒", "邱信維", "張瑀榛", "陳宛廷", "戴鎰祥", "鍾明志", "黃瑞翎", "羅文發", "羅章淳", "蕭桓惟", "周棟榮", "李偉誠", "潘信成", "張瑀榛", "周政龍", "傑米", "達文", "吉爾"],
                 "劉志偉": ["劉定澤", "胡瑄芸", "蕭詩瓊", "劉秀鳳", "龍才華", "龍斯愷", "姜治銘", "彭毓萱", "邱珍娜", "陳建勳", "黃建堃", "麥可", "費南"],
@@ -1265,9 +1251,9 @@ else:
                 "李俊霖": ["陳育信", "陳凱彥"]
             }
 
-        # 如果主清單在後台是空的，自動採用預設完整組長清單
+        # 如果主清單在後台是空的，我們從 staff_map 的 key 自動取得組長清單，保證不會顯示錯誤
         if not leader_list:
-            leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
+            leader_list = list(leader_member_mapping.keys())
 
         # 介面渲染：選擇組長與成員
         st.markdown("### 🔍 第一步：確認您的身份")
