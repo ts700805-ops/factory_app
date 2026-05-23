@@ -665,7 +665,7 @@ else:
 
 
 # --- 📊 製造部派工專區 ---
-    if st.session_state.menu_selection == "📊 製造部派工專區":
+        if st.session_state.menu_selection == "📊 製造部派工專區":
         st.markdown('<h1 style="text-align:center; color:#34d399; font-weight:900;">📋 製造部派工進度看板</h1>', unsafe_allow_html=True)
 
         @st.dialog("👥 編輯施工人員", width="medium")
