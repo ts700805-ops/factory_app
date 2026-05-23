@@ -417,10 +417,11 @@ else:
 # ==========================================
     # 🎮 6S 戰境養成功能區塊
     # ==========================================
-    elif st.session_state.get("menu_selection") and "6S戰境養成" in str(st.session_state.menu_selection):
+   # 更改為獨立 if 判定，徹底解決 elif 造成的 SyntaxError 語法錯誤
+    if st.session_state.get("menu_selection") and "6S戰境養成" in str(st.session_state.menu_selection):
         import random
         import time
-        import json
+        import json # 確保有載入 json 模組
 
         st.markdown(
             '''
@@ -447,7 +448,7 @@ else:
             GAME_CONFIG_URL = "https://your-firebase-url/game_config"
             BASE_URL = "https://your-firebase-url"
 
-        # 1. 取得當前登入者
+        # 1. 取得當前登入者 (配合回報中心傳遞的 user)
         current_user = str(st.session_state.get("user", "未登入同仁")).strip()
         
         # 2. 讀取目前玩家的 RPG 資料庫
@@ -457,6 +458,7 @@ else:
         # 防呆確保數值是數字
         u_str = int(user_stats.get("str", 0))
         u_vit = int(user_stats.get("vit", 0))
+        u_agi = int(user_stats.get("agi", 0))
         u_cha = int(user_stats.get("cha", 0))
         u_pts = int(user_stats.get("avail_pts", 0))
         u_title = user_stats.get("level_name", "🌾 平民")
@@ -483,7 +485,6 @@ else:
                 st.rerun()
 
         with col_agi:
-            u_agi = int(user_stats.get("agi", 0))
             st.metric("⚡ 敏捷 (閃避率)", f"{u_agi} 點", f"+{u_agi * 2}%")
             if u_pts > 0 and st.button("➕ 加敏捷", key="add_agi_btn"):
                 user_stats["agi"] = u_agi + 1
@@ -512,9 +513,12 @@ else:
 
         st.divider()
 
+        # ==========================================
         # ⚔️ 尋找現場同仁發起決鬥系統
+        # ==========================================
         st.markdown("### ⚔️ 尋找現場同仁發起決鬥")
 
+        # 讀取對照表以抓取所有可能同仁名單
         raw_staff = requests.get(f"{BASE_URL}/leader_members.json").json() or ""
         all_opponents = []
         if isinstance(raw_staff, str):
@@ -525,6 +529,7 @@ else:
                         members = [m.strip() for m in parts[1].split(",") if m.strip()]
                         all_opponents.extend(members)
         
+        # 移除重複與自己
         all_opponents = sorted(list(set(all_opponents)))
         if current_user in all_opponents:
             all_opponents.remove(current_user)
@@ -534,78 +539,11 @@ else:
         else:
             target_user = st.selectbox("🎯 選擇決鬥對手同仁：", all_opponents, key="duel_target_select")
             
-            # 建立內嵌對話框
-         @st.dialog("⚔️ 戰境決鬥場 ⚔️", width="large")
-            def run_duel_popup(p1_title, p1_name, p1_hp, p1_atk, p2_title, p2_name, p2_hp, p2_atk):
-        
-    st.divider()
-
-        
-        # --- 2. 接下來如果是跑戰鬥回合紀錄的迴圈 (範例) ---
-        # 如果你下面有用迴圈印出每回合受傷紀錄，請確保也用同樣方式轉成黑色：
-        st.markdown('<p style="color: #000000 !important; font-weight: bold; font-size: 1.2rem;">⚔️ 戰鬥開始 ⚔️</p>', unsafe_allow_html=True)
-        
-        # 範例迴圈（請維持你原本的戰鬥邏輯，只改 st.markdown 部分）
-        # while p1_hp > 0 and p2_hp > 0:
-        #     ... 戰鬥計算 ...
-        #     st.markdown(f'<p style="color: #000000 !important;">💥 {p1_name} 發動攻擊，造成 {p2_name} XXX 點傷害</p>', unsafe_allow_html=True)
-                # 頂部數據區塊：使用 CSS 強制將所有文字設為純黑色（#000000），並加上強大覆蓋力 !important
-                st.markdown(
-                    f'''
-                    <div style="color: #000000 !important; font-family: sans-serif; background-color: #FFFFFF; padding: 15px; border-radius: 8px; border: 1px solid #E5E7EB; margin-bottom: 15px;">
-                        <h3 style="color: #1E40AF !important; margin-top: 0; margin-bottom: 10px; font-weight: bold;">🥊 雙方數據就緒！</h3>
-                        <p style="margin: 5px 0; font-size: 1.2rem; color: #000000 !important; font-weight: bold;">
-                            🔴 <b>【{p1_title}】{p1_name}</b> (HP: {p1_hp} / ATK: {p1_atk})
-                        </p>
-                        <p style="margin: 5px 0; font-size: 1.2rem; color: #000000 !important; font-weight: bold;">
-                            🔵 <b>【{p2_title}】{p2_name}</b> (HP: {p2_hp} / ATK: {p2_atk})
-                        </p>
-                    </div>
-                    ''', 
-                    unsafe_allow_html=True
-                )
-                
-                hp1, hp2 = p1_hp, p2_hp
-                round_num = 1
-                logs_html = '<div style="color: #000000 !important; font-size: 1.05rem; line-height: 1.6; font-weight: 500;">'
-
-                while hp1 > 0 and hp2 > 0 and round_num <= 10:
-                    dmg1 = max(1, p1_atk + random.randint(-3, 3))
-                    hp2 -= dmg1
-                    logs_html += f"⚔️ <b>第 {round_num} 回合</b>：【{p1_title}】{p1_name} 攻擊，對 【{p2_title}】{p2_name} 造成 <span style='color:#DC2626; font-weight:bold;'>{dmg1}</span> 點傷害！<br>"
-                    if hp2 <= 0: break
-                    
-                    dmg2 = max(1, p2_atk + random.randint(-3, 3))
-                    hp1 -= dmg2
-                    logs_html += f"🛡️ <b>第 {round_num} 回合</b>：【{p2_title}】{p2_name} 反擊，對 【{p1_title}】{p1_name} 造成 <span style='color:#2563EB; font-weight:bold;'>{dmg2}</span> 點傷害！<br>"
-                    logs_html += "<div style='margin-bottom: 8px;'></div>"
-                    round_num += 1
-
-                logs_html += "</div>"
-                st.markdown(logs_html, unsafe_allow_html=True)
-                
-                if hp1 > hp2:
-                    winner_text = f"🏆 【{p1_title}】{p1_name} 獲勝！"
-                    bg_color = "#000000"
-                    text_color = "#000000" # 修改為更深黑的顏色
-                else:
-                    winner_text = f"🏆 【{p2_title}】{p2_name} 獲勝！"
-                    bg_color = "#000000"
-                    text_color = "#000000" # 修改為更深黑的顏色
-                    
-                # 底部勝負宣告區塊：使用強制黑色字體 color: #000000 !important
-                st.markdown(
-                    f'''
-                    <div style="background-color: {bg_color}; border: 2px solid #9CA3AF; padding: 1.2rem; border-radius: 8px; margin-top: 15px; text-align: center;">
-                        <h3 style="color: #000000 !important; margin: 0; font-size: 1.6rem; font-weight: 900 !important;">{winner_text}</h3>
-                    </div>
-                    ''', 
-                    unsafe_allow_html=True
-                )
-
+            # 點擊按鈕跳出對話框 (強制定調文字為黑色防止白底遮蔽)
             if st.button(f"💥 與 【{target_user}】 展開 6S 實力對決！", use_container_width=True, type="primary"):
                 target_stats = all_players_data.get(target_user, {"str": 0, "vit": 0, "agi": 0, "cha": 0, "level_name": "🌾 平民"})
                 
+                # 計算戰鬥屬性 (基礎值 + 點數加成)
                 p1_hp = 100 + int(user_stats.get("vit", 0)) * 30
                 p1_atk = 15 + int(user_stats.get("str", 0)) * 2
                 p1_title = user_stats.get("level_name", "🌾 平民")
@@ -614,21 +552,71 @@ else:
                 p2_atk = 15 + int(target_stats.get("str", 0)) * 2
                 p2_title = target_stats.get("level_name", "🌾 平民")
 
-                st.session_state["trigger_duel_popup"] = {
-                    "p1_title": p1_title, "p1_name": current_user, "p1_hp": p1_hp, "p1_atk": p1_atk,
-                    "p2_title": p2_title, "p2_name": target_user, "p2_hp": p2_hp, "p2_atk": p2_atk
-                }
+                # 對話框宣告：用強制的 style="color: #111827 !important;" 鎖定黑字
+                @st.dialog("⚔️ 戰境決鬥場 ⚔️", width="large")
+                def show_battle_logs():
+                    st.markdown(
+                        f'''
+                        <div style="color: #111827 !important; font-family: sans-serif;">
+                            <h3 style="color: #1E40AF !important; margin-bottom: 5px;">🥊 雙方數據就緒！</h3>
+                            <p style="margin: 3px 0; font-size: 1.1rem; color: #111827 !important;">🔴 <b>【{p1_title}】{current_user}</b> (HP: {p1_hp} / ATK: {p1_atk})</p>
+                            <p style="margin: 3px 0; font-size: 1.1rem; color: #111827 !important;">🔵 <b>【{p2_title}】{target_user}</b> (HP: {p2_hp} / ATK: {p2_atk})</p>
+                            <hr style="border-top: 1px solid #CCC; margin: 10px 0;">
+                        </div>
+                        ''', 
+                        unsafe_allow_html=True
+                    )
+                    
+                    hp1, hp2 = p1_hp, p2_hp
+                    round_num = 1
+                    logs_html = '<div style="color: #111827 !important; font-size: 1rem; line-height: 1.6;">'
 
-            if "trigger_duel_popup" in st.session_state:
-                p_params = st.session_state.pop("trigger_duel_popup")
-                run_duel_popup(**p_params)
+                    while hp1 > 0 and hp2 > 0 and round_num <= 10:
+                        # 隨機波動攻擊力
+                        dmg1 = max(1, p1_atk + random.randint(-3, 3))
+                        hp2 -= dmg1
+                        logs_html += f"⚔️ <b>第 {round_num} 回合</b>：【{p1_title}】{current_user} 攻擊，對 【{p2_title}】{target_user} 造成 <span style='color:#DC2626;'><b>{dmg1}</b></span> 點傷害！<br>"
+                        if hp2 <= 0: break
+                        
+                        dmg2 = max(1, p2_atk + random.randint(-3, 3))
+                        hp1 -= dmg2
+                        logs_html += f"🛡️ <b>第 {round_num} 回合</b>：【{p2_title}】{target_user} 反擊，對 【{p1_title}】{current_user} 造成 <span style='color:#2563EB;'><b>{dmg2}</b></span> 點傷害！<br>"
+                        logs_html += "<div style='margin-bottom: 8px;'></div>"
+                        round_num += 1
 
-        # 管理後台
+                    logs_html += "</div>"
+                    st.markdown(logs_html, unsafe_allow_html=True)
+                    
+                    # 判定勝負結果
+                    if hp1 > hp2:
+                        winner_text = f"🏆 【{p1_title}】{current_user} 獲勝！"
+                        bg_color = "#DCFCE7"
+                        text_color = "#166534"
+                    else:
+                        winner_text = f"🏆 【{p2_title}】{target_user} 獲勝！"
+                        bg_color = "#FEE2E2"
+                        text_color = "#991B1B"
+                        
+                    st.markdown(
+                        f'''
+                        <div style="background-color: {bg_color}; border: 1px solid {text_color}; padding: 1rem; border-radius: 8px; margin-top: 15px; text-align: center;">
+                            <h3 style="color: {text_color} !important; margin: 0; font-size: 1.5rem; font-weight: bold;">{winner_text}</h3>
+                        </div>
+                        ''', 
+                        unsafe_allow_html=True
+                    )
+
+                show_battle_logs()
+
+        # ==========================================
+        # ⚙️ 6S 戰境養成管理後台 (調整階級與自訂功能)
+        # ==========================================
         st.write("")
         st.write("")
         with st.expander("⚙️ 6S 戰境養成管理後台"):
             st.markdown("##### 👑 稱號與升級門檻點數自訂")
             
+            # 從配置檔下載目前的稱號設定或給予初始值
             config_data = requests.get(f"{GAME_CONFIG_URL}.json").json() or {}
             titles_list = config_data.get("titles", ["🌾 平民", "⚔️ 驍勇新兵", "🛡️ 堅毅騎士", "🦅 戰境領主", "👑 傳奇戰神"])
             
@@ -643,19 +631,19 @@ else:
                 config_data["titles"] = new_titles
                 requests.put(f"{GAME_CONFIG_URL}.json", data=json.dumps(config_data))
                 
+                # 自動重新批次計算所有在線玩家的頭銜更新
                 for player, p_data in all_players_data.items():
                     total_pts = int(p_data.get("str", 0)) + int(p_data.get("vit", 0)) + int(p_data.get("agi", 0)) + int(p_data.get("cha", 0))
-                    if total_pts >= 100: p_data["level_name"] = new_titles[4]
-                    elif total_pts >= 60: p_data["level_name"] = new_titles[3]
-                    elif total_pts >= 30: p_data["level_name"] = new_titles[2]
-                    elif total_pts >= 10: p_data["level_name"] = new_titles[1]
+                    if total_pts >= 100: p_data["level_name"] = new_titles[5-1]
+                    elif total_pts >= 60: p_data["level_name"] = new_titles[4-1]
+                    elif total_pts >= 30: p_data["level_name"] = new_titles[3-1]
+                    elif total_pts >= 10: p_data["level_name"] = new_titles[2-1]
                     else: p_data["level_name"] = new_titles[0]
                     requests.put(f"{GAME_DB_URL}/{player}.json", data=json.dumps(p_data))
                 
                 st.success("✅ 階級稱號更新成功！系統已將所有人員名單頭銜同步洗牌。")
                 time.sleep(1)
                 st.rerun()
-                
       
 
 
