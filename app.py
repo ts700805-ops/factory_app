@@ -554,18 +554,18 @@ else:
 
                 @st.dialog("⚔️ 戰境決鬥場 ⚔️", width="large")
                 def show_battle_logs():
-                    # 數據顯示區塊：白底黑邊
+                    # 數據顯示區塊：調整為紫色調風格
                     st.markdown(
                         f"""
-                        <div style="color:#000000 !important; font-family:sans-serif; background-color: #ffffff; border: 2px solid #000000; padding: 15px; border-radius: 8px;">
-                            <h3 style="color:#000000 !important; margin-bottom:5px;">🥊 雙方數據就緒！</h3>
-                            <p style="margin:3px 0; font-size:1.1rem; color:#000000 !important;">
+                        <div style="color:#000000 !important; font-family:sans-serif; background-color: #F3E8FF; border: 3px solid #7E22CE; padding: 20px; border-radius: 12px;">
+                            <h3 style="color:#4C1D95 !important; margin-bottom:10px;">🥊 雙方數據就緒！</h3>
+                            <p style="margin:5px 0; font-size:1.1rem; color:#000000 !important;">
                                 🔴 <b>【{p1_title}】{current_user}</b> (HP: {p1_hp} / ATK: {p1_atk})
                             </p>
-                            <p style="margin:3px 0; font-size:1.1rem; color:#000000 !important;">
+                            <p style="margin:5px 0; font-size:1.1rem; color:#000000 !important;">
                                 🔵 <b>【{p2_title}】{target_user}</b> (HP: {p2_hp} / ATK: {p2_atk})
                             </p>
-                            <hr style="border-top:1px solid #000000; margin:10px 0;">
+                            <hr style="border-top:2px solid #7E22CE; margin:15px 0;">
                         </div>
                         """,
                         unsafe_allow_html=True
@@ -573,36 +573,35 @@ else:
                     
                     hp1, hp2 = p1_hp, p2_hp
                     round_num = 1
-                    logs_html = '<div style="color: #000000 !important; font-size: 1rem; line-height: 1.6; background-color: #ffffff; border: 1px solid #000000; padding: 10px; border-radius: 5px; margin-top: 10px;">'
+                    # 戰鬥紀錄區塊：同樣調整為紫色調
+                    logs_html = '<div style="color: #000000 !important; font-size: 1rem; line-height: 1.6; background-color: #ffffff; border: 2px solid #7E22CE; padding: 15px; border-radius: 8px; margin-top: 15px;">'
 
                     while hp1 > 0 and hp2 > 0 and round_num <= 10:
                         dmg1 = max(1, p1_atk + random.randint(-3, 3))
                         hp2 -= dmg1
-                        logs_html += f"⚔️ <b>第 {round_num} 回合</b>：【{p1_title}】{current_user} 攻擊，對 【{p2_title}】{target_user} 造成 <span style='color:#DC2626;'><b>{dmg1}</b></span> 點傷害！<br>"
+                        logs_html += f"⚔️ <b>第 {round_num} 回合</b>：【{p1_title}】{current_user} 攻擊，造成 <span style='color:#7E22CE;'><b>{dmg1}</b></span> 點傷害！<br>"
                         if hp2 <= 0: break
                         
                         dmg2 = max(1, p2_atk + random.randint(-3, 3))
                         hp1 -= dmg2
-                        logs_html += f"🛡️ <b>第 {round_num} 回合</b>：【{p2_title}】{target_user} 反擊，對 【{p1_title}】{current_user} 造成 <span style='color:#2563EB;'><b>{dmg2}</b></span> 點傷害！<br>"
+                        logs_html += f"🛡️ <b>第 {round_num} 回合</b>：【{p2_title}】{target_user} 反擊，造成 <span style='color:#7E22CE;'><b>{dmg2}</b></span> 點傷害！<br>"
                         logs_html += "<div style='margin-bottom: 8px;'></div>"
                         round_num += 1
 
                     logs_html += "</div>"
                     st.markdown(logs_html, unsafe_allow_html=True)
                     
-                    # 判定勝負結果：白底黑邊
+                    # 判定勝負結果：紫色調強調框
                     winner_text = f"🏆 【{p1_title}】{current_user} 獲勝！" if hp1 > hp2 else f"🏆 【{p2_title}】{target_user} 獲勝！"
-                    result_color = "#000000" if hp1 > hp2 else "#000000"
                         
                     st.markdown(
                         f'''
-                        <div style="background-color: #ffffff; border: 2px solid #000000; padding: 1rem; border-radius: 8px; margin-top: 15px; text-align: center;">
-                            <h3 style="color: {result_color} !important; margin: 0; font-size: 1.5rem; font-weight: bold;">{winner_text}</h3>
+                        <div style="background-color: #EDE9FE; border: 3px solid #7E22CE; padding: 1.5rem; border-radius: 12px; margin-top: 15px; text-align: center;">
+                            <h3 style="color: #581C87 !important; margin: 0; font-size: 1.6rem; font-weight: bold;">{winner_text}</h3>
                         </div>
                         ''', 
                         unsafe_allow_html=True
                     )
-
                 show_battle_logs()
 
         
