@@ -552,7 +552,7 @@ else:
                 p2_atk = 15 + int(target_stats.get("str", 0)) * 2
                 p2_title = target_stats.get("level_name", "🌾 平民")
 
-                # 對話框宣告：用強制的 style="color: #111827 !important;" 鎖定黑字
+                # 對話框宣告：用強制的 style="color: #000000 !important;" 鎖定黑字
                 @st.dialog("⚔️ 戰境決鬥場 ⚔️", width="large")
                 def show_battle_logs():
                     st.markdown(
@@ -582,7 +582,7 @@ else:
                     
                     hp1, hp2 = p1_hp, p2_hp
                     round_num = 1
-                    logs_html = '<div style="color: #111827 !important; font-size: 1rem; line-height: 1.6;">'
+                    logs_html = '<div style="color: #000000 !important; font-size: 1rem; line-height: 1.6;">'
 
                     while hp1 > 0 and hp2 > 0 and round_num <= 10:
                         # 隨機波動攻擊力
@@ -603,11 +603,11 @@ else:
                     # 判定勝負結果
                     if hp1 > hp2:
                         winner_text = f"🏆 【{p1_title}】{current_user} 獲勝！"
-                        bg_color = "#DCFCE7"
+                        bg_color = "#000000"
                         text_color = "#166534"
                     else:
                         winner_text = f"🏆 【{p2_title}】{target_user} 獲勝！"
-                        bg_color = "#FEE2E2"
+                        bg_color = "#000000"
                         text_color = "#991B1B"
                         
                     st.markdown(
