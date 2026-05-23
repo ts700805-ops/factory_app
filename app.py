@@ -1185,7 +1185,10 @@ else:
                     requests.post(f"{USER_TOOLS_URL}.json", data=json.dumps(tool_payload))
                     st.success(f"已紀錄！"); time.sleep(0.5); st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
-
+            
+# ==========================================
+# 📝 每日 6S 任務回報中心 (完整修正版)
+# ==========================================
 elif st.session_state.menu_selection == "每日6S任務回報":
     import requests
     import json
