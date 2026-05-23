@@ -228,13 +228,14 @@ else:
 # ==========================================
 # 📝 頁面一：每日 6S 任務回報中心 (後台優先同步版)
 # ==========================================
-elif st.session_state.menu_selection == "📝每日6S任務回報":
+# 建議將選單名稱改為不含 Emoji 的純文字，避免系統解析錯誤
+    elif st.session_state.menu_selection == "每日6S任務回報":
         import requests
         import json
         from datetime import datetime, timedelta, timezone
         import time
 
-        # 【修正】移除過多引號，確保 HTML 正確渲染
+        # 使用三重引號確保 HTML 標籤正確包覆，並移除會干擾渲染的額外引號
         st.markdown('''
             <div style="text-align:center; margin-bottom:2rem;">
                 <h1 style="color:#60A5FA; font-weight:900; font-size: 3.5rem;">📋 每日 6S 任務回報中心</h1>
@@ -247,17 +248,18 @@ elif st.session_state.menu_selection == "📝每日6S任務回報":
         GAME_DB_URL = f"{BASE_URL}/game_rpg_data"
         REPORT_LOG_URL = f"{BASE_URL}/daily_6s_report_logs"
 
+        # 1. 取得當前台灣時間日期 (UTC+8)
         tz_taiwan = timezone(timedelta(hours=8))
         today_tw_str = datetime.now(tz_taiwan).strftime("%Y-%m-%d")
 
         st.info(f"📅 任務結算基準日（台北時間）：**{today_tw_str}**")
 
-        # 讀取後台名單
-        raw_data_1 = requests.get(f"{BASE_URL}/leader_members.json").json() or ""
-        
+        # 2. 讀取並解析後台名單
+        raw_data = requests.get(f"{BASE_URL}/leader_members.json").json() or ""
         leader_member_mapping = {}
-        if isinstance(raw_data_1, str):
-            for line in raw_data_1.splitlines():
+        
+        if isinstance(raw_data, str):
+            for line in raw_data.splitlines():
                 line = line.strip()
                 if ':' in line:
                     parts = line.split(":")
@@ -268,7 +270,7 @@ elif st.session_state.menu_selection == "📝每日6S任務回報":
 
         leader_list = list(leader_member_mapping.keys()) or ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
 
-        # 介面渲染
+        # 3. 介面渲染
         st.markdown("### 🔍 第一步：確認您的身份")
         col_leader, col_member = st.columns(2)
         
@@ -291,17 +293,16 @@ elif st.session_state.menu_selection == "📝每日6S任務回報":
         if not has_members:
             st.error("❌ 無法回報：請確認後台設定管理中的配置。")
         else:
-            st.warning(f"⚠️ 每人每日限領一次。送出後【{selected_user}】將獲得 1 點獎勵。")
-
             if st.button(f"✨ 繳交今日 6S 成果", use_container_width=True, type="primary"):
                 safe_user_key = str(selected_user).strip()
-                # 檢查今日回報狀態
+                
+                # 檢查是否已重複回報
                 check_exist = requests.get(f"{REPORT_LOG_URL}/{today_tw_str}/{safe_user_key}.json").json()
 
                 if check_exist:
                     st.error(f"❌ 【{selected_user}】今日已完成過任務！")
                 else:
-                    # 紀錄回報
+                    # 寫入記錄
                     report_payload = {
                         "reported_at": datetime.now(tz_taiwan).strftime("%Y-%m-%d %H:%M:%S"),
                         "leader": selected_leader,
@@ -309,7 +310,7 @@ elif st.session_state.menu_selection == "📝每日6S任務回報":
                     }
                     requests.put(f"{REPORT_LOG_URL}/{today_tw_str}/{safe_user_key}.json", data=json.dumps(report_payload))
 
-                    # 讀取並更新 RPG 數據
+                    # 更新點數
                     player_rpg_data = requests.get(f"{GAME_DB_URL}/{safe_user_key}.json").json() or {}
                     update_payload = {
                         "str": int(player_rpg_data.get("str", 0)),
@@ -320,11 +321,10 @@ elif st.session_state.menu_selection == "📝每日6S任務回報":
                     }
                     requests.put(f"{GAME_DB_URL}/{safe_user_key}.json", data=json.dumps(update_payload))
 
-                    st.session_state.user = safe_user_key
                     st.balloons()
                     st.success(f"🎉 回報成功！點數已發放。")
-                    time.sleep(1.2)
-                    st.session_state.menu_selection = "🎮6S戰境養成"
+                    time.sleep(1)
+                    st.session_state.menu_selection = "6S戰境養成" # 請確保此對應名稱無Emoji
                     st.rerun()
 # ==========================================
 # 🎮 頁面二：6S 戰境養成與決鬥系統
