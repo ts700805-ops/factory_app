@@ -592,7 +592,7 @@ else:
                     
                     # 判定勝負結果：白底黑邊
                     winner_text = f"🏆 【{p1_title}】{current_user} 獲勝！" if hp1 > hp2 else f"🏆 【{p2_title}】{target_user} 獲勝！"
-                    result_color = "#166534" if hp1 > hp2 else "#991B1B"
+                    result_color = "#000000" if hp1 > hp2 else "#000000"
                         
                     st.markdown(
                         f'''
