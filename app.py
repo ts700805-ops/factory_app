@@ -556,29 +556,29 @@ else:
                 @st.dialog("⚔️ 戰境決鬥場 ⚔️", width="large")
                 def show_battle_logs():
                     st.markdown(
-        f"""
-        <div style="color:#000000 !important; font-family:sans-serif;">
+                f"""
+                <div style="color:#000000 !important; font-family:sans-serif;">
 
-            <h3 style="color:#000000 !important; margin-bottom:5px;">
+                <h3 style="color:#000000 !important; margin-bottom:5px;">
                 🥊 雙方數據就緒！
-            </h3>
+                </h3>
 
-            <p style="margin:3px 0; font-size:1.1rem; color:#000000 !important;">
+                <p style="margin:3px 0; font-size:1.1rem; color:#000000 !important;">
                 🔴 <b>【{p1_title}】{current_user}</b>
                 (HP: {p1_hp} / ATK: {p1_atk})
-            </p>
+                </p>
 
-            <p style="margin:3px 0; font-size:1.1rem; color:#000000 !important;">
+                <p style="margin:3px 0; font-size:1.1rem; color:#000000 !important;">
                 🔵 <b>【{p2_title}】{target_user}</b>
                 (HP: {p2_hp} / ATK: {p2_atk})
-            </p>
+                </p>
 
-            <hr style="border-top:1px solid #000000; margin:10px 0;">
+               <hr style="border-top:1px solid #000000; margin:10px 0;">
 
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+             </div>
+            """,
+           unsafe_allow_html=True
+              )
                     
                     hp1, hp2 = p1_hp, p2_hp
                     round_num = 1
