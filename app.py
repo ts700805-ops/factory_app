@@ -800,6 +800,7 @@ else:
             ''',
             unsafe_allow_html=True
         )
+
         # 【安全修正】檢查並確保 URL 存在，防止 NameError 報錯
         if 'TODO_DB_URL' not in globals() and 'TODO_DB_URL' not in locals():
             if 'DB_URL' in globals() or 'DB_URL' in locals():
@@ -812,48 +813,55 @@ else:
                 TODO_DB_URL = "https://your-firebase-url/todo_tasks" 
                 TODO_DONE_URL = "https://your-firebase-url/todo_completed"
 
-        # 注入優化 CSS：字體全面放大、確保深色背景與網格清晰可讀
+        # 注入優化 CSS：維護網格與輸入框的清晰度
         st.markdown("""
             <style>
+            /* 針對一般段落、標籤、下拉選單文字 */
             div[data-testid="stMarkdownContainer"] p, 
             label, 
             .stWidgetLabel p,
             span,
             li {
                 color: #7DD3FC !important; 
-                font-size: 1.15rem !important; 
+                font-size: 1.3rem !important; 
                 font-weight: 800 !important;
             }
+            /* 針對各區段的中標題 */
             h3 {
                 color: #38BDF8 !important; 
-                font-size: 1.6rem !important; 
+                font-size: 1.8rem !important; 
                 font-weight: 900 !important;
-                margin-top: 1rem !important;
+                margin-top: 1.2rem !important;
             }
+            /* CSV 匯出按鈕文字 */
             div.stDownloadButton button p {
                 color: #7DD3FC !important;
                 font-weight: 900 !important;
-                font-size: 1.1rem !important;
+                font-size: 1.2rem !important;
             }
             div.stDownloadButton button {
                 border: 2px solid #38BDF8 !important;
                 background-color: #052e16 !important;
             }
+            /* 輸入框、下拉選單本體、日曆輸入框、以及網格編輯器內的文字 */
             div[data-baseweb="select"] > div, 
             div[data-testid="stTextInput"] div div input, 
             div[data-testid="stTextArea"] textarea,
-            div[data-testid="stDateInput"] input {
+            div[data-testid="stDateInput"] input,
+            div[data-testid="stTable"] table,
+            .stDataEditor div {
                 background-color: #052e16 !important; 
                 color: #ffffff !important;           
                 border: 1px solid #38BDF8 !important; 
-                font-size: 1.1rem !important;
+                font-size: 1.25rem !important; 
                 font-weight: 700 !important;
             }
+            /* 表單提交按鈕字體調整 */
             div[data-testid="stForm"] div.stButton > button {
                 background-color: #052e16 !important;
                 color: #38BDF8 !important;
                 border: 2px solid #38BDF8 !important;
-                font-size: 1.2rem !important;
+                font-size: 1.3rem !important;
                 font-weight: 900 !important;
             }
             div[data-testid="stForm"] div.stButton > button:hover {
@@ -1023,7 +1031,7 @@ else:
         st.divider()
 
         # ==========================================
-        # 第三區：🎉 已完成事項歷史紀錄 (最下方網格)
+        # 第三區：🎉 已完成事項歷史紀錄
         # ==========================================
         st.markdown("### 🎉 已完成事項歷史紀錄")
         if done_raw:
@@ -1060,7 +1068,6 @@ else:
                 st.info("💡 目前沒有對應組長的已完成事項紀錄。")
         else:
             st.info("💡 尚無任何已點選完成的事項紀錄，繼續加油！")
-            
     
 # --- ⚙️ 編輯手工具清單 (修正 Duplicate ID 版本) ---
     elif st.session_state.menu_selection == "⚙️ 資產編輯清單":
