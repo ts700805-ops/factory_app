@@ -784,7 +784,8 @@ else:
                 st.dataframe(asset_df, use_container_width=True, hide_index=True)
             else:
                 st.info("💡 目前無資產資料")
-# --- 🧾 組長待辦事項 ---
+
+    # --- 🧾 組長待辦事項 ---
     elif st.session_state.menu_selection == "🧾組長待辦事項":
         import io
 
@@ -793,14 +794,17 @@ else:
             unsafe_allow_html=True
         )
 
-        # 【安全修正】檢查並確保 TODO_DB_URL 存在，防止 NameError 報錯
+        # 【安全修正】檢查並確保 URL 存在，防止 NameError 報錯
         if 'TODO_DB_URL' not in globals() and 'TODO_DB_URL' not in locals():
             if 'DB_URL' in globals() or 'DB_URL' in locals():
                 TODO_DB_URL = f"{DB_URL}/todo_tasks"
+                TODO_DONE_URL = f"{DB_URL}/todo_completed"
             elif 'DB_BASE_URL' in globals() or 'DB_BASE_URL' in locals():
                 TODO_DB_URL = f"{DB_BASE_URL}/todo_tasks"
+                TODO_DONE_URL = f"{DB_BASE_URL}/todo_completed"
             else:
                 TODO_DB_URL = "https://your-firebase-url/todo_tasks" # 防護備用機制
+                TODO_DONE_URL = "https://your-firebase-url/todo_completed"
 
         # 注入優化 CSS：字體全面放大、改用顯眼的亮天藍色與冰藍色，確保深色背景清晰可讀
         st.markdown("""
@@ -876,7 +880,7 @@ else:
                 font-weight: 700 !important;
             }
 
-            /* 当滑鼠移到下拉選單選項上時 */
+            /* 當滑鼠移到下拉選單選項上時 */
             div[role="option"]:hover, 
             li[role="option"]:hover,
             div[data-baseweb="menu"] li:hover,
@@ -914,46 +918,13 @@ else:
         elif str(current_leader).strip() not in all_leaders_list:
             all_leaders_list.insert(0, str(current_leader).strip())
 
-        # 讀取現有待辦事項歷史資料
+        # 同時讀取「未完成待辦」與「已完成紀錄」歷史資料
         todo_raw = requests.get(f"{TODO_DB_URL}.json").json() or {}
+        done_raw = requests.get(f"{TODO_DONE_URL}.json").json() or {}
 
-        # --- 新增待辦事項表單 ---
-        st.markdown("### ✍️ 新增組長交辦事項")
-        with st.form("todo_input_form"):
-            c1, c2 = st.columns(2)
-            with c1:
-                # 讓你可以自由選擇要把任務派給哪一位組長
-                try:
-                    default_idx = all_leaders_list.index(str(current_leader).strip())
-                except:
-                    default_idx = 0
-                target_leader = st.selectbox("👤 負責組長", all_leaders_list, index=default_idx)
-            with c2:
-                # 預設完工日期為今天
-                target_deadline = st.text_input("📅 預計完成日期", value=datetime.datetime.now().strftime("%Y-%m-%d"))
-
-            todo_content = st.text_area("📝 交辦事項內容 / 待辦備註", height=120, placeholder="請輸入需要交辦的事項內容...")
-            submitted = st.form_submit_button("💾 儲存交辦事項", use_container_width=True)
-
-            if submitted:
-                if not todo_content.strip():
-                    st.error("❌ 請輸入交辦事項內容，不能留空！")
-                else:
-                    payload = {
-                        "組長": target_leader,
-                        "交辦事項": todo_content.strip(),
-                        "預計完成日期": target_deadline,
-                        "指派人": current_leader,
-                        "建立時間": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    }
-                    requests.post(f"{TODO_DB_URL}.json", data=json.dumps(payload))
-                    st.success(f"✅ 已成功將交辦事項指派給 【{target_leader}】！")
-                    time.sleep(0.5)
-                    st.rerun()
-
-        st.divider()
-
-        # --- 查詢與篩選 ---
+        # ==========================================
+        # 第一區：🔍 歷史交辦事項查詢與總覽 (移至最上方)
+        # ==========================================
         st.markdown("### 🔍 歷史交辦事項查詢")
         fc1, fc2, fc3 = st.columns(3)
         with fc1:
@@ -1003,7 +974,7 @@ else:
                     key="download_todo_csv"
                 )
 
-                st.markdown("### 📊 事項總覽")
+                st.markdown("### 📊 未完成事項總覽")
                 show_cols = ["組長", "交辦事項", "預計完成日期", "指派人", "建立時間"]
                 available_cols = [c for c in show_cols if c in todo_df.columns]
                 
@@ -1013,7 +984,7 @@ else:
                     hide_index=True
                 )
 
-                st.markdown("### 👁️ 明細檢視 / 刪除")
+                st.markdown("### 👁️ 明細檢視 / 完成與刪除操作")
                 # 排序將最新建立的待辦事項顯示在最上方
                 for _, row in todo_df.sort_values(by="建立時間", ascending=False).iterrows():
                     with st.expander(f"👤 負責：{row.get('組長', '未知')} ｜ 📅 期限：{row.get('預計完成日期', '')} ｜ 📝 內容：{str(row.get('交辦事項',''))[:15]}..."):
@@ -1025,9 +996,27 @@ else:
                         - **建立時間：** {row.get('建立時間', '-')}
                         """)
 
-                        del_col1, del_col2 = st.columns([3, 1])
-                        with del_col2:
-                            if st.button("🗑️ 刪除", key=f"del_todo_{row['db_id']}"):
+                        btn_col1, btn_col2, btn_col3 = st.columns([2, 1, 1])
+                        
+                        # 按鈕：標記為完成 (全新功能)
+                        with btn_col2:
+                            if st.button("✅ 完成", key=f"done_todo_{row['db_id']}", use_container_width=True):
+                                # 1. 先把任務打包好，加入「完成時間」欄位
+                                done_payload = row.copy()
+                                done_payload["完成時間"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                db_key = done_payload.pop("db_id") # 移除多餘欄位
+                                
+                                # 2. 推送到已完成資料庫，再從原資料庫刪除
+                                requests.post(f"{TODO_DONE_URL}.json", data=json.dumps(done_payload))
+                                requests.delete(f"{TODO_DB_URL}/{db_key}.json")
+                                
+                                st.success("🎉 太棒了！該事項已標記為完成並移入歷史紀錄！")
+                                time.sleep(0.5)
+                                st.rerun()
+
+                        # 按鈕：直接刪除
+                        with btn_col3:
+                            if st.button("🗑️ 刪除", key=f"del_todo_{row['db_id']}", use_container_width=True):
                                 requests.delete(f"{TODO_DB_URL}/{row['db_id']}.json")
                                 st.success("已成功刪除該筆交辦事項！")
                                 time.sleep(0.5)
@@ -1035,7 +1024,44 @@ else:
             else:
                 st.info("💡 查無符合條件的待辦事項")
         else:
-            st.info("💡 目前尚無任何交辦事項紀錄")
+            st.info("💡 目前尚無任何未完成的交辦事項紀錄")
+
+        st.divider()
+
+        # ==========================================
+        # 第二區：✍️ 新增組長交辦事項表單 (移至中間)
+        # ==========================================
+        st.markdown("### ✍️ 新增組長交辦事項")
+        with st.form("todo_input_form"):
+            c1, c2 = st.columns(2)
+            with c1:
+                try:
+                    default_idx = all_leaders_list.index(str(current_leader).strip())
+                except:
+                    default_idx = 0
+                target_leader = st.selectbox("👤 負責組長", all_leaders_list, index=default_idx)
+            with c2:
+                target_deadline = st.text_input("📅 預計完成日期", value=datetime.datetime.now().strftime("%Y-%m-%d"))
+
+            todo_content = st.text_area("📝 交辦事項內容 / 待辦備註", height=120, placeholder="請輸入需要交辦的事項內容...")
+            submitted = st.form_submit_button("💾 儲存交辦事項", use_container_width=True)
+
+            if submitted:
+                if not todo_content.strip():
+                    st.error("❌ 請輸入交辦事項內容，不能留空！")
+                else:
+                    payload = {
+                        "組長": target_leader,
+                        "交辦事項": todo_content.strip(),
+                        "預計完成日期": target_deadline,
+                        "指派人": current_leader,
+                        "建立時間": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    }
+                    requests.post(f"{TODO_DB_URL}.json", data=json.dumps(payload))
+                    st.success(f"✅ 已成功將交辦事項指派給 【{target_leader}】！")
+                    time.sleep(0.5)
+
+    
 # --- ⚙️ 編輯手工具清單 (修正 Duplicate ID 版本) ---
     elif st.session_state.menu_selection == "⚙️ 資產編輯清單":
         # 1. 補回關鍵的粉紅色 CSS 樣式 (優化對比度與文字清晰度)
