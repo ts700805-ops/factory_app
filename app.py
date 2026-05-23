@@ -582,7 +582,7 @@ else:
                     logs_html += "</div>"
                     st.markdown(logs_html, unsafe_allow_html=True)
                     
-                    # 判定勝負結果
+                # 判定勝負結果 (確保文字在白底中為強制黑字 color: #111827)
                     if hp1 > hp2:
                         winner_text = f"🏆 【{p1_title}】{current_user} 獲勝！"
                         bg_color = "#DCFCE7"
@@ -595,13 +595,11 @@ else:
                     st.markdown(
                         f'''
                         <div style="background-color: {bg_color}; border: 1px solid {text_color}; padding: 1rem; border-radius: 8px; margin-top: 15px; text-align: center;">
-                            <h3 style="color: {text_color} !important; margin: 0; font-size: 1.5rem; font-weight: bold;">{winner_text}</h3>
+                            <h3 style="color: #111827 !important; margin: 0; font-size: 1.5rem; font-weight: bold;">{winner_text}</h3>
                         </div>
                         ''', 
                         unsafe_allow_html=True
                     )
-
-                show_battle_logs()
 
         # ==========================================
         # ⚙️ 6S 戰境養成管理後台 (調整階級與自訂功能)
