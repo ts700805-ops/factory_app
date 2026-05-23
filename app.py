@@ -483,192 +483,193 @@ elif st.session_state.menu_selection == "員工技能評核表":
             st.info("💡 目前尚無資料，請於上方填寫第一筆紀錄。")
     except Exception as e:
         st.error(f"讀取進度看板時發生錯誤: {str(e)}")
+
 # --- 🔧 人員手工具紀錄表 (修正版：恢復資產匯出 + 移除重複) ---
-    elif st.session_state.menu_selection == "🔧 固資&手工具紀錄表":
-        import io
-        st.markdown('<h1 style="text-align:center; color:#db2777; font-weight:900; font-size:2.5rem;">🌸 超慧固資&手工具紀錄表</h1>', unsafe_allow_html=True)
+elif st.session_state.menu_selection == "🔧 固資&手工具紀錄表":
+    import io
+    st.markdown('<h1 style="text-align:center; color:#db2777; font-weight:900; font-size:2.5rem;">🌸 超慧固資&手工具紀錄表</h1>', unsafe_allow_html=True)
+    
+    # 1. 讀取資料
+    user_tool_raw = requests.get(f"{USER_TOOLS_URL}.json").json() or {}
+    asset_tools_raw = requests.get(f"{DB_URL}/asset_tools.json").json() or {}
+    current_leader = st.session_state.user
+    my_team = staff_map.get(current_leader, [])
+
+    # 2. 安全修改與刪除彈窗
+    @st.dialog("🔒 安全驗證與修改")
+    def edit_record_dialog(db_id, current_name, current_qty, person):
+        try:
+            t_res = requests.get(f"{TOOL_LIST_URL}.json").json() or {}
+            all_tools = t_res.get("tool_types", [])
+        except: all_tools = []
+        if current_name and current_name not in all_tools: all_tools.append(current_name)
+
+        st.markdown(f"**正在修改 {person} 的紀錄**")
+        pwd = st.text_input("請輸入驗證碼", type="password", key=f"fixed_dlg_pwd_{db_id}")
+        new_name = st.selectbox("修改工具名稱", options=all_tools, index=all_tools.index(current_name) if current_name in all_tools else 0, key=f"fixed_dlg_name_{db_id}")
+        new_qty = st.number_input("修改數量", min_value=1, value=int(current_qty), key=f"fixed_dlg_qty_{db_id}")
+        if st.button("💗 確認修改", use_container_width=True, key=f"fixed_dlg_btn_{db_id}"):
+            if pwd == "0000":
+                requests.patch(f"{USER_TOOLS_URL}/{db_id}.json", data=json.dumps({"手工具名稱": new_name, "數量": int(new_qty)}))
+                st.success("修改成功！"); time.sleep(0.5); st.rerun()
+            else: st.error("驗證碼錯誤")
+
+    @st.dialog("🔒 刪除紀錄確認")
+    def delete_record_dialog(db_id, tool_name):
+        st.warning(f"確定要刪除「{tool_name}」嗎？")
+        pwd = st.text_input("請輸入驗證碼", type="password", key=f"fixed_del_pwd_{db_id}")
+        if st.button("❌ 確定刪除", use_container_width=True, key=f"fixed_del_btn_{db_id}"):
+            if pwd == "0000":
+                requests.delete(f"{USER_TOOLS_URL}/{db_id}.json")
+                st.success("已刪除！"); time.sleep(0.5); st.rerun()
+            else: st.error("驗證碼錯誤")
+
+    # 注入全新「亮紫色」全網頁字體主題 CSS
+    st.markdown("""
+        <style>
+        /* 1. 全網頁基本文字、單選鈕標籤、下拉選單標題等全面強制改為亮工紫色 */
+        div[data-testid="stMarkdownContainer"] p, 
+        .stRadio label, 
+        label, 
+        .stWidgetLabel p,
+        span {
+            color: #e879f9 !important; /* 明亮的紫羅蘭色 */
+            font-weight: 800 !important;
+        }
         
-        # 1. 讀取資料
-        user_tool_raw = requests.get(f"{USER_TOOLS_URL}.json").json() or {}
-        asset_tools_raw = requests.get(f"{DB_URL}/asset_tools.json").json() or {}
-        current_leader = st.session_state.user
-        my_team = staff_map.get(current_leader, [])
+        /* 2. 修正分頁標籤（Tabs）選取與未選取文字，皆改為紫色系 */
+        div[data-testid="stTabs"] button {
+            font-size: 1.15rem !important;
+            font-weight: 800 !important;
+            color: #c084fc !important; /* 未選中時為淡紫色 */
+        }
+        div[data-testid="stTabs"] button[aria-selected="true"] {
+            color: #ff00ff !important; /* 選中時為極亮粉紫色 */
+            font-weight: 900 !important;
+            border-bottom: 3px solid #ff00ff !important;
+        }
+        
+        /* 3. 修正折疊區塊 (例如: 蘇萬紘 👩‍🔧 標題) 文字顏色為亮紫色 */
+        div[data-testid="stExpander"] details summary p {
+            color: #ff00ff !important;
+            font-weight: 900 !important;
+            font-size: 1.15rem !important;
+        }
+        
+        /* 4. 修正匯出按鈕的文字顏色與邊框顏色 */
+        div.stDownloadButton button p {
+            color: #ff00ff !important;
+            font-weight: 900 !important;
+        }
+        div.stDownloadButton button {
+            border: 2px solid #ff00ff !important;
+            background-color: #ffffff !important;
+        }
+        div.stDownloadButton button:hover {
+            background-color: #fdf4ff !important;
+        }
+        
+        /* 5. 下拉選單與輸入框內部的選中文字優化（維持暗色便於白底閱讀） */
+        .stSelectbox div div, .stTextInput div div input {
+            color: #0f172a !important;
+            font-weight: 700 !important;
+        }
+        
+        /* 6. 小標題 */
+        h3 {
+            color: #ff00ff !important;
+            font-weight: 900 !important;
+        }
+        
+        /* 7. 卡片內部的專屬 class 強制覆寫為亮紫色（解決 C型板手 看不見的問題） */
+        .t-title { 
+            font-weight: 900 !important; 
+            color: #ff00ff !important; /* 強制改亮紫色 */
+            font-size: 1.15rem !important; 
+        } 
+        .t-qty { 
+            color: #ff00ff !important; /* 數量也同步亮紫 */
+            font-weight: 900 !important; 
+            font-size: 1.2rem !important; 
+            margin-left: 8px !important; 
+            background: #fdf4ff !important; /* 淡紫色背景襯托 */
+            padding: 2px 8px !important; 
+            border-radius: 5px !important; 
+        }
+        .t-meta { 
+            color: #e879f9 !important; /* 登記時間與人改為明亮紫 */
+            font-size: 0.85rem !important; 
+            margin-top: 5px !important; 
+            font-weight: 700 !important; 
+        }
+        
+        /* 卡片外框設定 */
+        .card { background: #ffffff; border-radius: 10px; padding: 15px; margin-bottom: 10px; border: 2px solid #e879f9; box-shadow: 0 2px 4px rgba(0,0,0,0.05); } 
+        .asset-card { border-left: 10px solid #7c3aed !important; background: #faf5ff !important; border-color: #d8b4fe; } 
+        </style>
+    """, unsafe_allow_html=True)
 
-        # 2. 安全修改與刪除彈窗
-        @st.dialog("🔒 安全驗證與修改")
-        def edit_record_dialog(db_id, current_name, current_qty, person):
-            try:
-                t_res = requests.get(f"{TOOL_LIST_URL}.json").json() or {}
-                all_tools = t_res.get("tool_types", [])
-            except: all_tools = []
-            if current_name and current_name not in all_tools: all_tools.append(current_name)
+    # 3. 建立分頁
+    tab1, tab2 = st.tabs(["👥 人員紀錄", "🛡️ 資產總覽"])
 
-            st.markdown(f"**正在修改 {person} 的紀錄**")
-            pwd = st.text_input("請輸入驗證碼", type="password", key=f"fixed_dlg_pwd_{db_id}")
-            new_name = st.selectbox("修改工具名稱", options=all_tools, index=all_tools.index(current_name) if current_name in all_tools else 0, key=f"fixed_dlg_name_{db_id}")
-            new_qty = st.number_input("修改數量", min_value=1, value=int(current_qty), key=f"fixed_dlg_qty_{db_id}")
-            if st.button("💗 確認修改", use_container_width=True, key=f"fixed_dlg_btn_{db_id}"):
-                if pwd == "0000":
-                    requests.patch(f"{USER_TOOLS_URL}/{db_id}.json", data=json.dumps({"手工具名稱": new_name, "數量": int(new_qty)}))
-                    st.success("修改成功！"); time.sleep(0.5); st.rerun()
-                else: st.error("驗證碼錯誤")
-
-        @st.dialog("🔒 刪除紀錄確認")
-        def delete_record_dialog(db_id, tool_name):
-            st.warning(f"確定要刪除「{tool_name}」嗎？")
-            pwd = st.text_input("請輸入驗證碼", type="password", key=f"fixed_del_pwd_{db_id}")
-            if st.button("❌ 確定刪除", use_container_width=True, key=f"fixed_del_btn_{db_id}"):
-                if pwd == "0000":
-                    requests.delete(f"{USER_TOOLS_URL}/{db_id}.json")
-                    st.success("已刪除！"); time.sleep(0.5); st.rerun()
-                else: st.error("驗證碼錯誤")
-
-        # 注入全新「亮紫色」全網頁字體主題 CSS
-        st.markdown("""
-            <style>
-            /* 1. 全網頁基本文字、單選鈕標籤、下拉選單標題等全面強制改為亮工紫色 */
-            div[data-testid="stMarkdownContainer"] p, 
-            .stRadio label, 
-            label, 
-            .stWidgetLabel p,
-            span {
-                color: #e879f9 !important; /* 明亮的紫羅蘭色 */
-                font-weight: 800 !important;
-            }
-            
-            /* 2. 修正分頁標籤（Tabs）選取與未選取文字，皆改為紫色系 */
-            div[data-testid="stTabs"] button {
-                font-size: 1.15rem !important;
-                font-weight: 800 !important;
-                color: #c084fc !important; /* 未選中時為淡紫色 */
-            }
-            div[data-testid="stTabs"] button[aria-selected="true"] {
-                color: #ff00ff !important; /* 選中時為極亮粉紫色 */
-                font-weight: 900 !important;
-                border-bottom: 3px solid #ff00ff !important;
-            }
-            
-            /* 3. 修正折疊區塊 (例如: 蘇萬紘 👩‍🔧 標題) 文字顏色為亮紫色 */
-            div[data-testid="stExpander"] details summary p {
-                color: #ff00ff !important;
-                font-weight: 900 !important;
-                font-size: 1.15rem !important;
-            }
-            
-            /* 4. 修正匯出按鈕的文字顏色與邊框顏色 */
-            div.stDownloadButton button p {
-                color: #ff00ff !important;
-                font-weight: 900 !important;
-            }
-            div.stDownloadButton button {
-                border: 2px solid #ff00ff !important;
-                background-color: #ffffff !important;
-            }
-            div.stDownloadButton button:hover {
-                background-color: #fdf4ff !important;
-            }
-            
-            /* 5. 下拉選單與輸入框內部的選中文字優化（維持暗色便於白底閱讀） */
-            .stSelectbox div div, .stTextInput div div input {
-                color: #0f172a !important;
-                font-weight: 700 !important;
-            }
-            
-            /* 6. 小標題 */
-            h3 {
-                color: #ff00ff !important;
-                font-weight: 900 !important;
-            }
-            
-            /* 7. 卡片內部的專屬 class 強制覆寫為亮紫色（解決 C型板手 看不見的問題） */
-            .t-title { 
-                font-weight: 900 !important; 
-                color: #ff00ff !important; /* 強制改亮紫色 */
-                font-size: 1.15rem !important; 
-            } 
-            .t-qty { 
-                color: #ff00ff !important; /* 數量也同步亮紫 */
-                font-weight: 900 !important; 
-                font-size: 1.2rem !important; 
-                margin-left: 8px !important; 
-                background: #fdf4ff !important; /* 淡紫色背景襯托 */
-                padding: 2px 8px !important; 
-                border-radius: 5px !important; 
-            }
-            .t-meta { 
-                color: #e879f9 !important; /* 登記時間與人改為明亮紫 */
-                font-size: 0.85rem !important; 
-                margin-top: 5px !important; 
-                font-weight: 700 !important; 
-            }
-            
-            /* 卡片外框設定 */
-            .card { background: #ffffff; border-radius: 10px; padding: 15px; margin-bottom: 10px; border: 2px solid #e879f9; box-shadow: 0 2px 4px rgba(0,0,0,0.05); } 
-            .asset-card { border-left: 10px solid #7c3aed !important; background: #faf5ff !important; border-color: #d8b4fe; } 
-            </style>
-        """, unsafe_allow_html=True)
-
-        # 3. 建立分頁
-        tab1, tab2 = st.tabs(["👥 人員紀錄", "🛡️ 資產總覽"])
-
-        with tab1:
-            # --- 唯一篩選區 ---
-            st.markdown("### 🔍 查詢與清點")
-            c1, c2 = st.columns(2)
-            with c1:
-                filter_type = st.radio("篩選範圍", ["我的組員", "全廠人員搜尋"], horizontal=True, key="unique_filter_radio")
-            with c2:
-                if filter_type == "我的組員":
-                    search_staff = st.selectbox("👤 選擇組員", ["顯示全組"] + sorted(my_team), key="unique_sel_team")
-                else:
-                    search_staff = st.selectbox("🌍 選擇全廠人員", ["顯示全部"] + sorted(list(all_staff)), key="unique_sel_all")
-
-            if user_tool_raw:
-                t_data = []
-                for k, v in user_tool_raw.items():
-                    item = v.copy(); item['db_id'] = k
-                    item['類型'] = "資產工具" if "【資產】" in str(v.get('手工具名稱','')) else "一般工具"
-                    t_data.append(item)
-                tool_df = pd.DataFrame(t_data)
-
-                if filter_type == "我的組員":
-                    display_df = tool_df[tool_df["人員"].isin(my_team)] if search_staff == "顯示全組" else tool_df[tool_df["人員"] == search_staff]
-                else:
-                    display_df = tool_df if search_staff == "顯示全部" else tool_df[tool_df["人員"] == search_staff]
-
-                if not display_df.empty:
-                    csv_data = display_df.to_csv(index=False).encode('utf-8-sig')
-                    st.download_button(label="📄 匯出人員清點表", data=csv_data, file_name="人員工具清點.csv", key="p_csv_btn")
-
-                    for person, group in display_df.groupby("人員"):
-                        with st.expander(f"👩‍🔧 {person} ({len(group)} 項)", expanded=True):
-                            for _, row in group.iterrows():
-                                db_id = row['db_id']
-                                is_a = "asset-card" if row['類型'] == "資產工具" else ""
-                                st.markdown(f'<div class="card {is_a}">', unsafe_allow_html=True)
-                                col1, col2 = st.columns([7.5, 2.5])
-                                with col1:
-                                    # 卡片內部的手工具名稱、數量、與登記資訊
-                                    st.markdown(f'<div class="t-title">🛠️ {row["手工具名稱"]} <span class="t-qty">x {row["數量"]}</span></div>', unsafe_allow_html=True)
-                                    st.markdown(f'<div class="t-meta">登記人: {row.get("登記人","-")} | 時間: {row["登記時間"]}</div>', unsafe_allow_html=True)
-                                with col2:
-                                    sc1, sc2 = st.columns(2)
-                                    if sc1.button("✏️", key=f"e_{db_id}"): edit_record_dialog(db_id, row['手工具名稱'], row['數量'], person)
-                                    if sc2.button("🗑️", key=f"d_{db_id}"): delete_record_dialog(db_id, row['手工具名稱'])
-                                st.markdown('</div>', unsafe_allow_html=True)
-                else: st.info("💡 目前無紀錄")
-            else: st.info("🌸 系統無資料")
-
-        with tab2:
-            st.markdown("### 🏢 全廠資產清冊")
-            if asset_tools_raw:
-                asset_df = pd.DataFrame(list(asset_tools_raw.values()))
-                # 恢復資產匯出功能
-                csv_asset = asset_df.to_csv(index=False).encode('utf-8-sig')
-                st.download_button("📄 匯出全廠資產清單", data=csv_asset, file_name="全廠資產總表.csv", key="ast_csv_btn")
-                st.dataframe(asset_df, use_container_width=True, hide_index=True)
+    with tab1:
+        # --- 唯一篩選區 ---
+        st.markdown("### 🔍 查詢與清點")
+        c1, c2 = st.columns(2)
+        with c1:
+            filter_type = st.radio("篩選範圍", ["我的組員", "全廠人員搜尋"], horizontal=True, key="unique_filter_radio")
+        with c2:
+            if filter_type == "我的組員":
+                search_staff = st.selectbox("👤 選擇組員", ["顯示全組"] + sorted(my_team), key="unique_sel_team")
             else:
-                st.info("💡 目前無資產資料")
+                search_staff = st.selectbox("🌍 選擇全廠人員", ["顯示全部"] + sorted(list(all_staff)), key="unique_sel_all")
+
+        if user_tool_raw:
+            t_data = []
+            for k, v in user_tool_raw.items():
+                item = v.copy(); item['db_id'] = k
+                item['類型'] = "資產工具" if "【資產】" in str(v.get('手工具名稱','')) else "一般工具"
+                t_data.append(item)
+            tool_df = pd.DataFrame(t_data)
+
+            if filter_type == "我的組員":
+                display_df = tool_df[tool_df["人員"].isin(my_team)] if search_staff == "顯示全組" else tool_df[tool_df["人員"] == search_staff]
+            else:
+                display_df = tool_df if search_staff == "顯示全部" else tool_df[tool_df["人員"] == search_staff]
+
+            if not display_df.empty:
+                csv_data = display_df.to_csv(index=False).encode('utf-8-sig')
+                st.download_button(label="📄 匯出人員清點表", data=csv_data, file_name="人員工具清點.csv", key="p_csv_btn")
+
+                for person, group in display_df.groupby("人員"):
+                    with st.expander(f"👩‍🔧 {person} ({len(group)} 項)", expanded=True):
+                        for _, row in group.iterrows():
+                            db_id = row['db_id']
+                            is_a = "asset-card" if row['類型'] == "資產工具" else ""
+                            st.markdown(f'<div class="card {is_a}">', unsafe_allow_html=True)
+                            col1, col2 = st.columns([7.5, 2.5])
+                            with col1:
+                                # 卡片內部的手工具名稱、數量、與登記資訊
+                                st.markdown(f'<div class="t-title">🛠️ {row["手工具名稱"]} <span class="t-qty">x {row["數量"]}</span></div>', unsafe_allow_html=True)
+                                st.markdown(f'<div class="t-meta">登記人: {row.get("登記人","-")} | 時間: {row["登記時間"]}</div>', unsafe_allow_html=True)
+                            with col2:
+                                sc1, sc2 = st.columns(2)
+                                if sc1.button("✏️", key=f"e_{db_id}"): edit_record_dialog(db_id, row['手工具名稱'], row['數量'], person)
+                                if sc2.button("🗑️", key=f"d_{db_id}"): delete_record_dialog(db_id, row['手工具名稱'])
+                            st.markdown('</div>', unsafe_allow_html=True)
+            else: st.info("💡 目前無紀錄")
+        else: st.info("🌸 系統無資料")
+
+    with tab2:
+        st.markdown("### 🏢 全廠資產清冊")
+        if asset_tools_raw:
+            asset_df = pd.DataFrame(list(asset_tools_raw.values()))
+            # 恢復資產匯出功能
+            csv_asset = asset_df.to_csv(index=False).encode('utf-8-sig')
+            st.download_button("📄 匯出全廠資產清單", data=csv_asset, file_name="全廠資產總表.csv", key="ast_csv_btn")
+            st.dataframe(asset_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("💡 目前無資產資料")
 # --- 🧾 人員評核表 ---
     elif st.session_state.menu_selection == "🧾 人員評核表":
         import io
