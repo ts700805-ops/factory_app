@@ -785,7 +785,7 @@ else:
             else:
                 st.info("💡 目前無資產資料")
 
-    # --- 🧾 組長待辦事項 ---
+   # --- 🧾 組長待辦事項 ---
     elif st.session_state.menu_selection == "🧾組長待辦事項":
         import io
 
@@ -923,7 +923,7 @@ else:
         done_raw = requests.get(f"{TODO_DONE_URL}.json").json() or {}
 
         # ==========================================
-        # 第一區：🔍 歷史交辦事項查詢與總覽 (移至最上方)
+        # 第一區：🔍 歷史交辦事項查詢與總覽
         # ==========================================
         st.markdown("### 🔍 歷史交辦事項查詢")
         fc1, fc2, fc3 = st.columns(3)
@@ -998,21 +998,32 @@ else:
 
                         btn_col1, btn_col2, btn_col3 = st.columns([2, 1, 1])
                         
-                        # 按鈕：標記為完成 (全新功能)
+                        # 按鈕：標記為完成 (已修正 JSON 轉型錯誤)
                         with btn_col2:
                             if st.button("✅ 完成", key=f"done_todo_{row['db_id']}", use_container_width=True):
-                                # 1. 先把任務打包好，加入「完成時間」欄位
-                                done_payload = row.copy()
+                                # 【核心修正】將 pandas row 物件轉為標準 Python dict，並將內容轉成標準字串，防止 JSON 轉型出錯
+                                raw_dict = row.to_dict()
+                                done_payload = {}
+                                for key, val in raw_dict.items():
+                                    if pd.isna(val):
+                                        done_payload[str(key)] = ""
+                                    else:
+                                        done_payload[str(key)] = str(val)
+
+                                # 額外附加完成時間
                                 done_payload["完成時間"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                                db_key = done_payload.pop("db_id") # 移除多餘欄位
                                 
-                                # 2. 推送到已完成資料庫，再從原資料庫刪除
-                                requests.post(f"{TODO_DONE_URL}.json", data=json.dumps(done_payload))
-                                requests.delete(f"{TODO_DB_URL}/{db_key}.json")
+                                # 移除非必要的 db_id 主鍵欄位
+                                db_key = done_payload.pop("db_id", None)
                                 
-                                st.success("🎉 太棒了！該事項已標記為完成並移入歷史紀錄！")
-                                time.sleep(0.5)
-                                st.rerun()
+                                if db_key:
+                                    # 推送到已完成資料庫，再從原資料庫刪除
+                                    requests.post(f"{TODO_DONE_URL}.json", data=json.dumps(done_payload))
+                                    requests.delete(f"{TODO_DB_URL}/{db_key}.json")
+                                    
+                                    st.success("🎉 太棒了！該事項已標記為完成並移入歷史紀錄！")
+                                    time.sleep(0.5)
+                                    st.rerun()
 
                         # 按鈕：直接刪除
                         with btn_col3:
@@ -1029,7 +1040,7 @@ else:
         st.divider()
 
         # ==========================================
-        # 第二區：✍️ 新增組長交辦事項表單 (移至中間)
+        # 第二區：✍️ 新增組長交辦事項表單
         # ==========================================
         st.markdown("### ✍️ 新增組長交辦事項")
         with st.form("todo_input_form"):
@@ -1060,7 +1071,53 @@ else:
                     requests.post(f"{TODO_DB_URL}.json", data=json.dumps(payload))
                     st.success(f"✅ 已成功將交辦事項指派給 【{target_leader}】！")
                     time.sleep(0.5)
+                    st.rerun()
 
+        st.divider()
+
+        # ==========================================
+        # 第三區：🎉 已完成事項歷史紀錄 (顯示在最下方)
+        # ==========================================
+        st.markdown("### 🎉 已完成事項歷史紀錄")
+        if done_raw:
+            done_list = []
+            for k, v in done_raw.items():
+                row = v.copy()
+                row["done_db_id"] = k
+                done_list.append(row)
+            
+            done_df = pd.DataFrame(done_list)
+            
+            # 過濾僅顯示當前篩選負責組長的完成紀錄 (若有篩選的話)
+            if not done_df.empty and filter_leader != "全部" and "組長" in done_df.columns:
+                done_df = done_df[done_df["組長"] == filter_leader]
+                
+            if not done_df.empty:
+                # 重新整理顯示欄位，加上「完成時間」
+                done_cols = ["組長", "交辦事項", "預計完成日期", "完成時間", "指派人"]
+                avail_done_cols = [c for c in done_cols if c in done_df.columns]
+                
+                # 顯示已完成表格
+                st.dataframe(
+                    done_df[avail_done_cols].sort_values(by="完成時間", ascending=False),
+                    use_container_width=True,
+                    hide_index=True
+                )
+                
+                # 提供清除歷史紀錄按鈕 (選填防呆)
+                with st.expander("⚙️ 歷史紀錄清理區"):
+                    for _, d_row in done_df.sort_values(by="完成時間", ascending=False).iterrows():
+                        st.text(f"✔ {d_row.get('完成時間')} - 【{d_row.get('組長')}】{d_row.get('交辦事項')[:20]}...")
+                        if st.button("🗑️ 永久抹除此完成紀錄", key=f"erase_done_{d_row['done_db_id']}"):
+                            requests.delete(f"{TODO_DONE_URL}/{d_row['done_db_id']}.json")
+                            st.success("紀錄已永久抹除！")
+                            time.sleep(0.5)
+                            st.rerun()
+            else:
+                st.info("💡 目前沒有對應組長的已完成事項紀錄。")
+        else:
+            st.info("💡 尚無任何已點選完成的事項紀錄，繼續加油！")
+            
     
 # --- ⚙️ 編輯手工具清單 (修正 Duplicate ID 版本) ---
     elif st.session_state.menu_selection == "⚙️ 資產編輯清單":
