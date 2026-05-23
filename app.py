@@ -389,21 +389,20 @@ else:
             st.warning("目前系統資料緩衝中，請稍後再試。")
 
 elif page == "員工技能評核表":
+    import time  # 確保刪除功能使用的 time.sleep() 正常運作
+    
     st.title("👤 員工技能評核表")
     st.markdown("---")
 
-    # 1. 自動取得當前登入使用者的「組別」
-    # 這裡假設你在登入時有把組別存進 st.session_state.user_group (例如 "組別一")
-    # 如果你原本的變數名稱不同，請把下面的名稱改成你原本的變數
+    # 1. 自動取得當前登入使用者的「組別」與「組長姓名」
     user_group = st.session_state.get("user_group", "組別一")
+    current_leader = st.session_state.get("username", "陳德文")  # 依據圖片顯示當前人員
     
-    st.markdown(f"#### 📁 目前檢視組別：`{user_group}`")
+    st.markdown(f"#### 📁 目前檢視組別：`{user_group}` ｜ 👨‍✈️ 管理組長：`{current_leader}`")
     st.markdown("以下由上往下列出本組所有員工之技能考核完成程度百分表：")
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # 2. 讀取或設定該組別的員工與技能進度資料
-    # 【新手教學】：這裡的資料未來你可以對接你的資料庫或 Google Sheets。
-    # 這裡我們先設定好一組範例資料，直接包含所有人名與對應的百分比。
+    # 2. 設定該組別的員工與技能進度資料
     if "group_members_skills" not in st.session_state:
         st.session_state.group_members_skills = {
             "傑米": 90,
@@ -415,76 +414,75 @@ elif page == "員工技能評核表":
             "張晴繪": 30
         }
 
-    # 3. 使用迴圈直接「由上往下一列一列」呈現所有員工，完全不用下拉式選單、製令與工序
+    # 3. 使用迴圈直接「由上往下一列一列」呈現所有員工，不用下拉式選單
     for member_name, progress_value in st.session_state.group_members_skills.items():
         
         # 建立兩欄：左欄 col1 放員工姓名，右欄 col2 放進度條
         col1, col2 = st.columns([1, 4])
         
         with col1:
-            # 顯示員工姓名，利用 HTML 的 padding-top 讓名字跟右邊的進度條能完美平行對齊
             st.markdown(f"<div style='padding-top: 5px; font-weight: bold; font-size: 16px;'>👤 {member_name}</div>", unsafe_allow_html=True)
             
         with col2:
             # 將 0-100 的百分比數字轉成 Streamlit 進度條需要的 0.0-1.0 小數
             progress_float = min(max(float(progress_value) / 100.0, 0.0), 1.0)
-            
-            # 渲染進度條，並在上面直接顯示目前的百分比文字
+            # 渲染進度條
             st.progress(progress_float, text=f"考核完成度：{progress_value}%")
             
-        # 在每位員工之間加上一條淡淡的虛線，讓畫面上下分隔更清晰
+        # 在每位員工之間加上一條淡淡的虛線
         st.markdown("<div style='margin: 15px 0; border-bottom: 1px dashed #cccccc;'></div>", unsafe_allow_html=True)
 
     # 4. 底部加上一個小備註
     st.caption("💡 提示：本頁面依據您所屬的組別自動列出全員名單，進度條為即時考核完成百分比。")
+    st.markdown("<br>", unsafe_allow_html=True)
 
-        # --- 技能進度看板查詢區 ---
-        st.markdown("### 🔍 當前組員技能進度總覽")
-        try:
-            r_skills = requests.get(f"{SKILL_DB_URL}.json").json()
-            if r_skills and isinstance(r_skills, dict):
-                skill_list = []
-                for k, v in r_skills.items():
-                    row = v.copy()
-                    row["db_id"] = k
-                    skill_list.append(row)
+    # --- 技能進度看板查詢區（已修正縮排與對齊） ---
+    st.markdown("### 🔍 當前組員技能進度總覽")
+    try:
+        r_skills = requests.get(f"{SKILL_DB_URL}.json").json()
+        if r_skills and isinstance(r_skills, dict):
+            skill_list = []
+            for k, v in r_skills.items():
+                row = v.copy()
+                row["db_id"] = k
+                skill_list.append(row)
+            
+            df_skills = pd.DataFrame(skill_list)
+            
+            # 僅篩選出當前組長管轄的紀錄
+            if not df_skills.empty and "組長" in df_skills.columns:
+                df_skills = df_skills[df_skills["組長"] == current_leader]
+            
+            if not df_skills.empty:
+                # 重新排列欄位順序以利閱讀
+                show_cols = ["人員", "製令", "工序", "熟練度", "完成進度", "更新時間"]
+                available_cols = [c for c in show_cols if c in df_skills.columns]
                 
-                df_skills = pd.DataFrame(skill_list)
+                st.dataframe(
+                    df_skills[available_cols],
+                    use_container_width=True,
+                    hide_index=True
+                )
                 
-                # 僅篩選出當前組長管轄的紀錄
-                if not df_skills.empty and "組長" in df_skills.columns:
-                    df_skills = df_skills[df_skills["組長"] == current_leader]
-                
-                if not df_skills.empty:
-                    # 重新排列欄位順序以利閱讀
-                    show_cols = ["人員", "製令", "工序", "熟練度", "完成進度", "更新時間"]
-                    available_cols = [c for c in show_cols if c in df_skills.columns]
-                    
-                    st.dataframe(
-                        df_skills[available_cols],
-                        use_container_width=True,
-                        hide_index=True
-                    )
-                    
-                    # 提供刪除錯誤紀錄的按鈕
-                    st.markdown("### 👁️ 明細管理")
-                    for _, row in df_skills.sort_values(by="更新時間", ascending=False).iterrows():
-                        with st.expander(f"👤 {row.get('人員')} ｜ 📦 製令: {row.get('製令')} ｜ 🎯 進度: {row.get('完成進度')}"):
-                            st.write(f"• **執行工序：** {row.get('工序')}")
-                            st.write(f"• **熟練度判定：** {row.get('熟練度')}")
-                            st.write(f"• **最後更新時間：** {row.get('更新時間')}")
-                            
-                            if st.button("🗑️ 刪除此筆進度", key=f"del_skill_{row['db_id']}", type="primary"):
-                                requests.delete(f"{SKILL_DB_URL}/{row['db_id']}.json")
-                                st.success("已成功刪除該筆進度紀錄")
-                                time.sleep(0.5)
-                                st.rerun()
-                else:
-                    st.info("💡 目前尚無此組長的組員技能評核紀錄。")
+                # 提供刪除錯誤紀錄的按鈕
+                st.markdown("### 👁️ 明細管理")
+                for _, row in df_skills.sort_values(by="更新時間", ascending=False).iterrows():
+                    with st.expander(f"👤 {row.get('人員')} ｜ 📦 製令: {row.get('製令')} ｜ 🎯 進度: {row.get('完成進度')}"):
+                        st.write(f"• **執行工序：** {row.get('工序')}")
+                        st.write(f"• **熟練度判定：** {row.get('熟練度')}")
+                        st.write(f"• **最後更新時間：** {row.get('更新時間')}")
+                        
+                        if st.button("🗑️ 刪除此筆進度", key=f"del_skill_{row['db_id']}", type="primary"):
+                            requests.delete(f"{SKILL_DB_URL}/{row['db_id']}.json")
+                            st.success("已成功刪除該筆進度紀錄")
+                            time.sleep(0.5)
+                            st.rerun()
             else:
-                st.info("💡 目前尚無資料，請於上方填寫第一筆紀錄。")
-        except Exception as e:
-            st.error(f"讀取進度看板時發生錯誤: {str(e)}")
+                st.info("💡 目前尚無此組長的組員技能評核紀錄。")
+        else:
+            st.info("💡 目前尚無資料，請於上方填寫第一筆紀錄。")
+    except Exception as e:
+        st.error(f"讀取進度看板時發生錯誤: {str(e)}")
 # --- 🔧 人員手工具紀錄表 (修正版：恢復資產匯出 + 移除重複) ---
     elif st.session_state.menu_selection == "🔧 固資&手工具紀錄表":
         import io
