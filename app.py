@@ -494,17 +494,16 @@ else:
             st.markdown(f"<div style='background-color:#1e3a8a; padding:10px; border-radius:5px; text-align:center;'><b style='color:#FBBF24;'>剩餘自由點數</b><br><span style='font-size:2rem; font-weight:900; color:#fff;'>{u_pts}</span></div>", unsafe_allow_html=True)
 
         st.divider()
-
-    # ==========================================
+# ==========================================
         # ⚔️ 擂台決鬥 PK 場
         # ==========================================
         st.markdown("### ⚔️ 尋找現場同仁發起決鬥")
 
-        # 1. 獲取所有員工名單 (請確保 DB_BASE_URL 有定義)
+        # 1. 獲取所有員工名單
         employee_data = requests.get(f"{DB_BASE_URL}/employees.json").json() or {}
         all_staff = list(employee_data.keys()) 
 
-        # 2. 過濾掉自己與未登入者
+        # 2. 整合名單：過濾掉自己與未登入者
         opponents = sorted(list(set(all_staff)))
         if current_user in opponents:
             opponents.remove(current_user)
@@ -512,7 +511,7 @@ else:
             opponents.remove("未登入同仁")
         
         if not opponents:
-            st.warning("💡 目前現場戰報中還沒有其他同仁建立角色。")
+            st.warning("💡 目前暫無其他同仁名單可進行決鬥。")
         else:
             c_sel, c_btn = st.columns([3, 1])
             with c_sel:
@@ -523,11 +522,15 @@ else:
                 start_battle = st.button("💥 發起決鬥！", use_container_width=True)
 
             if start_battle and current_user != "未登入同仁":
-                # 檢查對手是否有遊戲數據，若無則初始化
+                # 確保對手有遊戲數據，若無則強制自動初始化一份數據給他
                 if target_opp not in all_players_data:
                     init_payload = {"str": 0, "vit": 0, "agi": 0, "cha": 0, "avail_pts": 0}
                     requests.put(f"{GAME_DB_URL}/{target_opp}.json", data=json.dumps(init_payload))
+                    # 更新當前記憶體中的資料以便戰鬥讀取
                     all_players_data[target_opp] = init_payload
+                
+                # 準備對手數據
+                target_data = all_players_data.get(target_opp)
 
                 @st.dialog("⚔️ 戰境決鬥場 ⚔️")
                 def run_battle_simulation(p1, p2, p1_data, p2_data):
@@ -563,7 +566,7 @@ else:
                     round_cnt = 1
                     while p1_hp > 0 and p2_hp > 0 and round_cnt <= 20:
                         battle_log.append(f"⚔️ **--- 第 {round_cnt} 回合 ---**")
-                        # 邏輯運算... (保持您原本的邏輯)
+                        # 攻擊邏輯
                         dmg = random.randint(p1_atk-3, p1_atk+5)
                         p2_hp -= dmg
                         battle_log.append(f"💥 {p1_name} 攻擊 {p2_name} 造成 **{dmg}** 點傷害！")
@@ -578,7 +581,9 @@ else:
                     if p1_hp > 0: st.success(f"🏆 {p1_name} 獲勝！")
                     else: st.error(f"💀 {p2_name} 獲勝！")
 
-                run_battle_simulation(current_user, target_opp, user_stats, all_players_data[target_opp])
+                run_battle_simulation(current_user, target_opp, user_stats, target_data)
+
+        st.divider()
         
         # ==========================================
         # ⚙️ 後台稱謂門檻設定區
