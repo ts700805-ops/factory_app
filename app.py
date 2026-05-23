@@ -1062,75 +1062,355 @@ else:
             st.info("💡 尚無任何已點選完成的事項紀錄，繼續大家辛苦了！")
     
 # --- ⚙️ 編輯手工具清單 (修正 Duplicate ID 版本) ---
-    # --- 修正後的區塊：請取代原本對應的兩個區塊 ---
 
-# 1. 資產編輯區塊
-elif st.session_state.menu_selection == "⚙️ 資產編輯清單":
-    st.markdown("""
-        <style>
-        .pink-card { background-color: #fff1f2; border: 2px solid #f43f5e; padding: 20px; border-radius: 15px; margin-bottom: 20px; }
-        </style>
-    """, unsafe_allow_html=True)
+    elif st.session_state.menu_selection == "⚙️ 資產編輯清單":
 
-    st.markdown('<h1 style="text-align:center; color:#db2777;">✨ 超慧資產管理中心</h1>', unsafe_allow_html=True)
-    
-    # 確保變數存在，避免 NameError
+        # 1. 補回關鍵的粉紅色 CSS 樣式 (優化對比度與文字清晰度)
+
+        st.markdown("""
+
+            <style>
+
+            .pink-card {
+
+                background-color: #fff1f2;
+
+                border: 2px solid #f43f5e;
+
+                padding: 20px;
+
+                border-radius: 15px;
+
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+
+                margin-bottom: 20px;
+
+            }
+
+            .stButton>button {
+
+                border-radius: 10px;
+
+                font-weight: bold;
+
+            }
+
+            h3 {
+
+                color: #be123c !important;
+
+                font-weight: 900 !important;
+
+            }
+
+            label {
+
+                color: #4c0519 !important;
+
+                font-weight: bold !important;
+
+            }
+
+            </style>
+
+        """, unsafe_allow_html=True)
+
+
+
+        st.markdown('<h1 style="text-align:center; color:#db2777; font-weight:900; font-size:2.5rem;">✨ 超慧資產管理中心</h1>', unsafe_allow_html=True)
+
+        
+
+        # 2. 讀取資料
+
+        tool_settings = requests.get(f"{TOOL_LIST_URL}.json").json() or {"tool_types": []}
+
+        tool_types = tool_settings.get("tool_types", [])
+
+        asset_tools_raw = requests.get(f"{DB_URL}/asset_tools.json").json() or {}
+
+        
+
+        current_user = st.session_state.user
+
+        my_team = staff_map.get(current_user, [])
+
+        staff_options = sorted(list(set(my_team))) if my_team else sorted(list(all_staff))
+
+
+
+        # --- 資產編輯 Dialog ---
+
+        @st.dialog("✏️ 修改資產內容")
+
+        def edit_asset_dialog(db_id, current_val):
+
+            new_n = st.text_input("修改名稱", value=current_val.get('name', ''))
+
+            new_no = st.text_input("修改編號", value=current_val.get('no', ''))
+
+            new_adm = st.selectbox("修改管理人", staff_options, index=staff_options.index(current_val.get('管理人員')) if current_val.get('管理人員') in staff_options else 0)
+
+            
+
+            if st.button("💾 儲存修改", use_container_width=True, key="save_edit_asset"):
+
+                updated_payload = {
+
+                    "name": new_n,
+
+                    "no": new_no,
+
+                    "管理人員": new_adm,
+
+                    "建立時間": current_val.get('建立時間', get_now_str())
+
+                }
+
+                requests.put(f"{DB_URL}/asset_tools/{db_id}.json", data=json.dumps(updated_payload))
+
+                st.success("修改成功！"); time.sleep(0.5); st.rerun()
+
+
+
+        col1, col2 = st.columns(2)
+
+        
+
+        # --- 左側：管理區 ---
+
+        with col1:
+
+            # A. 🛠️ 編輯一般工具
+
+            st.markdown('<div class="pink-card">', unsafe_allow_html=True)
+
+            st.subheader("🛠️ 編輯一般工具清單")
+
+            current_tools_str = "，".join(tool_types)
+
+            new_tools_input = st.text_area("工具清單 (逗號分隔)", value=current_tools_str, height=120)
+
+            
+
+            # 修正處：加上唯一的 key="btn_save_general_tools"
+
+            if st.button("💾 儲存工具清單", use_container_width=True, key="btn_save_general_tools"):
+
+                import re
+
+                new_list = [t.strip() for t in re.split(r'[，,]', new_tools_input) if t.strip()]
+
+                requests.put(f"{TOOL_LIST_URL}.json", data=json.dumps({"tool_types": new_list}))
+
+                st.success("工具清單已更新"); time.sleep(0.5); st.rerun()
+
+            st.markdown('</div>', unsafe_allow_html=True)
+
+
+
+            # B. 📋 編輯資產手工具
+
+            st.markdown('<div class="pink-card">', unsafe_allow_html=True)
+
+            st.subheader("📋 編輯資產手工具")
+
+            c_a1, c_a2 = st.columns(2)
+
+            a_name = c_a1.text_input("資產名稱", key="input_a_name")
+
+            a_no = c_a2.text_input("資產編號", key="input_a_no")
+
+            a_admin = st.selectbox("指定管理人", staff_options, key="select_a_admin")
+
+            
+
+            if st.button("➕ 新增資產", use_container_width=True, key="btn_add_asset"):
+
+                if a_name and a_no:
+
+                    payload = {"name": a_name, "no": a_no, "管理人員": a_admin, "建立時間": get_now_str()}
+
+                    requests.post(f"{DB_URL}/asset_tools.json", data=json.dumps(payload))
+
+                    st.success("資產已建立"); time.sleep(0.5); st.rerun()
+
+                else: st.warning("請填寫完整資訊")
+
+            
+
+            if asset_tools_raw:
+
+                st.write("---")
+
+                for k, v in asset_tools_raw.items():
+
+                    c_t1, c_t2, c_t3 = st.columns([4, 1, 1])
+
+                    c_t1.markdown(f"📍 **{v['no']}** - {v['name']}", help="資產項目")
+
+                    if c_t2.button("✏️", key=f"edit_ast_{k}"):
+
+                        edit_asset_dialog(k, v)
+
+                    if c_t3.button("🗑️", key=f"del_ast_{k}"):
+
+                        requests.delete(f"{DB_URL}/asset_tools/{k}.json")
+
+                        st.success("已刪除"); time.sleep(0.5); st.rerun()
+
+            st.markdown('</div>', unsafe_allow_html=True)
+
+
+
+        # --- 右側：新增領用紀錄 ---
+
+        with col2:
+
+            st.markdown('<div class="pink-card">', unsafe_allow_html=True)
+
+            st.subheader("📝 新增領用紀錄")
+
+            
+
+            final_tool_options = tool_types 
+
+            
+
+            with st.form("user_tool_form"):
+
+                t_staff = st.selectbox("選擇成員", staff_options)
+
+                t_name = st.selectbox("選擇工具", final_tool_options) 
+
+                t_qty = st.number_input("數量", min_value=1, value=1)
+
+                # Form 內的 Submit 按鈕
+
+                if st.form_submit_button("🎉 確認新增紀錄", use_container_width=True):
+
+                    tool_payload = {
+
+                        "人員": t_staff,
+
+                        "手工具名稱": t_name,
+
+                        "數量": int(t_qty),
+
+                        "登記時間": get_now_str(),
+
+                        "登記人": current_user
+
+                    }
+
+                    requests.post(f"{USER_TOOLS_URL}.json", data=json.dumps(tool_payload))
+
+                    st.success(f"已紀錄！"); time.sleep(0.5); st.rerun()
+
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            
+
+elif st.session_state.menu_selection == "📝每日6S任務回報":
+
+    import requests
+
+    import json
+
+    from datetime import datetime, timedelta, timezone
+
+
+
+    # 1. 基礎設定
+
+    st.markdown("### 📝 每日 6S 任務回報中心")
+
     DB_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
-    TOOL_LIST_URL = f"{DB_URL}/settings/tool_settings"
-    
-    tool_settings = requests.get(f"{TOOL_LIST_URL}.json").json() or {"tool_types": []}
-    tool_types = tool_settings.get("tool_types", [])
-    
-    # 直接從 Firebase 讀取 staff_map，避免全域變數失效
-    staff_map = requests.get(f"{DB_URL}/settings/staff_map.json").json() or {}
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown('<div class="pink-card">', unsafe_allow_html=True)
-        st.subheader("🛠️ 編輯一般工具清單")
-        current_tools_str = "，".join(tool_types)
-        new_tools_input = st.text_area("工具清單 (逗號分隔)", value=current_tools_str, height=120, key="txt_tools_list")
-        if st.button("💾 儲存工具清單", key="btn_save_tools"):
-            import re
-            new_list = [t.strip() for t in re.split(r'[，,]', new_tools_input) if t.strip()]
-            requests.put(f"{TOOL_LIST_URL}.json", json={"tool_types": new_list})
-            st.success("更新成功"); st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
 
-# 2. 每日 6S 回報區塊 (已移除容易導致 SyntaxError 的符號)
-elif st.session_state.menu_selection == "每日6S任務回報":
-    st.markdown("### 📋 每日 6S 任務回報中心")
-    DB_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
-    
-    # 重新獲取資料
+    TZ = timezone(timedelta(hours=8))
+
+    TODAY = datetime.now(TZ).strftime("%Y-%m-%d")
+
+
+
+    # 2. 讀取與處理資料 (簡化邏輯，避免變數錯誤)
+
     try:
-        staff_data = requests.get(f"{DB_URL}/settings/staff_map.json").json() or {}
+
+        data_res = requests.get(f"{DB_URL}/settings/staff_map.json")
+
+        staff_data = data_res.json() or {}
+
     except:
+
         staff_data = {}
 
-    if not staff_data:
-        st.error("無法讀取人員設定，請檢查 Firebase 路徑")
-    else:
-        leaders = list(staff_data.keys())
-        selected_leader = st.selectbox("選擇組長", leaders, key="sel_ldr_v2")
-        
-        member_dict = staff_data.get(selected_leader, {})
-        member_list = list(member_dict.values())
-        selected_user = st.selectbox("選擇組員", member_list, key="sel_usr_v2")
 
-        if st.button("確認繳交回報", key="btn_sub_v2"):
-            TODAY = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d")
+
+    # 3. UI 顯示 (強制加上 key 防止 DuplicateElementId)
+
+    if not staff_data:
+
+        st.error("無法讀取人員資料，請確認後台設定")
+
+    else:
+
+        leaders = list(staff_data.keys())
+
+        selected_leader = st.selectbox("選擇組長", leaders, key="sel_ldr_001")
+
+        
+
+        # 處理組員列表
+
+        member_dict = staff_data.get(selected_leader, {})
+
+        member_list = list(member_dict.values())
+
+        selected_user = st.selectbox("選擇組員", member_list, key="sel_usr_001")
+
+
+
+        # 4. 提交回報邏輯
+
+        if st.button("確認繳交回報", key="btn_sub_001"):
+
+            # 檢查是否已完成
+
             check_url = f"{DB_URL}/daily_6s_report_logs/{TODAY}/{selected_user}.json"
-            
+
             if requests.get(check_url).json():
-                st.warning("今日已回報")
+
+                st.warning("今日已回報過")
+
             else:
+
+                # 記錄回報
+
                 requests.put(check_url, json={"status": "done", "time": str(datetime.now())})
+
+                
+
+                # 更新點數
+
                 user_url = f"{DB_URL}/skills_current_status/{selected_user}.json"
+
                 user_info = requests.get(user_url).json() or {}
-                user_info["avail_pts"] = int(user_info.get("avail_pts", 0)) + 1
+
+                
+
+                # 確保點數為數字
+
+                old_pts = int(user_info.get("avail_pts", 0))
+
+                user_info["avail_pts"] = old_pts + 1
+
+                
+
                 requests.put(user_url, json=user_info)
+
                 st.success(f"成功為 {selected_user} 增加點數")
+
                 st.rerun()
     # --- ⚙️ 設定管理 ---
     elif st.session_state.menu_selection == "⚙️ 設定管理":
