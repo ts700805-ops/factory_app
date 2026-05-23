@@ -589,43 +589,7 @@ else:
                 time.sleep(1)
                 st.rerun()
 
-        # ==========================================
-        # ⚙️ 6S 戰境養成管理後台 (調整階級與自訂功能)
-        # ==========================================
-        st.write("")
-        st.write("")
-        with st.expander("⚙️ 6S 戰境養成管理後台"):
-            st.markdown("##### 👑 稱號與升級門檻點數自訂")
-            
-            # 從配置檔下載目前的稱號設定或給予初始值
-            config_data = requests.get(f"{GAME_CONFIG_URL}.json").json() or {}
-            titles_list = config_data.get("titles", ["🌾 平民", "⚔️ 驍勇新兵", "🛡️ 堅毅騎士", "🦅 戰境領主", "👑 傳奇戰神"])
-            
-            t1 = st.text_input("階級 1 稱號 (初始)：", value=titles_list[0])
-            t2 = st.text_input("階級 2 稱號 (總點數達 10)：", value=titles_list[1])
-            t3 = st.text_input("階級 3 稱號 (總點數達 30)：", value=titles_list[2])
-            t4 = st.text_input("階級 4 稱號 (總點數達 60)：", value=titles_list[3])
-            t5 = st.text_input("階級 5 稱號 (總點數達 100)：", value=titles_list[4])
-            
-            if st.button("💾 儲存後台配置", use_container_width=True, key="save_config_btn"):
-                new_titles = [t1.strip(), t2.strip(), t3.strip(), t4.strip(), t5.strip()]
-                config_data["titles"] = new_titles
-                requests.put(f"{GAME_CONFIG_URL}.json", data=json.dumps(config_data))
-                
-                # 自動重新批次計算所有在線玩家的頭銜更新
-                for player, p_data in all_players_data.items():
-                    total_pts = int(p_data.get("str", 0)) + int(p_data.get("vit", 0)) + int(p_data.get("agi", 0)) + int(p_data.get("cha", 0))
-                    if total_pts >= 100: p_data["level_name"] = new_titles[5-1]
-                    elif total_pts >= 60: p_data["level_name"] = new_titles[4-1]
-                    elif total_pts >= 30: p_data["level_name"] = new_titles[3-1]
-                    elif total_pts >= 10: p_data["level_name"] = new_titles[2-1]
-                    else: p_data["level_name"] = new_titles[0]
-                    requests.put(f"{GAME_DB_URL}/{player}.json", data=json.dumps(p_data))
-                
-                st.success("✅ 階級稱號更新成功！系統已將所有人員名單頭銜同步洗牌。")
-                time.sleep(1)
-                st.rerun()
-
+      
 
 
 
