@@ -1229,8 +1229,7 @@ else:
         leaders_raw = requests.get(f"{BASE_URL}/leaders_list.json").json() or ""
         leader_list = [l.strip() for l in leaders_raw.split(",") if l.strip()] if isinstance(leaders_raw, str) else []
 
-     # 3. 【核心修正】直接讀取 Firebase 的 staff_map 結構
-        # 這樣就不需要再去處理複雜的文字斷行，直接用現成的字典格式
+   # 3. 【核心修正】直接讀取 Firebase 的 staff_map 結構
         try:
             staff_data = requests.get(f"{BASE_URL}/staff_map.json").json()
         except:
@@ -1251,9 +1250,32 @@ else:
                 "李俊霖": ["陳育信", "陳凱彥"]
             }
 
-        # 如果主清單在後台是空的，我們從 staff_map 的 key 自動取得組長清單，保證不會顯示錯誤
+        # 如果主清單在後台是空的，我們從 staff_map 的 key 自動取得組長清單
         if not leader_list:
             leader_list = list(leader_member_mapping.keys())
+
+        # 介面渲染：選擇組長與成員
+        st.markdown("### 🔍 第一步：確認您的身份")
+        col_leader, col_member = st.columns(2)
+        
+        with col_leader:
+            selected_leader = st.selectbox("👤 選擇所屬組長：", leader_list)
+        
+        with col_member:
+            # 【關鍵修正】：檢查資料格式，如果是字典（Firebase結構），強制取出值轉為列表
+            data_raw = leader_member_mapping.get(selected_leader, [])
+            if isinstance(data_raw, dict):
+                available_members = list(data_raw.values())
+            else:
+                available_members = data_raw
+            
+            if available_members:
+                selected_user = st.selectbox("🎯 選擇回報同仁姓名：", available_members)
+                has_members = True
+            else:
+                st.warning("⚠️ 此組長尚未在後台配置屬下同仁")
+                selected_user = None
+                has_members = False
 
         # 介面渲染：選擇組長與成員
         st.markdown("### 🔍 第一步：確認您的身份")
