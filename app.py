@@ -182,8 +182,8 @@ else:
     st.sidebar.markdown(f"### 👤 當前人員：**{st.session_state.user}**")
     nav = st.sidebar.radio("功能導航", [
    
-    "📊 製造部派工專區", 
     "📋 員工技能考核進度", 
+    "📊 製造部派工專區", 
     "📜 完工紀錄查詢", 
     "🔧 固資&手工具紀錄表",
     "🧾 人員評核表",
