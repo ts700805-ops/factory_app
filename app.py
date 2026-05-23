@@ -1187,93 +1187,56 @@ else:
             st.markdown('</div>', unsafe_allow_html=True)
             
 elif st.session_state.menu_selection == "📝每日6S任務回報":
-        import requests
-        import json
-        from datetime import datetime, timedelta, timezone
-        import time
+    import requests
+    import json
+    from datetime import datetime, timedelta, timezone
 
-        st.markdown('''
-            <div style="text-align:center; margin-bottom:2rem;">
-                <h1 style="color:#60A5FA !important; font-weight:900 !important; font-size: 3.5rem !important;">📋 每日 6S 任務回報中心</h1>
-                <p style="color:#9CA3AF;">完成今日現場回報，即可領取 1 點自由屬性點數！</p>
-            </div>
-        ''', unsafe_allow_html=True)
+    # 1. 基礎設定
+    st.markdown("### 📝 每日 6S 任務回報中心")
+    DB_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
+    TZ = timezone(timedelta(hours=8))
+    TODAY = datetime.now(TZ).strftime("%Y-%m-%d")
 
-        # 1. 安全路徑與設定
-        BASE_URL = globals().get('DB_URL') or globals().get('DB_BASE_URL') or "https://your-firebase-url"
-        GAME_DB_URL = f"{BASE_URL}/game_rpg_data"
-        REPORT_LOG_URL = f"{BASE_URL}/daily_6s_report_logs"
+    # 2. 讀取與處理資料 (簡化邏輯，避免變數錯誤)
+    try:
+        data_res = requests.get(f"{DB_URL}/settings/staff_map.json")
+        staff_data = data_res.json() or {}
+    except:
+        staff_data = {}
+
+    # 3. UI 顯示 (強制加上 key 防止 DuplicateElementId)
+    if not staff_data:
+        st.error("無法讀取人員資料，請確認後台設定")
+    else:
+        leaders = list(staff_data.keys())
+        selected_leader = st.selectbox("選擇組長", leaders, key="sel_ldr_001")
         
-        tz_taiwan = timezone(timedelta(hours=8))
-        today_tw_str = datetime.now(tz_taiwan).strftime("%Y-%m-%d")
+        # 處理組員列表
+        member_dict = staff_data.get(selected_leader, {})
+        member_list = list(member_dict.values())
+        selected_user = st.selectbox("選擇組員", member_list, key="sel_usr_001")
 
-        st.info(f"📅 任務結算基準日（台北時間）：**{today_tw_str}**")
-
-        # 2. 從 Firebase 讀取最新人員配置
-        try:
-            leaders_req = requests.get(f"{BASE_URL}/leaders_list.json")
-            leaders_raw = leaders_req.json() or ""
-            leader_list = [l.strip() for l in leaders_raw.split(",")] if isinstance(leaders_raw, str) else []
-            
-            # 從後台直接讀取映射表，不再寫死 backup_mapping
-            leader_member_mapping = requests.get(f"{BASE_URL}/leader_members.json").json() or {}
-        except:
-            leader_list = []
-            leader_member_mapping = {}
-
-        # 3. 介面渲染
-        st.markdown("### 🔍 第一步：確認您的身份")
-        col_leader, col_member = st.columns(2)
-        
-        with col_leader:
-            selected_leader = st.selectbox("👤 選擇所屬組長：", options=leader_list, key="sel_ldr")
-        
-        with col_member:
-            available_members = leader_member_mapping.get(selected_leader, [])
-            if available_members:
-                selected_user = st.selectbox("🎯 選擇回報同仁姓名：", options=available_members, key="sel_mem")
-                has_members = True
+        # 4. 提交回報邏輯
+        if st.button("確認繳交回報", key="btn_sub_001"):
+            # 檢查是否已完成
+            check_url = f"{DB_URL}/daily_6s_report_logs/{TODAY}/{selected_user}.json"
+            if requests.get(check_url).json():
+                st.warning("今日已回報過")
             else:
-                st.warning("⚠️ 此組長尚未在後台配置屬下同仁")
-                selected_user = None
-                has_members = False
-
-        st.divider()
-
-        # 4. 回報與領獎邏輯
-        if has_members and selected_user:
-            if st.button(f"✨ 繳交今日 6S 成果，領取點數！", use_container_width=True, type="primary"):
-                safe_user_key = str(selected_user).strip()
+                # 記錄回報
+                requests.put(check_url, json={"status": "done", "time": str(datetime.now())})
                 
-                # 檢查今日是否已回報
-                check_exist = requests.get(f"{REPORT_LOG_URL}/{today_tw_str}/{safe_user_key}.json").json()
-
-                if check_exist:
-                    st.error(f"❌ 提示：【{selected_user}】您今天已經完成過任務回報囉！")
-                else:
-                    # 寫入回報紀錄
-                    report_payload = {
-                        "reported_at": datetime.now(tz_taiwan).strftime("%Y-%m-%d %H:%M:%S"),
-                        "leader": selected_leader,
-                        "status": "已完成"
-                    }
-                    requests.put(f"{REPORT_LOG_URL}/{today_tw_str}/{safe_user_key}.json", data=json.dumps(report_payload))
-
-                    # 更新點數
-                    player_rpg_data = requests.get(f"{GAME_DB_URL}/{safe_user_key}.json").json() or {}
-                    new_pts = int(player_rpg_data.get("avail_pts", 0)) + 1
-                    
-                    update_rpg_payload = {
-                        **player_rpg_data,
-                        "avail_pts": new_pts
-                    }
-                    requests.put(f"{GAME_DB_URL}/{safe_user_key}.json", data=json.dumps(update_rpg_payload))
-
-                    st.balloons()
-                    st.success(f"🎉 大成功！【{selected_user}】今日 6S 回報完畢！")
-                    time.sleep(1)
-                    st.session_state.menu_selection = "🎮6S戰境養成"
-                    st.rerun()
+                # 更新點數
+                user_url = f"{DB_URL}/skills_current_status/{selected_user}.json"
+                user_info = requests.get(user_url).json() or {}
+                
+                # 確保點數為數字
+                old_pts = int(user_info.get("avail_pts", 0))
+                user_info["avail_pts"] = old_pts + 1
+                
+                requests.put(user_url, json=user_info)
+                st.success(f"成功為 {selected_user} 增加點數")
+                st.rerun()
     # --- ⚙️ 設定管理 ---
     elif st.session_state.menu_selection == "⚙️ 設定管理":
         st.title("⚙️ 系統核心設定")
