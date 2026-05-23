@@ -234,77 +234,70 @@ elif st.session_state.menu_selection == "每日6S任務回報":
     from datetime import datetime, timezone, timedelta
     import time
 
-    # 顯示頁面標題
-    st.markdown("### 📋 每日 6S 任務回報中心")
-    st.write("完成今日現場回報，即可領取 1 點自由屬性點數！")
-
-    # 基礎設定
+    st.markdown("### 📋 每日 6S 任務回報")
+    
+    # 1. 初始化環境變數 (確保路徑不報錯)
     BASE_URL = globals().get('DB_URL', "https://my-factory-system-default-rtdb.firebaseio.com")
     GAME_DB_URL = f"{BASE_URL}/game_rpg_data"
     REPORT_LOG_URL = f"{BASE_URL}/daily_6s_report_logs"
-    
     tz_taiwan = timezone(timedelta(hours=8))
-    today_tw_str = datetime.now(tz_taiwan).strftime("%Y-%m-%d")
+    today = datetime.now(tz_taiwan).strftime("%Y-%m-%d")
 
-    # 抓取並解析資料
-    try:
-        leaders_data = requests.get(f"{BASE_URL}/leaders_list.json").json()
-        leader_list = [l.strip() for l in leaders_data.split(",")] if isinstance(leaders_data, str) else []
-        
-        # 讀取人員對應表
-        raw_1 = requests.get(f"{BASE_URL}/leader_members.json").json() or ""
-        raw_2 = requests.get(f"{BASE_URL}/leader_members_2.json").json() or ""
-        
-        lines = []
-        if isinstance(raw_1, str): lines.extend(raw_1.splitlines())
-        if isinstance(raw_2, str): lines.extend(raw_2.splitlines())
-        
-        leader_map = {}
-        for line in lines:
-            if ":" in line:
-                parts = line.split(":", 1)
-                leader_map[parts[0].strip()] = [m.strip() for m in parts[1].split(",") if m.strip()]
-    except:
-        leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
-        leader_map = {}
+    # 2. 讀取與解析資料
+    def get_data():
+        try:
+            # 獲取組長名單
+            leaders_raw = requests.get(f"{BASE_URL}/leaders_list.json").json()
+            leader_list = [l.strip() for l in leaders_raw.split(",")] if isinstance(leaders_raw, str) else []
+            
+            # 獲取組員資料
+            raw_1 = requests.get(f"{BASE_URL}/leader_members.json").json() or ""
+            raw_2 = requests.get(f"{BASE_URL}/leader_members_2.json").json() or ""
+            mapping = {}
+            for line in (raw_1 + "\n" + raw_2).splitlines():
+                if ":" in line:
+                    parts = line.split(":", 1)
+                    mapping[parts[0].strip()] = [m.strip() for m in parts[1].split(",") if m.strip()]
+            return leader_list, mapping
+        except:
+            return ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"], {}
 
-    # 介面選擇 (已加入 key 防止 DuplicateElementId)
+    leaders, member_map = get_data()
+
+    # 3. 下拉選單區域 (強制指定唯一 key)
+    st.write("---")
     col1, col2 = st.columns(2)
+    
     with col1:
-        selected_leader = st.selectbox("選擇所屬組長：", leader_list, key="6s_key_leader_select")
+        sel_leader = st.selectbox("請選擇組長", leaders, key="new_sel_leader")
     
     with col2:
-        members = leader_map.get(selected_leader, [])
-        if members:
-            selected_user = st.selectbox("選擇同仁姓名：", members, key="6s_key_member_select")
-            has_data = True
-        else:
-            st.warning("該組長下無設定人員")
-            selected_user = None
-            has_data = False
+        members = member_map.get(sel_leader, ["尚未設定"])
+        sel_member = st.selectbox("請選擇執行同仁", members, key="new_sel_member")
 
-    # 提交邏輯 (已加入 key)
-    if has_data:
-        if st.button(f"送出回報：{selected_user}", key="6s_key_submit_btn"):
-            # 檢查重複
-            check_url = f"{REPORT_LOG_URL}/{today_tw_str}/{selected_user}.json"
+    # 4. 提交區域 (位於頁面最下方)
+    st.write("---")
+    if st.button("確認提交回報並領取點數", key="new_submit_btn", type="primary", use_container_width=True):
+        if sel_member == "尚未設定":
+            st.error("該組別無人員資料，無法提交")
+        else:
+            # 檢查是否重複
+            check_url = f"{REPORT_LOG_URL}/{today}/{sel_member}.json"
             if requests.get(check_url).json() is not None:
-                st.error(f"【{selected_user}】今日已回報過！")
+                st.warning(f"【{sel_member}】今天已經回報過囉！")
             else:
                 # 寫入回報
-                payload = {"time": datetime.now(tz_taiwan).strftime("%H:%M:%S"), "status": "done"}
-                requests.put(check_url, json=payload)
+                requests.put(check_url, json={"time": datetime.now(tz_taiwan).strftime("%H:%M:%S")})
                 
-                # 增加點數
-                user_data = requests.get(f"{GAME_DB_URL}/{selected_user}.json").json() or {}
-                pts = int(user_data.get("avail_pts", 0)) + 1
-                user_data["avail_pts"] = pts
-                requests.put(f"{GAME_DB_URL}/{selected_user}.json", json=user_data)
+                # 寫入點數 (增加 1 點)
+                user_data = requests.get(f"{GAME_DB_URL}/{sel_member}.json").json() or {}
+                new_pts = int(user_data.get("avail_pts", 0)) + 1
+                user_data["avail_pts"] = new_pts
+                requests.put(f"{GAME_DB_URL}/{sel_member}.json", json=user_data)
                 
-                st.success("回報成功！")
+                st.success(f"✅ 【{sel_member}】回報成功！點數已發放！")
+                time.sleep(1)
                 st.rerun()
-
-
 # --- 📊 製造部派工專區 ---
     if st.session_state.menu_selection == "📊 製造部派工專區":
         st.markdown('<h1 style="text-align:center; color:#34d399; font-weight:900;">📋 製造部派工進度看板</h1>', unsafe_allow_html=True)
