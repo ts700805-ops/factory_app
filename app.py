@@ -614,34 +614,6 @@ else:
                 st.success("後台晉升設定更新完成！")
                 time.sleep(0.5)
                 st.rerun()
-        # ==========================================
-        # ⚙️ 後台稱謂門檻設定區
-        # ==========================================
-        st.markdown("### ⚙️ 6S 戰境養成管理後台")
-        with st.expander("🔒 稱謂晉升門檻點數自訂"):
-            f_col1, f_col2 = st.columns(2)
-            with f_col1:
-                in_lv1 = st.text_input("等級1名稱", value=lv1_name)
-                in_lv2 = st.text_input("等級2名稱", value=lv2_name)
-                in_lv3 = st.text_input("等級3名稱", value=lv3_name)
-                in_lv4 = st.text_input("等級4名稱", value=lv4_name)
-            with f_col2:
-                pt_lv1 = st.number_input("等級1所需配點總數", value=lv1_pts)
-                pt_lv2 = st.number_input("等級2所需配點總數", value=lv2_pts)
-                pt_lv3 = st.number_input("等級3所需配點總數", value=lv3_pts)
-                pt_lv4 = st.number_input("等級4所需配點總數", value=lv4_pts)
-
-            if st.button("💾 儲存後台配置設定", use_container_width=True):
-                save_payload = {
-                    "lv1_name": str(in_lv1), "lv1_pts": int(pt_lv1),
-                    "lv2_name": str(in_lv2), "lv2_pts": int(pt_lv2),
-                    "lv3_name": str(in_lv3), "lv3_pts": int(pt_lv3),
-                    "lv4_name": str(in_lv4), "lv4_pts": int(pt_lv4),
-                }
-                requests.put(f"{GAME_CONFIG_URL}.json", data=json.dumps(save_payload))
-                st.success("後台晉升設定更新完成！")
-                time.sleep(0.5)
-                st.rerun()
     
 # --- 📊 製造部派工專區 ---
     if st.session_state.menu_selection == "📊 製造部派工專區":
