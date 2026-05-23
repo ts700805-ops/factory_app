@@ -387,14 +387,14 @@ else:
             # 💡 增加錯誤偵測，幫助開發者看到真正的問題
             st.error(f"系統偵測到錯誤：{str(e)}")
             st.warning("目前系統資料緩衝中，請稍後再試。")
-# --- 📈 工時統計分析 (已修改為 📊 技能評核表並列安全版) ---
+# --- 📈 工時統計分析 (已修改為 📊 全員技能評核表終極安全版) ---
     elif st.session_state.menu_selection == "📈 工時統計分析":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📋 員工技能評核表</h1>', unsafe_allow_html=True)
         
         # 1. 取得當前組長名字 (例如: 陳德文)
         current_leader = st.session_state.user 
         
-        # 2. 針對您的 Firebase 結構做抓取
+        # 2. 針對您的 Firebase 結構做抓取與嚴格文字清洗
         display_list = []
         try:
             # 抓取 staff_map.json
@@ -402,33 +402,51 @@ else:
             if map_res.status_code == 200:
                 staff_data = map_res.json() or {}
                 
-                # --- 直接用組長名字當 Key 抓取組員列表 ---
-                my_team = staff_data.get(current_leader, [])
+                # 抓取該組長下的原始資料
+                raw_team_data = staff_data.get(current_leader, [])
                 
-                if isinstance(my_team, list):
-                    display_list = [str(member).strip() for member in my_team]
+                # --- 核心修正：相容字串（逗號隔開）與 清單 結構 ---
+                if isinstance(raw_team_data, list):
+                    # 如果原本就是 list，逐一清理字串
+                    for item in raw_team_data:
+                        item_str = str(item).strip()
+                        if "," in item_str:
+                            # 防呆：如果 list 裡面又包了逗號字串
+                            display_list.extend([x.strip() for x in item_str.split(",") if x.strip()])
+                        else:
+                            if item_str:
+                                display_list.append(item_str)
+                elif isinstance(raw_team_data, str):
+                    # 如果後台抓出來是整串用逗號隔開的文字
+                    display_list = [x.strip() for x in raw_team_data.split(",") if x.strip()]
                 
-            # 保險：如果沒抓到，讓組長選自己
+            # 保險防呆：如果都沒抓到，至少顯示組長自己
             if not display_list:
-                display_list = [current_leader]
+                display_list = [str(current_leader).strip()]
         except Exception as e:
-            st.error(f"連線失敗: {e}")
-            display_list = [current_leader]
+            st.error(f"連線或解析失敗: {e}")
+            display_list = [str(current_leader).strip()]
+
+        # 去除重覆的人員名稱，確保迴圈絕對乾淨
+        display_list = sorted(list(set(display_list)))
 
         st.markdown(f'<p style="font-size:1.2rem; font-weight:bold; color:#1e3a8a;">👥 {current_leader} 組長 的全體組員考核表：</p>', unsafe_allow_html=True)
         st.divider()
 
         # 3. 並列由上往下列出該組所有員工
         if display_list:
-            for member in sorted(display_list):
-                # 確保名字轉為乾淨的字串型態，避免相加出錯
+            for member in display_list:
                 m_name = str(member).strip()
                 
+                # 避免空字串影響 UI
+                if not m_name:
+                    continue
+                    
                 # 建立外層精美的大外框，把每位員工隔開
                 st.markdown(f'<div style="background:#1e3a8a; color:white; padding:10px 15px; border-radius:10px 10px 0 0; font-weight:bold; font-size:1.2rem;">👤 評核人員：{m_name}</div>', unsafe_allow_html=True)
                 
                 with st.container(border=True):
-                    # 第一排：三個滑桿 (出勤、工作效率、紀律) - 改用最安全的字串相加 Key 邏輯
+                    # 第一排：三個滑桿 (出勤、工作效率、紀律) - 採用最無害的標準字串相加產生唯一的 Key
                     c1, c2, c3 = st.columns(3)
                     with c1:
                         st.markdown('<p style="color:#1e3a8a; font-weight:bold; margin-bottom:-5px;">📋 出勤表現</p>', unsafe_allow_html=True)
@@ -454,7 +472,7 @@ else:
                     
                     # 評語輸入框
                     st.markdown('<p style="color:#1e3a8a; font-weight:bold; margin-bottom:-5px;">📝 評語 / 改善建議</p>', unsafe_allow_html=True)
-                    eval_comment = st.text_area("評語", value="", placeholder="請輸入對 " + m_name + " 的評語...", key="comment_" + m_name, label_visibility="collapsed")
+                    eval_comment = st.text_area("評語", value="", placeholder="請輸入評語...", key="comment_" + m_name, label_visibility="collapsed")
                     
                     # 計算該員工目前的完成度百分比總分 (以 6 項 10 分滿分為 100% 換算)
                     total_score = score_attendance + score_efficiency + score_discipline + score_quality + score_team + score_5s
@@ -488,7 +506,6 @@ else:
                         except Exception as save_err:
                             st.error(f"儲存出錯: {save_err}")
                 
-                # 員工之間的間距
                 st.markdown('<br>', unsafe_allow_html=True)
         else:
             st.info("💡 目前此組別無成員資料。")
@@ -535,7 +552,7 @@ else:
                             st.rerun()
             else: st.warning("查無紀錄。")
         else: st.info("💡 目前尚無紀錄。")
-
+            
 # --- 🔧 人員手工具紀錄表 (修正版：恢復資產匯出 + 移除重複) ---
     elif st.session_state.menu_selection == "🔧 固資&手工具紀錄表":
         import io
