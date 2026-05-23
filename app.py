@@ -183,10 +183,10 @@ else:
     nav = st.sidebar.radio("功能導航", [
    
     "💡2o26上半年技能考核進度", 
+    "🧾 組長待辦事項",
     "📊 製造部派工專區", 
     "📜 完工紀錄查詢", 
     "🔧 固資&手工具紀錄表",
-    "🧾 人員評核表",
     "⚙️ 資產編輯清單",
     "📝 任務派發", 
     "⚙️ 設定管理"
@@ -784,21 +784,23 @@ else:
                 st.dataframe(asset_df, use_container_width=True, hide_index=True)
             else:
                 st.info("💡 目前無資產資料")
-# --- 🧾 人員評核表 ---
-    elif st.session_state.menu_selection == "🧾 人員評核表":
+# --- 🧾 組長待辦事項 ---
+    elif st.session_state.menu_selection == "🧾組長待辦事項":
         import io
 
         st.markdown(
-            '<h1 style="text-align:center; color:#7DD3FC; font-weight:900; font-size:2.5rem;">🧾 人員評核表</h1>',
+            '<h1 style="text-align:center; color:#7DD3FC; font-weight:900; font-size:2.5rem;">🧾 組長待辦事項</h1>',
             unsafe_allow_html=True
         )
 
-        # 【安全修正】檢查並確保 EVALUATION_URL 存在，防止 NameError 報錯
-        if 'EVALUATION_URL' not in globals() and 'EVALUATION_URL' not in locals():
+        # 【安全修正】檢查並確保 TODO_DB_URL 存在，防止 NameError 報錯
+        if 'TODO_DB_URL' not in globals() and 'TODO_DB_URL' not in locals():
             if 'DB_URL' in globals() or 'DB_URL' in locals():
-                EVALUATION_URL = f"{DB_URL}/evaluation"
+                TODO_DB_URL = f"{DB_URL}/todo_tasks"
+            elif 'DB_BASE_URL' in globals() or 'DB_BASE_URL' in locals():
+                TODO_DB_URL = f"{DB_BASE_URL}/todo_tasks"
             else:
-                EVALUATION_URL = "https://your-firebase-url/evaluation" # 防護備用機制
+                TODO_DB_URL = "https://your-firebase-url/todo_tasks" # 防護備用機制
 
         # 注入優化 CSS：字體全面放大、改用顯眼的亮天藍色與冰藍色，確保深色背景清晰可讀
         st.markdown("""
@@ -814,7 +816,7 @@ else:
                 font-weight: 800 !important;
             }
             
-            /* 2. 讓區域大標題（例如：新增評核、評核紀錄查詢）更亮、更大 */
+            /* 2. 讓區域大標題更亮、更大 */
             h3 {
                 color: #38BDF8 !important; /* 亮天藍色 */
                 font-size: 1.6rem !important; /* 標題放大 */
@@ -843,7 +845,7 @@ else:
                 background-color: #14532d !important;
             }
             
-            /* 5. 輸入框與文字區域內的文字（讓使用者打字時看得很清楚） */
+            /* 5. 輸入框與文字區域內的文字 */
             div[data-baseweb="select"] > div, 
             div[data-testid="stTextInput"] div div input, 
             div[data-testid="stTextArea"] textarea {
@@ -874,7 +876,7 @@ else:
                 font-weight: 700 !important;
             }
 
-            /* 當滑鼠移到下拉選單選項上時 */
+            /* 当滑鼠移到下拉選單選項上時 */
             div[role="option"]:hover, 
             li[role="option"]:hover,
             div[data-baseweb="menu"] li:hover,
@@ -883,7 +885,7 @@ else:
                 color: #052e16 !important; /* 反白時字體變深綠色以利閱讀 */
             }
 
-            /* 7. 「儲存評核」按鈕內的文字放大、變亮藍色 */
+            /* 7. 「儲存」按鈕內的文字放大、變亮藍色 */
             div[data-testid="stForm"] div.stButton > button {
                 background-color: #052e16 !important;
                 color: #38BDF8 !important;
@@ -900,164 +902,140 @@ else:
         """, unsafe_allow_html=True)
 
         current_leader = st.session_state.user
-        my_team = staff_map.get(current_leader, [])
 
-        if not my_team:
-            st.warning("⚠️ 目前此組長尚未設定組員，請先到【設定管理】設定 staff_map。")
-        else:
-            # 讀取現有評核資料
-            eval_raw = requests.get(f"{EVALUATION_URL}.json").json() or {}
+        # 從 staff_map 自動抓取全體組長的清單
+        all_leaders_list = []
+        if 'staff_map' in globals() or 'staff_map' in locals():
+            all_leaders_list = sorted([str(k).strip() for k in staff_map.keys() if k])
+        
+        # 防呆：如果名單是空的，至少要有當前登入者
+        if not all_leaders_list:
+            all_leaders_list = [str(current_leader).strip()]
+        elif str(current_leader).strip() not in all_leaders_list:
+            all_leaders_list.insert(0, str(current_leader).strip())
 
-            # --- 新增評核表單 ---
-            st.markdown("### ✍️ 新增評核")
-            with st.form("evaluation_form"):
-                c1, c2 = st.columns(2)
-                with c1:
-                    eval_staff = st.selectbox("👤 評核人員", sorted(my_team))
-                with c2:
-                    eval_month = st.text_input("📅 評核月份", value=datetime.datetime.now().strftime("%Y-%m"))
+        # 讀取現有待辦事項歷史資料
+        todo_raw = requests.get(f"{TODO_DB_URL}.json").json() or {}
 
-                c3, c4, c5 = st.columns(3)
-                with c3:
-                    score_attendance = st.slider("出勤表現", 1, 10, 8)
-                    score_quality = st.slider("品質表現", 1, 10, 8)
-                with c4:
-                    score_efficiency = st.slider("工作效率", 1, 10, 8)
-                    score_cooperation = st.slider("團隊配合", 1, 10, 8)
-                with c5:
-                    score_discipline = st.slider("紀律態度", 1, 10, 8)
-                    score_5s = st.slider("5S維護", 1, 10, 8)
+        # --- 新增待辦事項表單 ---
+        st.markdown("### ✍️ 新增組長交辦事項")
+        with st.form("todo_input_form"):
+            c1, c2 = st.columns(2)
+            with c1:
+                # 讓你可以自由選擇要把任務派給哪一位組長
+                try:
+                    default_idx = all_leaders_list.index(str(current_leader).strip())
+                except:
+                    default_idx = 0
+                target_leader = st.selectbox("👤 負責組長", all_leaders_list, index=default_idx)
+            with c2:
+                # 預設完工日期為今天
+                target_deadline = st.text_input("📅 預計完成日期", value=datetime.datetime.now().strftime("%Y-%m-%d"))
 
-                comment = st.text_area("📝 評語 / 改善建議", height=120)
-                submitted = st.form_submit_button("💾 儲存評核", use_container_width=True)
+            todo_content = st.text_area("📝 交辦事項內容 / 待辦備註", height=120, placeholder="請輸入需要交辦的事項內容...")
+            submitted = st.form_submit_button("💾 儲存交辦事項", use_container_width=True)
 
-                if submitted:
-                    avg_score = round((
-                        score_attendance +
-                        score_quality +
-                        score_efficiency +
-                        score_cooperation +
-                        score_discipline +
-                        score_5s
-                    ) / 6, 2)
-
+            if submitted:
+                if not todo_content.strip():
+                    st.error("❌ 請輸入交辦事項內容，不能留空！")
+                else:
                     payload = {
-                        "組長": current_leader,
-                        "人員": eval_staff,
-                        "評核月份": eval_month,
-                        "出勤表現": score_attendance,
-                        "品質表現": score_quality,
-                        "工作效率": score_efficiency,
-                        "團隊配合": score_cooperation,
-                        "紀律態度": score_discipline,
-                        "5S維護": score_5s,
-                        "平均分數": avg_score,
-                        "評語": comment,
-                        "建立時間": get_now_str()
+                        "組長": target_leader,
+                        "交辦事項": todo_content.strip(),
+                        "預計完成日期": target_deadline,
+                        "指派人": current_leader,
+                        "建立時間": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     }
-                    requests.post(f"{EVALUATION_URL}.json", data=json.dumps(payload))
-                    st.success(f"✅ {eval_staff} 的評核已儲存！平均分數：{avg_score}")
+                    requests.post(f"{TODO_DB_URL}.json", data=json.dumps(payload))
+                    st.success(f"✅ 已成功將交辦事項指派給 【{target_leader}】！")
                     time.sleep(0.5)
                     st.rerun()
 
-            st.divider()
+        st.divider()
 
-            # --- 查詢與篩選 ---
-            st.markdown("### 🔍 評核紀錄查詢")
-            fc1, fc2, fc3 = st.columns(3)
-            with fc1:
-                filter_staff = st.selectbox("篩選人員", ["全部"] + sorted(my_team), key="eval_filter_staff")
-            with fc2:
-                all_months = []
-                if eval_raw:
-                    all_months = sorted(list(set([
-                        str(v.get("評核月份", ""))
-                        for v in eval_raw.values()
-                        if v.get("評核月份")
-                    ])), reverse=True)
-                filter_month = st.selectbox("篩選月份", ["全部"] + all_months, key="eval_filter_month")
-            with fc3:
-                keyword = st.text_input("關鍵字搜尋", key="eval_keyword")
+        # --- 查詢與篩選 ---
+        st.markdown("### 🔍 歷史交辦事項查詢")
+        fc1, fc2, fc3 = st.columns(3)
+        with fc1:
+            filter_leader = st.selectbox("篩選負責組長", ["全部"] + all_leaders_list, key="todo_filter_leader")
+        with fc2:
+            all_deadlines = []
+            if todo_raw:
+                all_deadlines = sorted(list(set([
+                    str(v.get("預計完成日期", ""))
+                    for v in todo_raw.values()
+                    if v.get("預計完成日期")
+                ])), reverse=True)
+            filter_deadline = st.selectbox("篩選完成日期", ["全部"] + all_deadlines, key="todo_filter_deadline")
+        with fc3:
+            keyword = st.text_input("關鍵字搜尋", key="todo_keyword")
 
-            if eval_raw:
-                eval_list = []
-                for k, v in eval_raw.items():
-                    row = v.copy()
-                    row["db_id"] = k
-                    eval_list.append(row)
+        if todo_raw:
+            todo_list = []
+            for k, v in todo_raw.items():
+                row = v.copy()
+                row["db_id"] = k
+                todo_list.append(row)
 
-                eval_df = pd.DataFrame(eval_list)
+            todo_df = pd.DataFrame(todo_list)
 
-                # 安全檢查：確保 DataFrame 不為空且包含「組長」欄位時才進行篩選
-                if not eval_df.empty and "組長" in eval_df.columns:
-                    eval_df = eval_df[eval_df["組長"] == current_leader]
-                else:
-                    eval_df = pd.DataFrame()
+            # 進行資料過濾篩選
+            if not todo_df.empty and filter_leader != "全部" and "組長" in todo_df.columns:
+                todo_df = todo_df[todo_df["組長"] == filter_leader]
 
-                if not eval_df.empty and filter_staff != "全部" and "人員" in eval_df.columns:
-                    eval_df = eval_df[eval_df["人員"] == filter_staff]
+            if not todo_df.empty and filter_deadline != "全部" and "預計完成日期" in todo_df.columns:
+                todo_df = todo_df[todo_df["預計完成日期"] == filter_deadline]
 
-                if not eval_df.empty and filter_month != "全部" and "評核月份" in eval_df.columns:
-                    eval_df = eval_df[eval_df["評核月份"] == filter_month]
+            if not todo_df.empty and keyword:
+                todo_df = todo_df[
+                    todo_df.astype(str).apply(
+                        lambda x: x.str.contains(keyword, case=False, na=False)
+                    ).any(axis=1)
+                ]
 
-                if not eval_df.empty and keyword:
-                    eval_df = eval_df[
-                        eval_df.astype(str).apply(
-                            lambda x: x.str.contains(keyword, case=False, na=False)
-                        ).any(axis=1)
-                    ]
+            if not todo_df.empty:
+                # 匯出 CSV 功能
+                csv_data = todo_df.to_csv(index=False).encode("utf-8-sig")
+                st.download_button(
+                    "📄 匯出待辦事項 CSV",
+                    data=csv_data,
+                    file_name=f"組長待辦事項總表.csv",
+                    key="download_todo_csv"
+                )
 
-                if not eval_df.empty:
-                    # 匯出 CSV
-                    csv_data = eval_df.to_csv(index=False).encode("utf-8-sig")
-                    st.download_button(
-                        "📄 匯出評核表 CSV",
-                        data=csv_data,
-                        file_name=f"人員評核表_{current_leader}.csv",
-                        key="download_eval_csv"
-                    )
+                st.markdown("### 📊 事項總覽")
+                show_cols = ["組長", "交辦事項", "預計完成日期", "指派人", "建立時間"]
+                available_cols = [c for c in show_cols if c in todo_df.columns]
+                
+                st.dataframe(
+                    todo_df[available_cols],
+                    use_container_width=True,
+                    hide_index=True
+                )
 
-                    st.markdown("### 📊 評核總覽")
-                    
-                    show_cols = [
-                        "人員", "評核月份", "出勤表現", "品質表現", "工作效率",
-                        "團隊配合", "紀律態度", "5S維護", "平均分數", "評語", "建立時間"
-                    ]
-                    available_cols = [c for c in show_cols if c in eval_df.columns]
-                    
-                    st.dataframe(
-                        eval_df[available_cols],
-                        use_container_width=True,
-                        hide_index=True
-                    )
+                st.markdown("### 👁️ 明細檢視 / 刪除")
+                # 排序將最新建立的待辦事項顯示在最上方
+                for _, row in todo_df.sort_values(by="建立時間", ascending=False).iterrows():
+                    with st.expander(f"👤 負責：{row.get('組長', '未知')} ｜ 📅 期限：{row.get('預計完成日期', '')} ｜ 📝 內容：{str(row.get('交辦事項',''))[:15]}..."):
+                        st.markdown(f"""
+                        - **負責組長：** {row.get('組長', '-')}
+                        - **交辦事項：** {row.get('交辦事項', '-')}
+                        - **預計完成日期：** {row.get('預計完成日期', '-')}
+                        - **指派人：** {row.get('指派人', '-')}
+                        - **建立時間：** {row.get('建立時間', '-')}
+                        """)
 
-                    st.markdown("### 👁️ 明細檢視 / 刪除")
-                    for _, row in eval_df.sort_values(by="建立時間", ascending=False).iterrows():
-                        with st.expander(f"👤 {row.get('人員', '未知')}｜📅 {row.get('評核月份', '')}｜⭐ 平均 {row.get('平均分數', 0)}"):
-                            st.markdown(f"""
-                            - **組長：** {row.get('組長', '-')}
-                            - **出勤表現：** {row.get('出勤表現', '-')}
-                            - **品質表現：** {row.get('品質表現', '-')}
-                            - **工作效率：** {row.get('工作效率', '-')}
-                            - **團隊配合：** {row.get('團隊配合', '-')}
-                            - **紀律態度：** {row.get('紀律態度', '-')}
-                            - **5S維護：** {row.get('5S維護', '-')}
-                            - **平均分數：** {row.get('平均分數', '-')}
-                            - **評語：** {row.get('評語', '-')}
-                            - **建立時間：** {row.get('建立時間', '-')}
-                            """)
-
-                            del_col1, del_col2 = st.columns([3, 1])
-                            with del_col2:
-                                if st.button("🗑️ 刪除", key=f"del_eval_{row['db_id']}"):
-                                    requests.delete(f"{EVALUATION_URL}/{row['db_id']}.json")
-                                    st.success("已刪除該筆評核")
-                                    time.sleep(0.5)
-                                    st.rerun()
-                else:
-                    st.info("💡 查無符合條件的評核紀錄")
+                        del_col1, del_col2 = st.columns([3, 1])
+                        with del_col2:
+                            if st.button("🗑️ 刪除", key=f"del_todo_{row['db_id']}"):
+                                requests.delete(f"{TODO_DB_URL}/{row['db_id']}.json")
+                                st.success("已成功刪除該筆交辦事項！")
+                                time.sleep(0.5)
+                                st.rerun()
             else:
-                st.info("💡 目前尚無評核資料")
+                st.info("💡 查無符合條件的待辦事項")
+        else:
+            st.info("💡 目前尚無任何交辦事項紀錄")
 # --- ⚙️ 編輯手工具清單 (修正 Duplicate ID 版本) ---
     elif st.session_state.menu_selection == "⚙️ 資產編輯清單":
         # 1. 補回關鍵的粉紅色 CSS 樣式 (優化對比度與文字清晰度)
