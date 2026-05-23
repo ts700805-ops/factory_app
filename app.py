@@ -559,24 +559,6 @@ else:
                         f"""
                         st.markdown(
         f"""
-        <div style="
-            background-color:#7F1D1D;
-            border:4px solid #DC2626;
-            border-radius:15px;
-            padding:20px;
-            box-shadow:0 0 15px rgba(220,38,38,0.7);
-            color:#FFFFFF !important;
-            font-family:sans-serif;
-        ">
-
-            <h2 style="
-                color:#FFFFFF !important;
-                text-align:center;
-                margin-bottom:15px;
-                font-weight:bold;
-            ">
-                ⚔️ 戰境決鬥場 ⚔️
-            </h2>
                         <div style="color:#ffffff !important; font-family:sans-serif; background-color: #4C1D95; border: 4px solid #2E1065; padding: 20px; border-radius: 12px;">
                             <h3 style="color:#ffffff !important; margin-bottom:10px;">🥊 雙方數據就緒！</h3>
                             <p style="margin:5px 0; font-size:1.1rem; color:#ffffff !important;">
