@@ -227,8 +227,8 @@ else:
 
 
 # ==========================================
-    # 📝 頁面一：每日 6S 任務回報中心 (後台優先同步版)
-    # ==========================================
+# 📝 頁面一：每日 6S 任務回報中心 (後台優先同步版)
+# ==========================================
     elif st.session_state.menu_selection == "📝每日6S任務回報":
         import requests
         import json
@@ -408,10 +408,7 @@ else:
                             st.error("❌ 儲存失敗，請檢查網路。")
                     except Exception as e:
                         st.error(f"❌ 錯誤：{e}")
-# ==========================================
-# 🎮 頁面二：6S 戰境養成與決鬥系統
-# ==========================================
- elif st.session_state.menu_selection == "🎮6S戰境養成":
+elif st.session_state.menu_selection == "🎮6S戰境養成":
         import random
         import time
         import json # 確保有載入 json 模組
@@ -532,7 +529,7 @@ else:
         else:
             target_user = st.selectbox("🎯 選擇決鬥對手同仁：", all_opponents, key="duel_target_select")
             
-            # 點擊按鈕跳出裝飾視窗 (強制定調文字為黑色防止白底瞎眼)
+            # 點擊按鈕跳出裝飾視窗 (強制定調文字為黑色防止白底遮蔽)
             if st.button(f"💥 與 【{target_user}】 展開 6S 實力對決！", use_container_width=True, type="primary"):
                 target_stats = all_players_data.get(target_user, {"str": 0, "vit": 0, "agi": 0, "cha": 0, "level_name": "🌾 平民"})
                 
@@ -637,7 +634,8 @@ else:
                 st.success("✅ 階級稱號更新成功！系統已將所有人員名單頭銜同步洗牌。")
                 time.sleep(1)
                 st.rerun()
-    
+
+
 # --- 📊 製造部派工專區 ---
     if st.session_state.menu_selection == "📊 製造部派工專區":
         st.markdown('<h1 style="text-align:center; color:#34d399; font-weight:900;">📋 製造部派工進度看板</h1>', unsafe_allow_html=True)
