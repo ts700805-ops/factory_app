@@ -178,7 +178,7 @@ if "user" not in st.session_state:
                 st.session_state.user = u
                 st.rerun()
 else:
-    # 側邊欄導航 (新增手工具相關選項)
+    # 側邊欄導航 (新增手工具相關选项)
     st.sidebar.markdown(f"### 👤 當前人員：**{st.session_state.user}**")
     nav = st.sidebar.radio("功能導航", [
    
@@ -387,8 +387,9 @@ else:
             # 💡 增加錯誤偵測，幫助開發者看到真正的問題
             st.error(f"系統偵測到錯誤：{str(e)}")
             st.warning("目前系統資料緩衝中，請稍後再試。")
-# --- 📈 員工技能評核表 ---
-    elif st.session_state.menu_selection == "📈 工時統計分析":
+
+# --- 📈 員工技能評核表 (💡 修正：將判斷字串從 工時統計分析 改為 員工技能評核表) ---
+    elif st.session_state.menu_selection == "📈 員工技能評核表":
         st.markdown(
             '<h1 style="text-align:center; color:#7DD3FC; font-weight:900; font-size:2.5rem;">📈 員工技能評核表</h1>',
             unsafe_allow_html=True
@@ -531,7 +532,6 @@ else:
                 st.info("💡 目前尚無資料，請於上方填寫第一筆紀錄。")
         except Exception as e:
             st.error(f"讀取進度看板時發生錯誤: {str(e)}")
-
 # --- 🔧 人員手工具紀錄表 (修正版：恢復資產匯出 + 移除重複) ---
     elif st.session_state.menu_selection == "🔧 固資&手工具紀錄表":
         import io
