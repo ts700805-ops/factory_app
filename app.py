@@ -685,31 +685,32 @@ else:
                     new_wk.append(sel)
                 
                 if st.form_submit_button("💾 儲存修改", use_container_width=True):
-                    # 1. 確保 new_payload 是個標準字典，若不是則重建它
-                    if not isinstance(current_data, dict):
-                        new_payload = {"製令": str(order_id), "製造工序": proc_name}
-                    else:
-                        new_payload = current_data.copy()
+                    # 【防禦機制】：直接建立一個全新的字典，完全不依賴可能有問題的 current_data
+                    new_payload = {
+                        "製令": str(order_id),
+                        "製造工序": proc_name,
+                        "最後更新": get_now_str(),
+                        "人員1": new_wk[0],
+                        "人員2": new_wk[1],
+                        "人員3": new_wk[2],
+                        "人員4": new_wk[3],
+                        "人員5": new_wk[4]
+                    }
                     
-                    # 2. 強制手動填寫欄位，不使用 update() 避免格式衝突
-                    new_payload["最後更新"] = get_now_str()
-                    new_payload["人員1"] = new_wk[0]
-                    new_payload["人員2"] = new_wk[1]
-                    new_payload["人員3"] = new_wk[2]
-                    new_payload["人員4"] = new_wk[3]
-                    new_payload["人員5"] = new_wk[4]
-                    
-                    # 3. 確保 db_id 不會被放入資料庫內容中
-                    db_id = new_payload.pop("db_id", None)
+                    # 嘗試從 current_data 找回 db_id
+                    # 如果 current_data 不是字典，這裡就不會拿到 db_id
+                    db_id = current_data.get("db_id") if isinstance(current_data, dict) else None
                     
                     if db_id:
-                        # 4. 發送更新
+                        # 正常更新
                         requests.put(f"{DB_URL}/{db_id}.json", data=json.dumps(new_payload))
                         st.success("✅ 人員更新成功！")
-                        time.sleep(0.5)
-                        st.rerun()
                     else:
-                        st.error("❌ 系統找不到此筆資料的 ID，無法儲存。")
+                        # 錯誤處理：如果沒有 db_id，代表資料庫該路徑已損毀
+                        st.error("⚠️ 資料結構異常，請聯繫管理員清理該筆製令資料。")
+                    
+                    time.sleep(0.5)
+                    st.rerun()
 
         @st.dialog("📅 修改預計通電日期", width="small")
         def edit_power_date_dialog(order_id, current_date_str, related_records):
