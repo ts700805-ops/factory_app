@@ -698,35 +698,37 @@ else:
                 st.rerun()
 
 #============================================================================
-# --- 👤 6S 戰境養成系統 (強制路徑版) ---
+# --- 👤 6S 戰境養成系統 (穩定讀取版) ---
 with st.container(border=True):
     st.subheader("👤 戰境養成資料庫")
 
-    # 強制指定網址，避開變數讀取問題
+    # 強制指定網址，確保連結正確
     TARGET_URL = "https://my-factory-system-default-rtdb.firebaseio.com/game_rpg_data.json"
 
     try:
+        # 發送請求獲取資料
         response = requests.get(TARGET_URL)
         
         if response.status_code == 200:
             res = response.json()
             
             if res is None:
-                st.warning("⚠️ 讀取成功，但資料庫回傳為空 (null)，請確認該節點內容。")
+                st.warning("⚠️ 系統提示：目前資料庫暫無角色數據 (空值)。")
             else:
-                # 成功取得資料
+                # 成功取得資料，將 ID 排序
                 all_ids = sorted(list(res.keys()))
                 
-                # 讓使用者選擇
-                selected_id = st.selectbox("請選擇角色 ID:", all_ids)
+                # 讓使用者選擇 ID
+                selected_id = st.selectbox("請選擇角色 ID:", all_ids, key="rpg_id_select")
 
-                # 顯示資料
+                # 讀取對應數據
                 rpg_data = res.get(selected_id, {})
                 s = int(rpg_data.get('str', 0))
                 v = int(rpg_data.get('vit', 0))
                 a = int(rpg_data.get('agi', 0))
                 c = int(rpg_data.get('cha', 0))
 
+                # 顯示角色資訊
                 st.markdown(f"### 角色 ID：`{selected_id}`")
                 c1, c2, c3, c4 = st.columns(4)
                 c1.metric("力量 (ATK)", 10 + s)
@@ -734,10 +736,10 @@ with st.container(border=True):
                 c3.metric("敏捷", a)
                 c4.metric("魅力", c)
         else:
-            st.error(f"連線失敗，錯誤碼: {response.status_code}")
+            st.error(f"⚠️ 連線失敗 (錯誤碼: {response.status_code})，請稍後再試。")
 
     except Exception as e:
-        st.error(f"讀取異常: {e}")
+        st.error(f"⚠️ 讀取異常，錯誤內容: {e}")
 #============================================================================
 
 
