@@ -698,50 +698,59 @@ else:
                 st.rerun()
 
 #============================================================================
-    # --- 👤 個人戰力查詢 (完全隔離版) ---
-        st.write("")
-        st.subheader("👤 個人戰力與 RPG 能力查詢")
-        
-        # 1. 隔離環境：不使用 session_state 衝突的命名
-        try:
-            # 獲取人員名單
+   # --- 👤 個人戰力與 RPG 系統 (精裝版) ---
+st.write("")
+# 使用 container 建立外框，讓介面整潔
+with st.container(border=True):
+    st.subheader("👤 個人戰力與 RPG 能力查詢")
+    
+    # 1. 確保名單載入 (不影響其他頁面)
+    try:
+        if 'leader_member_mapping' not in st.session_state:
             res = requests.get(f"{BASE_URL}/leader_members.json").json()
-            mapping = res if isinstance(res, dict) else {}
-            all_staff = sorted(list(set([m for members in mapping.values() for m in members])))
-            
-            selected_user = st.selectbox("選擇姓名：", all_staff, key="unique_rpg_select_key")
-            
-            # 2. 修正讀取邏輯：如果姓名本身就是 ID，直接讀取，否則請檢查對照
-            # 這裡不強迫寫死 name_to_id，直接嘗試用 selected_user 去查
+            st.session_state.leader_member_mapping = res if isinstance(res, dict) else {}
+        
+        mapping = st.session_state.leader_member_mapping
+        # 取得所有人員列表
+        all_staff = sorted(list(set([m for members in mapping.values() for m in members])))
+        
+        # 下拉選單：若沒有資料顯示提示，有的話顯示名單
+        selected_user = st.selectbox("請選擇您的名字：", all_staff if all_staff else ["無名單資料"], key="rpg_final_select_v4")
+        
+        if selected_user != "無名單資料":
+            # 2. 讀取 RPG 資料 (需確保資料庫節點名稱對應正確，這裡假設以姓名查詢)
+            # 若您的節點是數字 ID，請務必確認 selected_user 與資料庫的 key 一致
             r_rpg = requests.get(f"{DB_BASE_URL}/game_rpg_data/{selected_user}.json").json()
-            # 若無資料，改用姓名嘗試尋找對照 ID (這裡視您的資料庫結構)
-            if not r_rpg:
-                r_rpg = {"str": 0, "vit": 0, "agi": 0, "cha": 0}
-
+            r_rpg = r_rpg if isinstance(r_rpg, dict) else {"str": 0, "vit": 0, "agi": 0, "cha": 0}
+            
             # 3. 計算數值 (基礎 10 + 點數)
             s = 10 + int(r_rpg.get('str', 0))
             v = 10 + int(r_rpg.get('vit', 0))
             a = 10 + int(r_rpg.get('agi', 0))
             c = 10 + int(r_rpg.get('cha', 0))
             
+            # 4. 顯示數值、稱謂、HP 與 ATK
             hp = 100 + (v * 2)
             atk = 10 + (s // 2)
+            total = s + v + a + c
+            title = "傳奇宗師" if total > 100 else "新手村村民"
             
-            # 4. 使用 Streamlit 原生元件呈現，避免使用可能會壞掉的 HTML
-            # 這樣就不會影響其他介面的排版了
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("力量 (STR)", s)
-                st.metric("敏捷 (AGI)", a)
-            with col2:
-                st.metric("體力 (VIT)", v)
-                st.metric("智力 (CHA)", c)
+            # 顯示稱謂與數值 (排版優化)
+            st.markdown(f"**稱謂：** {title}")
+            st.markdown(f"**HP:** `{hp}` | **ATK:** `{atk}`")
             
-            st.divider()
-            st.write(f"### 🔥 HP: {hp} | ⚔️ ATK: {atk}")
+            # 使用四欄呈現四項能力
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("力量", s)
+            c2.metric("體力", v)
+            c3.metric("敏捷", a)
+            c4.metric("智力", c)
             
-        except Exception as e:
-            st.info("請選擇人員以查看戰力數值")
+        else:
+            st.warning("⚠️ 目前讀取不到名單，請檢查後台資料。")
+            
+    except Exception as e:
+        st.error("讀取 RPG 資料時發生錯誤，請檢查資料庫路徑。")
  
 #============================================================================
 
