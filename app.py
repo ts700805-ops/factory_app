@@ -698,39 +698,35 @@ else:
                 st.rerun()
 
 #============================================================================
-# --- 6S 戰境養成系統與查詢 (修正版) ---
-
-# 檢查當前頁面是否為 "6S戰境養成"
-if st.session_state.get("menu_selection") == "6S戰境養成":
+# --- 👤 獨立能力查詢區塊 (完全隔離，不影響其他頁面) ---
+with st.container(border=True):
+    st.subheader("👤 角色能力查詢")
     
-    st.markdown("### 🎮 6S 戰境養成系統")
+    # 這裡使用完全獨立的變數名稱，不會與外部變數衝突
+    QUERY_URL = "https://my-factory-system-default-rtdb.firebaseio.com/game_rpg_data.json"
     
-    # 讀取資料的函數 (只在需要時執行)
     try:
-        url = "https://my-factory-system-default-rtdb.firebaseio.com/game_rpg_data.json"
-        response = requests.get(url, timeout=5)
-        if response.status_code == 200:
-            data = response.json() or {}
-            
-            if not data:
-                st.warning("目前無任何戰境資料。")
-            else:
-                # 簡單顯示能力查詢列表
-                st.markdown("#### 🔍 同仁戰力查詢")
-                selected_user = st.selectbox("選擇要查詢的同仁:", sorted(list(data.keys())))
+        r = requests.get(QUERY_URL, timeout=3)
+        if r.status_code == 200:
+            query_data = r.json()
+            if query_data and isinstance(query_data, dict):
+                # 選擇器與顯示
+                q_id = st.selectbox("請選擇同仁 ID:", sorted(query_data.keys()), key="query_id_v2")
+                q_stats = query_data.get(q_id, {})
                 
-                user_data = data.get(selected_user, {})
-                c1, c2, c3, c4 = st.columns(4)
-                c1.metric("力量", user_data.get('str', 0))
-                c2.metric("體力", user_data.get('vit', 0))
-                c3.metric("敏捷", user_data.get('agi', 0))
-                c4.metric("魅力", user_data.get('cha', 0))
+                # 顯示數據
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("💪 力量", q_stats.get('str', 0))
+                col2.metric("🔋 體力", q_stats.get('vit', 0))
+                col3.metric("⚡ 敏捷", q_stats.get('agi', 0))
+                col4.metric("✨ 魅力", q_stats.get('cha', 0))
+            else:
+                st.write("目前無角色資料")
         else:
-            st.error("無法連接至資料庫。")
-    except Exception as e:
-        st.error(f"系統錯誤: {e}")
-
-# (除此之外，這段程式碼對其他頁面不會有任何影響)
+            st.write("無法讀取資料")
+    except Exception:
+        # 這裡若發生錯誤，只會在此區塊顯示錯誤，絕不會讓整頁變空白
+        st.write("暫時無法查詢")
 
 #============================================================================
 
