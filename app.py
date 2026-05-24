@@ -925,7 +925,7 @@ else:
         st.divider()
 
         # 固定 0% 到 100% 的選單選項
-        options_10 = [f"{x}%" for x in range(0, 101, 10)]
+        options_10 = [f"{x}%" for x in range(0, 101, 20)]
 
         # 4. 一個畫面左右與上下並列顯示（2列 × 4欄 = 8個人）
         if display_list:
@@ -938,7 +938,7 @@ else:
                     m_name = str(member).strip()
                     if not m_name: continue
                     
-                    # 優先從資料庫歷史紀錄讀取百分比，如果資料庫沒紀錄，預設才顯示 50%
+                    # 優先從資料庫歷史紀錄讀取百分比，如果資料庫沒紀錄，預設才顯示 0%
                     member_score_in_db = db_saved_scores.get(m_name, {}).get("技能考核完成度", 0)
                     default_str = f"{member_score_in_db}%"
                     
