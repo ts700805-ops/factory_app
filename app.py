@@ -698,6 +698,28 @@ else:
                 st.rerun()
 
 #============================================================================
+    # --- 👤 獨立能力查詢區塊 ---
+with st.container(border=True):
+    st.subheader("👤 角色能力查詢")
+    
+    try:
+        # 單獨且強制地讀取資料，不使用全域變數
+        data_resp = requests.get("https://my-factory-system-default-rtdb.firebaseio.com/game_rpg_data.json", timeout=5)
+        rpg_db = data_resp.json() if data_resp.status_code == 200 else None
+
+        if not rpg_db or not isinstance(rpg_db, dict):
+            st.error("⚠️ 目前資料庫沒有任何角色資料。")
+        else:
+            # 建立本地選單，只在該區塊內運作
+            target = st.selectbox("請選擇查詢角色:", sorted(list(rpg_db.keys())), key="query_solo_select")
+            stats = rpg_db.get(target, {})
+            
+            # 使用兩欄顯示，保持版面簡潔
+            c1, c2 = st.columns(2)
+            c1.metric("力量 (ATK)", 10 + int(stats.get('str', 0)))
+            c2.metric("體力 (HP)", 100 + int(stats.get('vit', 0)) * 2)
+    except:
+        st.error("⚠️ 資料庫連線中斷。")
 
 #============================================================================
 
