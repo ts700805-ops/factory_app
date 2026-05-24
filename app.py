@@ -698,36 +698,37 @@ else:
                 st.rerun()
 
 #============================================================================
-# --- 👤 獨立能力查詢區塊 (完全隔離，不影響其他頁面) ---
-with st.container(border=True):
-    st.subheader("👤 角色能力查詢")
-    
-    # 這裡使用完全獨立的變數名稱，不會與外部變數衝突
-    QUERY_URL = "https://my-factory-system-default-rtdb.firebaseio.com/game_rpg_data.json"
-    
-    try:
-        r = requests.get(QUERY_URL, timeout=3)
-        if r.status_code == 200:
-            query_data = r.json()
-            if query_data and isinstance(query_data, dict):
-                # 選擇器與顯示
-                q_id = st.selectbox("請選擇同仁 ID:", sorted(query_data.keys()), key="query_id_v2")
-                q_stats = query_data.get(q_id, {})
-                
-                # 顯示數據
-                col1, col2, col3, col4 = st.columns(4)
-                col1.metric("💪 力量", q_stats.get('str', 0))
-                col2.metric("🔋 體力", q_stats.get('vit', 0))
-                col3.metric("⚡ 敏捷", q_stats.get('agi', 0))
-                col4.metric("✨ 魅力", q_stats.get('cha', 0))
-            else:
-                st.write("目前無角色資料")
-        else:
-            st.write("無法讀取資料")
-    except Exception:
-        # 這裡若發生錯誤，只會在此區塊顯示錯誤，絕不會讓整頁變空白
-        st.write("暫時無法查詢")
+# --- 6S 戰境養成系統 (最小侵入性修正版) ---
 
+st.subheader("👤 戰境養成資料庫")
+
+try:
+    # 僅針對此功能進行獨立連線
+    url = "https://my-factory-system-default-rtdb.firebaseio.com/game_rpg_data.json"
+    response = requests.get(url, timeout=3)
+    
+    if response.status_code == 200:
+        data = response.json()
+        
+        # 只有在資料真的有東西時才渲染功能
+        if data and isinstance(data, dict):
+            # 這裡放您原本正常的選擇器與顯示代碼
+            selected_id = st.selectbox("請選擇角色 ID:", sorted(list(data.keys())), key="rpg_standalone_select")
+            rpg_data = data.get(selected_id, {})
+            
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("力量", rpg_data.get('str', 0))
+            c2.metric("體力", rpg_data.get('vit', 0))
+            c3.metric("敏捷", rpg_data.get('agi', 0))
+            c4.metric("魅力", rpg_data.get('cha', 0))
+        else:
+            st.warning("目前暫無角色資料。")
+    else:
+        st.error("系統連線錯誤。")
+        
+except Exception as e:
+    # 這裡發生錯誤時，只會在該區塊顯示錯誤訊息，不會中斷其他頁面執行
+    st.error(f"無法載入資料: {e}")
 #============================================================================
 
 
