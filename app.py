@@ -723,17 +723,27 @@ else:
         with f_cols[1]: 
             s_staff = st.selectbox("👤 篩選人員", ["全部"] + sorted(my_team_for_filter), key="filter_staff")
         
-        # --- 資料讀取與顯示區 ---
+  # --- 資料讀取與顯示區 ---
         try:
-            # 1. 抓取進行中資料
+            # 1. 抓取進行中資料並強化防錯
             r_work_raw = requests.get(f"{DB_URL}.json").json()
-            r_work = r_work_raw if r_work_raw and isinstance(r_work_raw, dict) else {}
+            # 確保 r_work 永遠是 dict 格式
+            if isinstance(r_work_raw, dict):
+                r_work = r_work_raw
+            else:
+                r_work = {}
+            
             df_work = pd.DataFrame([dict(v, db_id=k) for k, v in r_work.items()]) if r_work else pd.DataFrame()
             if not df_work.empty: df_work = df_work.fillna("NA")
 
-            # 2. 抓取已完工資料
+            # 2. 抓取已完工資料並強化防錯
             r_finish_raw = requests.get(f"{FINISH_URL}.json").json()
-            r_finish = r_finish_raw if r_finish_raw and isinstance(r_finish_raw, dict) else {}
+            # 確保 r_finish 永遠是 dict 格式
+            if isinstance(r_finish_raw, dict):
+                r_finish = r_finish_raw
+            else:
+                r_finish = {}
+                
             df_finish = pd.DataFrame([v for k, v in r_finish.items()]) if r_finish else pd.DataFrame()
             if not df_finish.empty: df_finish = df_finish.fillna("NA")
 
@@ -824,7 +834,6 @@ else:
                             st.markdown('</div>', unsafe_allow_html=True)
                         st.markdown('</div>', unsafe_allow_html=True)
         except Exception as e:
-            # 💡 增加錯誤偵測，幫助開發者看到真正的問題
             st.error(f"系統偵測到錯誤：{str(e)}")
             st.warning("目前系統資料緩衝中，請稍後再試。")
             
