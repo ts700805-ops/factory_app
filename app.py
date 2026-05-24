@@ -698,6 +698,28 @@ else:
                 st.rerun()
 
 #============================================================================
+# --- 強制防禦載入 (放在程式最上方) ---
+import streamlit as st
+import requests
+
+# 檢查資料庫狀態的函式
+def get_rpg_data_or_error():
+    try:
+        url = "https://my-factory-system-default-rtdb.firebaseio.com/game_rpg_data.json"
+        res = requests.get(url, headers={"Cache-Control": "no-cache"}, timeout=5).json()
+        if res is None or not isinstance(res, dict) or not res:
+            return None
+        return res
+    except:
+        return None
+
+# 執行檢查
+rpg_db = get_rpg_data_or_error()
+
+# 如果讀不到資料，直接顯示錯誤並中斷程式，不執行後續頁面
+if rpg_db is None:
+    st.error("⚠️ 目前資料庫沒有任何角色資料，系統暫停執行。")
+    st.stop() # 這行是關鍵，直接讓網頁剩下的程式碼都不會跑
     # --- 👤 獨立能力查詢區塊 ---
 with st.container(border=True):
     st.subheader("👤 角色能力查詢")
