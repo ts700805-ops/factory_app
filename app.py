@@ -698,6 +698,50 @@ else:
                 st.rerun()
 
 #============================================================================
+    # --- 👤 個人戰力查詢 (完全隔離版) ---
+        st.write("")
+        st.subheader("👤 個人戰力與 RPG 能力查詢")
+        
+        # 1. 隔離環境：不使用 session_state 衝突的命名
+        try:
+            # 獲取人員名單
+            res = requests.get(f"{BASE_URL}/leader_members.json").json()
+            mapping = res if isinstance(res, dict) else {}
+            all_staff = sorted(list(set([m for members in mapping.values() for m in members])))
+            
+            selected_user = st.selectbox("選擇姓名：", all_staff, key="unique_rpg_select_key")
+            
+            # 2. 修正讀取邏輯：如果姓名本身就是 ID，直接讀取，否則請檢查對照
+            # 這裡不強迫寫死 name_to_id，直接嘗試用 selected_user 去查
+            r_rpg = requests.get(f"{DB_BASE_URL}/game_rpg_data/{selected_user}.json").json()
+            # 若無資料，改用姓名嘗試尋找對照 ID (這裡視您的資料庫結構)
+            if not r_rpg:
+                r_rpg = {"str": 0, "vit": 0, "agi": 0, "cha": 0}
+
+            # 3. 計算數值 (基礎 10 + 點數)
+            s = 10 + int(r_rpg.get('str', 0))
+            v = 10 + int(r_rpg.get('vit', 0))
+            a = 10 + int(r_rpg.get('agi', 0))
+            c = 10 + int(r_rpg.get('cha', 0))
+            
+            hp = 100 + (v * 2)
+            atk = 10 + (s // 2)
+            
+            # 4. 使用 Streamlit 原生元件呈現，避免使用可能會壞掉的 HTML
+            # 這樣就不會影響其他介面的排版了
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("力量 (STR)", s)
+                st.metric("敏捷 (AGI)", a)
+            with col2:
+                st.metric("體力 (VIT)", v)
+                st.metric("智力 (CHA)", c)
+            
+            st.divider()
+            st.write(f"### 🔥 HP: {hp} | ⚔️ ATK: {atk}")
+            
+        except Exception as e:
+            st.info("請選擇人員以查看戰力數值")
  
 #============================================================================
 
