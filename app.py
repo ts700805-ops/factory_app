@@ -698,66 +698,7 @@ else:
                 st.rerun()
 
 #============================================================================
-# --- 👤 個人戰力與 RPG 能力查詢 (精準修正版) ---
-        st.markdown("""
-        <div style="background-color: #333; padding: 15px; border-radius: 8px; color: #FFFFFF; font-weight: bold;">
-            👤 個人戰力與 RPG 能力查詢
-        </div>
-        """, unsafe_allow_html=True)
 
-        # 1. 建立姓名與資料庫 ID 的對應關係 (請在此補齊所有人員)
-        name_to_id = {
-            "陳德文": "111", 
-            "444": "444", # 若有其他人，請依此格式補上，例如 "王小明": "222"
-            "徐梓翔": "888"
-        }
-
-        if 'leader_member_mapping' not in st.session_state:
-            res = requests.get(f"{BASE_URL}/leader_members.json").json()
-            st.session_state.leader_member_mapping = res if isinstance(res, dict) else {}
-
-        all_staff = sorted(list(set([m for members in st.session_state.leader_member_mapping.values() for m in members])))
-        
-        selected_user = st.selectbox("請選擇姓名：", all_staff, key="final_rpg_select")
-        
-        # 取得對應 ID，若無則使用姓名本身
-        user_id = name_to_id.get(selected_user, selected_user)
-        
-        try:
-            r_rpg = requests.get(f"{DB_BASE_URL}/game_rpg_data/{user_id}.json").json()
-            r_rpg = r_rpg if isinstance(r_rpg, dict) else {"str": 0, "vit": 0, "agi": 0, "cha": 0}
-            
-            # 2. 加上基礎值 10 的計算公式
-            str_val = 10 + r_rpg.get('str', 0)
-            vit_val = 10 + r_rpg.get('vit', 0)
-            agi_val = 10 + r_rpg.get('agi', 0)
-            cha_val = 10 + r_rpg.get('cha', 0)
-            
-            # 計算呈現用的數值 (HP = 100 + 體力*2, ATK = 10 + 力量*0.5)
-            hp_display = 100 + (vit_val * 2)
-            atk_display = 10 + (str_val // 2)
-            
-            # 稱謂
-            total = str_val + vit_val + agi_val + cha_val
-            title = "傳奇宗師" if total > 100 else "新手村村民"
-
-            # 3. 顯示呈現
-            st.markdown(f"""
-            <div style="background-color: #1a1a1a; padding: 20px; border-radius: 10px; border: 2px solid #fbbf24; color: #FFFFFF;">
-                <h3 style="color: #fbbf24;">{selected_user} (ID: {user_id})</h3>
-                <p><b>稱謂：{title}</b></p>
-                <p style="font-size: 1.2em; color: #00ff00;"><b>HP: {hp_display} / ATK: {atk_display}</b></p>
-                <hr>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div>💪 力量 (STR): {str_val}</div>
-                    <div>❤️ 體力 (VIT): {vit_val}</div>
-                    <div>🏃 敏捷 (AGI): {agi_val}</div>
-                    <div>🧠 智力 (CHA): {cha_val}</div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        except:
-            st.error("⚠️ 讀取數據失敗，請檢查該 ID 是否存在於 game_rpg_data")
 #============================================================================
 
 
