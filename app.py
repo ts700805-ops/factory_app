@@ -698,46 +698,46 @@ else:
                 st.rerun()
 
 #============================================================================
-# --- 👤 6S 戰境養成系統 (修正版) ---
+# --- 👤 6S 戰境養成系統 (強制路徑版) ---
 with st.container(border=True):
     st.subheader("👤 戰境養成資料庫")
 
+    # 強制指定網址，避開變數讀取問題
+    TARGET_URL = "https://my-factory-system-default-rtdb.firebaseio.com/game_rpg_data.json"
+
     try:
-        # 讀取整個 RPG 資料庫
-        res = requests.get(f"{DB_BASE_URL}/game_rpg_data.json").json()
+        response = requests.get(TARGET_URL)
+        
+        if response.status_code == 200:
+            res = response.json()
+            
+            if res is None:
+                st.warning("⚠️ 讀取成功，但資料庫回傳為空 (null)，請確認該節點內容。")
+            else:
+                # 成功取得資料
+                all_ids = sorted(list(res.keys()))
+                
+                # 讓使用者選擇
+                selected_id = st.selectbox("請選擇角色 ID:", all_ids)
 
-        if res is None:
-            st.warning("⚠️ 目前資料庫沒有任何角色資料。")
+                # 顯示資料
+                rpg_data = res.get(selected_id, {})
+                s = int(rpg_data.get('str', 0))
+                v = int(rpg_data.get('vit', 0))
+                a = int(rpg_data.get('agi', 0))
+                c = int(rpg_data.get('cha', 0))
+
+                st.markdown(f"### 角色 ID：`{selected_id}`")
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("力量 (ATK)", 10 + s)
+                c2.metric("體力 (HP)", 100 + (v * 2))
+                c3.metric("敏捷", a)
+                c4.metric("魅力", c)
         else:
-            # 取得所有已存在的角色 ID
-            all_ids = sorted(list(res.keys()))
-            
-            # 讓使用者選擇要查看誰的資料 (預設選第一個，或是搜尋您的 ID)
-            selected_id = st.selectbox("選擇要查看的角色 ID：", all_ids, index=0)
-
-            # 抓取該角色的資料
-            rpg_data = res.get(selected_id, {})
-            
-            # 顯示該角色的數值 (如果沒有資料則顯示 0)
-            s = int(rpg_data.get('str', 0))
-            v = int(rpg_data.get('vit', 0))
-            a = int(rpg_data.get('agi', 0))
-            c = int(rpg_data.get('cha', 0))
-            
-            # 顯示介面
-            st.markdown(f"### 角色 ID：`{selected_id}`")
-            
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("力量 (ATK)", 10 + s)
-            c2.metric("體力 (HP)", 100 + (v * 2))
-            c3.metric("敏捷", a)
-            c4.metric("魅力", c)
-            
-            st.write("---")
-            st.caption(f"提示：若想建立「{selected_id}」之外的新角色，請至後台新增資料。")
+            st.error(f"連線失敗，錯誤碼: {response.status_code}")
 
     except Exception as e:
-        st.error(f"讀取資料庫發生錯誤，請聯絡管理員: {e}")
+        st.error(f"讀取異常: {e}")
 #============================================================================
 
 
