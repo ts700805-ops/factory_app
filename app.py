@@ -698,31 +698,21 @@ else:
                 st.rerun()
 
 #============================================================================
-# --- 👤 個人戰力與稱謂查詢 (終極修正版) ---
+# --- 👤 個人戰力與稱謂查詢 (直接讀取 RPG 數據) ---
         st.write("")
-
-        # 使用自訂的 HTML 標題，確保顏色可見
+        
+        # 1. 自訂標題區塊 (強制黑色底，白色字，確保一定看得到)
         st.markdown("""
-        <div style="background-color: #444; padding: 15px; border-radius: 5px; color: #FFFFFF; font-size: 18px; font-weight: bold; margin-bottom: 10px;">
-        👤 個人戰力與稱謂查詢 (請點選下方選單)
+        <div style="background-color: #000000; padding: 15px; border-radius: 8px; border: 1px solid #FFFFFF; color: #FFFFFF; font-size: 20px; font-weight: bold;">
+            👤 個人戰力與 RPG 能力查詢
         </div>
         """, unsafe_allow_html=True)
 
-        # 強制執行一次資料獲取
-        if 'leader_member_mapping' not in st.session_state or not st.session_state.leader_member_mapping:
+        # 2. 確保名單已載入
+        if 'leader_member_mapping' not in st.session_state:
             try:
-                # 直接嘗試從雲端同步最新名單
                 res = requests.get(f"{BASE_URL}/leader_members.json").json()
-                # 處理可能是字串格式或字典格式
-                if isinstance(res, str):
-                    mapping = {}
-                    for line in res.strip().split('\n'):
-                        if ':' in line:
-                            l, m = line.split(':', 1)
-                            mapping[l.strip()] = [x.strip() for x in m.split(',')]
-                    st.session_state.leader_member_mapping = mapping
-                else:
-                    st.session_state.leader_member_mapping = res if res else {}
+                st.session_state.leader_member_mapping = res if isinstance(res, dict) else {}
             except:
                 st.session_state.leader_member_mapping = {}
 
@@ -730,46 +720,33 @@ else:
         all_staff_list = sorted(list(set([m for members in mapping.values() for m in members])))
 
         if not all_staff_list:
-            st.error("⚠️ 名單讀取失敗，請確認 Firebase 路徑是否正確 (BASE_URL/leader_members.json)")
+            st.error("⚠️ 名單讀取失敗，請確認 Firebase 設定。")
         else:
-            selected_user = st.selectbox("請選擇姓名：", all_staff_list, key="final_char_query")
+            # 使用者選擇姓名
+            selected_user = st.selectbox("請選擇姓名查詢戰力：", all_staff_list, key="rpg_query_final")
             
             try:
-                r_6s = requests.get(f"{DB_BASE_URL}/6s_logs.json").json()
-                r_6s = r_6s if isinstance(r_6s, dict) else {}
-                user_reports = [v for v in r_6s.values() if isinstance(v, dict) and v.get("姓名") == selected_user]
-                total_count = len(user_reports)
+                # 3. 獲取 RPG 數據 (假設 Firebase 路徑為 game_rpg_data)
+                # 您需要將 selected_user 對應到資料庫中的 ID，這裡暫時假設姓名就是 ID (或您需修改對應邏輯)
+                r_rpg = requests.get(f"{DB_BASE_URL}/game_rpg_data/{selected_user}.json").json()
+                r_rpg = r_rpg if isinstance(r_rpg, dict) else {"str": 0, "vit": 0, "agi": 0, "cha": 0}
                 
-                # 計算戰力
-                stats = {
-                    "力量": 10 + (total_count * 4),
-                    "智力": 10 + (total_count * 2),
-                    "敏捷": 10 + (total_count * 2),
-                    "體力": 10 + (total_count * 3)
-                }
-                
-                if total_count < 5: title = "新手村村民"
-                elif total_count < 15: title = "6S 見習生"
-                elif total_count < 30: title = "6S 執行者"
-                else: title = "6S 傳奇宗師"
-                
-                # 顯示結果 (使用強制白色字體)
+                # 4. 顯示結果 (強制白色字體)
                 st.markdown(f"""
-                <div style="background-color: #000000; padding: 20px; border-radius: 10px; border: 2px solid #fbbf24; color: #FFFFFF;">
-                    <h3 style="color: #fbbf24; margin-top: 0;">{selected_user} 的戰境資料</h3>
-                    <p style="font-size: 1.1em;"><b>稱謂：</b> {title}</p>
-                    <p><b>累積回報：</b> {total_count} 次</p>
+                <div style="background-color: #1a1a1a; padding: 20px; border-radius: 10px; border: 2px solid #fbbf24; color: #FFFFFF;">
+                    <h3 style="color: #fbbf24; margin-top: 0;">{selected_user} 的 RPG 能力值</h3>
                     <hr style="border-top: 1px solid #FFFFFF;">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; color: #FFFFFF;">
-                        <div>💪 力量：{stats['力量']}</div>
-                        <div>🧠 智力：{stats['智力']}</div>
-                        <div>🏃 敏捷：{stats['敏捷']}</div>
-                        <div>❤️ 體力：{stats['體力']}</div>
+                        <div>💪 力量 (STR): {r_rpg.get('str', 0)}</div>
+                        <div>🧠 智力 (CHA): {r_rpg.get('cha', 0)}</div>
+                        <div>🏃 敏捷 (AGI): {r_rpg.get('agi', 0)}</div>
+                        <div>❤️ 體力 (VIT): {r_rpg.get('vit', 0)}</div>
                     </div>
+                    <p style="margin-top:15px; font-size:0.9em; color:#ccc;">(數據來自 game_rpg_data)</p>
                 </div>
                 """, unsafe_allow_html=True)
             except:
-                st.error("暫無法讀取戰力資料。")
+                st.error("⚠️ 讀取 RPG 數據失敗。")
 #============================================================================
 
 
