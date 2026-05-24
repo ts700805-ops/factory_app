@@ -703,57 +703,58 @@ else:
         with st.expander("👤 個人戰力與稱謂查詢"):
             st.markdown("##### ⚔️ 查看我的 6S 戰境能力")
             
-            # 【修正重點】確保變數存在，若遺失則嘗試從 Firebase 抓取
+            # 確保變數存在
             if 'leader_member_mapping' not in locals():
-                try:
-                    res = requests.get(f"{BASE_URL}/leader_members.json").json()
-                    # 假設儲存的是字串格式，需轉換為字典
-                    leader_member_mapping = {}
-                    for line in res.splitlines():
-                        if ":" in line:
-                            l, m = line.split(":")
-                            leader_member_mapping[l.strip()] = [x.strip() for x in m.split(",")]
-                except:
-                    leader_member_mapping = {}
+                leader_member_mapping = {} # 這裡請確保您程式中有正確載入此變數
 
             # 1. 取得所有人員列表
             all_staff_list = sorted(list(set([m for members in leader_member_mapping.values() for m in members])))
             
             if not all_staff_list:
-                st.warning("目前沒有人員名單資料，請先在上方設定。")
+                st.warning("目前沒有人員名單資料。")
             else:
+                # 2. 修改：選取後直接自動查詢 (移除 st.button)
                 selected_user = st.selectbox("請選擇您的名字：", all_staff_list, key="char_query_select")
                 
-                if st.button("查看戰力數值", key="query_power_btn"):
-                    try:
-                        # 讀取 6S 紀錄
-                        r_6s = requests.get(f"{DB_BASE_URL}/6s_logs.json").json()
-                        r_6s = r_6s if isinstance(r_6s, dict) else {}
+                # 自動進行查詢，不需要再按按鈕
+                try:
+                    r_6s = requests.get(f"{DB_BASE_URL}/6s_logs.json").json()
+                    r_6s = r_6s if isinstance(r_6s, dict) else {}
+                    
+                    user_reports = [v for v in r_6s.values() if isinstance(v, dict) and v.get("姓名") == selected_user]
+                    total_count = len(user_reports)
+                    
+                    # 定義稱謂與四項能力值 (體力/智力/力量/敏捷)
+                    if total_count == 0:
+                        title, stats = "新手村村民", {"體力": 10, "智力": 10, "力量": 10, "敏捷": 10}
+                    elif total_count < 5:
+                        title, stats = "6S 見習生", {"體力": 30, "智力": 20, "力量": 25, "敏捷": 20}
+                    elif total_count < 15:
+                        title, power = "6S 執行者", {"體力": 50, "智力": 40, "力量": 45, "敏捷": 35}
+                    elif total_count < 30:
+                        title, power = "6S 守護者", {"體力": 80, "智力": 70, "力量": 75, "敏捷": 60}
+                    else:
+                        title, power = "6S 傳奇宗師", {"體力": 100, "智力": 100, "力量": 100, "敏捷": 100}
+                    
+                    # 樣式調整：使用 st.info 或 st.markdown 搭配顏色，避免白底白字
+                    st.markdown(f"""
+                    <div style="background-color: #1e3a8a; padding: 15px; border-radius: 10px; color: white;">
+                        <h3 style="color: #fbbf24;">{selected_user} 的戰境資料</h3>
+                        <p><b>稱謂：</b> {title}</p>
+                        <p><b>累積回報：</b> {total_count} 次</p>
+                        <hr>
+                        <p><b>能力值：</b></p>
+                        <ul>
+                            <li>體力：{stats['體力']}</li>
+                            <li>智力：{stats['智力']}</li>
+                            <li>力量：{stats['力量']}</li>
+                            <li>敏捷：{stats['敏捷']}</li>
+                        </ul>
+                    </div>
+                    """, unsafe_allow_html=True)
                         
-                        # 計算該人員總回報次數
-                        user_reports = [v for v in r_6s.values() if isinstance(v, dict) and v.get("姓名") == selected_user]
-                        total_count = len(user_reports)
-                        
-                        # 定義稱謂邏輯
-                        if total_count == 0:
-                            title, power = "新手村村民", "基礎 10"
-                        elif total_count < 5:
-                            title, power = "6S 見習生", "體力 30"
-                        elif total_count < 15:
-                            title, power = "6S 執行者", "智力 50"
-                        elif total_count < 30:
-                            title, power = "6S 守護者", "力量 80"
-                        else:
-                            title, power = "6S 傳奇宗師", "全能 100"
-                        
-                        # 顯示結果
-                        st.success(f"### {selected_user} 的戰境資料")
-                        st.write(f"**目前稱謂：** {title}")
-                        st.write(f"**累積回報次數：** {total_count} 次")
-                        st.write(f"**特殊能力：** {power}")
-                        
-                    except Exception as e:
-                        st.error("暫無法讀取戰力資料。")
+                except Exception as e:
+                    st.error("暫無法讀取戰力資料。")
 #============================================================================
 
 
