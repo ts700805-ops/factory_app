@@ -698,36 +698,46 @@ else:
                 st.rerun()
 
 #============================================================================
-import streamlit as st
-import requests
+# --- 👤 6S 戰境養成系統 (修正版) ---
+with st.container(border=True):
+    st.subheader("👤 戰境養成資料庫")
 
-st.subheader("🔍 Firebase 資料庫診斷工具")
+    try:
+        # 讀取整個 RPG 資料庫
+        res = requests.get(f"{DB_BASE_URL}/game_rpg_data.json").json()
 
-# 我們直接測試根目錄，看看 Firebase 到底有沒有給我們資料
-# 請確保您的 DB_BASE_URL 設定正確 (例如: https://your-project.firebaseio.com)
-test_url = f"{DB_BASE_URL}/.json" 
-
-st.write(f"正在測試的路徑: `{test_url}`")
-
-try:
-    response = requests.get(test_url)
-    st.write(f"狀態碼 (200代表成功): {response.status_code}")
-    
-    if response.status_code == 200:
-        data = response.json()
-        if data is None:
-            st.error("⚠️ 讀取成功，但資料庫回傳 null (空值)。這代表路徑正確，但該路徑下沒有任何資料。")
-        elif data == {}:
-            st.error("⚠️ 讀取成功，但資料庫是空的 {}。請檢查您是否存入正確的節點。")
+        if res is None:
+            st.warning("⚠️ 目前資料庫沒有任何角色資料。")
         else:
-            st.success("✅ 讀取成功！這是您資料庫的完整結構，請看下方：")
-            st.json(data) # 這會幫您展開資料結構
-    else:
-        st.error(f"連線失敗，狀態碼: {response.status_code}")
-        st.write("錯誤內容:", response.text)
+            # 取得所有已存在的角色 ID
+            all_ids = sorted(list(res.keys()))
+            
+            # 讓使用者選擇要查看誰的資料 (預設選第一個，或是搜尋您的 ID)
+            selected_id = st.selectbox("選擇要查看的角色 ID：", all_ids, index=0)
 
-except Exception as e:
-    st.error(f"程式執行異常: {e}")
+            # 抓取該角色的資料
+            rpg_data = res.get(selected_id, {})
+            
+            # 顯示該角色的數值 (如果沒有資料則顯示 0)
+            s = int(rpg_data.get('str', 0))
+            v = int(rpg_data.get('vit', 0))
+            a = int(rpg_data.get('agi', 0))
+            c = int(rpg_data.get('cha', 0))
+            
+            # 顯示介面
+            st.markdown(f"### 角色 ID：`{selected_id}`")
+            
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("力量 (ATK)", 10 + s)
+            c2.metric("體力 (HP)", 100 + (v * 2))
+            c3.metric("敏捷", a)
+            c4.metric("魅力", c)
+            
+            st.write("---")
+            st.caption(f"提示：若想建立「{selected_id}」之外的新角色，請至後台新增資料。")
+
+    except Exception as e:
+        st.error(f"讀取資料庫發生錯誤，請聯絡管理員: {e}")
 #============================================================================
 
 
