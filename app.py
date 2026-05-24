@@ -712,39 +712,36 @@ with st.container(border=True):
         if response.status_code == 200:
             res = response.json()
             
-            # 如果回傳為空，建立一個空字典供後續執行，不在畫面上顯示警告
-            if res is None:
-                res = {}
+            # 如果回傳為空 (None) 或資料內沒有任何 Key，直接觸發異常流程，不顯示空選單
+            if res is None or not isinstance(res, dict) or not res:
+                raise ValueError("目前資料庫沒有任何角色資料。")
                 
             # 成功取得資料，將 ID 排序
             all_ids = sorted(list(res.keys()))
             
-            if all_ids:
-                # 讓使用者選擇 ID
-                selected_id = st.selectbox("請選擇角色 ID:", all_ids, key="rpg_db_view_select")
+            # 讓使用者選擇 ID
+            selected_id = st.selectbox("請選擇角色 ID:", all_ids, key="rpg_db_view_select")
 
-                # 讀取對應數據
-                rpg_data = res.get(selected_id, {})
-                s = int(rpg_data.get('str', 0))
-                v = int(rpg_data.get('vit', 0))
-                a = int(rpg_data.get('agi', 0))
-                c = int(rpg_data.get('cha', 0))
+            # 讀取對應數據
+            rpg_data = res.get(selected_id, {})
+            s = int(rpg_data.get('str', 0))
+            v = int(rpg_data.get('vit', 0))
+            a = int(rpg_data.get('agi', 0))
+            c = int(rpg_data.get('cha', 0))
 
-                # 顯示角色資訊
-                st.markdown(f"### 角色 ID：`{selected_id}`")
-                c1, c2, c3, c4 = st.columns(4)
-                c1.metric("力量 (ATK)", 10 + s)
-                c2.metric("體力 (HP)", 100 + (v * 2))
-                c3.metric("敏捷", a)
-                c4.metric("魅力", c)
-            else:
-                # 如果完全沒資料，只顯示最原初的空選單，不跳黃色警告
-                st.selectbox("請選擇角色 ID:", ["目前無角色"], key="rpg_db_view_select_empty")
+            # 顯示角色資訊
+            st.markdown(f"### 角色 ID：`{selected_id}`")
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("力量 (ATK)", 10 + s)
+            c2.metric("體力 (HP)", 100 + (v * 2))
+            c3.metric("敏捷", a)
+            c4.metric("魅力", c)
         else:
             st.error(f"⚠️ 連線失敗 (錯誤碼: {response.status_code})，請稍後再試。")
 
     except Exception as e:
-        st.error(f"⚠️ 讀取異常，錯誤內容: {e}")
+        # 只要發生錯誤或沒撈到資料，一律在這裡統一拋出錯誤，乾淨不留白面
+        st.error(f"⚠️ {e}")
 #============================================================================
 
 
