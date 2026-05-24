@@ -383,40 +383,15 @@ else:
 
 
 
-# --- ⚙️ 設定管理 ---
-    elif st.session_state.menu_selection == "⚙️ 設定管理":
-        st.title("⚙️ 系統核心設定")
-        
-        # 1. 系統參數設定表單 (完全保留您的原始結構)
-        with st.form("config_form"):
-            so = st.text_area("製令清單 (以逗號隔開)", ",".join(order_list))
-            sl = st.text_area("組長清單 (以逗號隔開)", ",".join(all_leaders))
-            ss = st.text_area("人員清單 (以逗號隔開)", ",".join(all_staff))
-            sp = st.text_area("工序清單 (以逗號隔開)", ",".join(process_list))
-            sm = st.text_area("組長對應工序 (組長:工序1,工序2)", "\n".join([f"{k}:{','.join(v)}" for k, v in process_map.items()]))
-            staff_in = st.text_area("組長屬下人員 (組長:人員1,人員2)", "\n".join([f"{k}:{','.join(v)}" for k, v in staff_map.items()]))
-            if st.form_submit_button("💾 儲存所有設定"):
-                # 這裡執行您原本的處理邏輯
-                def split_s(s): return [x.strip() for x in s.split(",") if x.strip()]
-                new_proc_map = {line.split(":")[0].strip(): split_s(line.split(":")[1]) for line in sm.split("\n") if ":" in line}
-                new_staff_map = {line.split(":")[0].strip(): split_s(line.split(":")[1]) for line in staff_in.split("\n") if ":" in line}
-                new_settings = {
-                    "all_orders": split_s(so), "all_leaders": split_s(sl), "all_staff": split_s(ss),
-                    "processes": split_s(sp), "process_map": new_proc_map, "staff_map": new_staff_map
-                }
-                try:
-                    requests.put(f"{SETTING_URL}.json", data=json.dumps(new_settings))
-                    st.success("✅ 設定已儲存！")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"❌ 儲存失敗：{e}")
-
-        # 2. 後台管理專區：維護組員名單 (完全使用您提供的程式碼)
+# ==========================================
+        # ⚙️ 後台管理專區：維護組員名單 (紅框處功能)
+        # ==========================================
         st.write("")
         with st.expander("⚙️ 管理員專區：維護組員名單"):
             st.markdown("##### 📝 編輯對照表")
             st.caption("格式範例：組長名:成員1,成員2,成員3 (每行一位組長)")
             
+            # 將目前的對照表轉換為文字顯示在輸入框中
             current_mapping_text = ""
             for l, m in leader_member_mapping.items():
                 current_mapping_text += f"{l}:{','.join(m)}\n"
@@ -436,37 +411,35 @@ else:
                     except Exception as e:
                         st.error(f"❌ 錯誤：{e}")
 
-            # 3. 今日未回報清單 (直接寫在 expander 內，確保不會消失)
+            # --- 以下是您要求的 6S 未回報清單邏輯 ---
             st.markdown("---")
-            st.markdown("##### ⚠️ 今日未回報 6S 人員")
+            st.markdown("##### ⚠️ 今日未回報 6S 人員清單")
             
-            # 取得全體人員名單 (從 leader_member_mapping 解析)
+            # 1. 取得所有人員 (從您上面的 mapping 提取)
             all_staff_set = set()
             for members in leader_member_mapping.values():
                 all_staff_set.update(members)
             
-            # 取得今日日期 (與您系統一致的格式)
+            # 2. 取得今日日期
             today_str = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
             
             try:
-                # 抓取 6S 紀錄
+                # 3. 讀取回報資料
                 r_6s = requests.get(f"{DB_BASE_URL}/6s_logs.json").json()
                 r_6s = r_6s if isinstance(r_6s, dict) else {}
                 
                 # 找出今天已回報的人
                 reported_staff = [v.get("姓名") for v in r_6s.values() if isinstance(v, dict) and v.get("日期") == today_str]
                 
-                # 篩選未回報的人
+                # 4. 比對出未回報者
                 not_reported = [name for name in all_staff_set if name not in reported_staff and name]
                 
                 if not not_reported:
                     st.success("✅ 今日全員已回報！")
                 else:
-                    st.warning("尚未回報的人員：")
-                    st.write(", ".join(not_reported))
+                    st.warning(", ".join(not_reported))
             except:
                 st.info("ℹ️ 目前無 6S 回報資料。")
-
 
  # ==========================================
 # ==========================================
