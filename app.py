@@ -698,56 +698,36 @@ else:
                 st.rerun()
 
 #============================================================================
-# --- 👤 個人戰力能力查詢 (修正版) ---
-with st.container(border=True):
-    st.subheader("👤 個人戰力能力查詢")
+import streamlit as st
+import requests
 
-    try:
-        # 直接讀取 game_rpg_data 整個節點，抓出所有 ID
-        res = requests.get(f"{DB_BASE_URL}/game_rpg_data.json").json()
+st.subheader("🔍 Firebase 資料庫診斷工具")
 
-        if not isinstance(res, dict):
-            st.warning("⚠️ 目前資料庫沒有資料，請確認 Firebase 路徑。")
+# 我們直接測試根目錄，看看 Firebase 到底有沒有給我們資料
+# 請確保您的 DB_BASE_URL 設定正確 (例如: https://your-project.firebaseio.com)
+test_url = f"{DB_BASE_URL}/.json" 
+
+st.write(f"正在測試的路徑: `{test_url}`")
+
+try:
+    response = requests.get(test_url)
+    st.write(f"狀態碼 (200代表成功): {response.status_code}")
+    
+    if response.status_code == 200:
+        data = response.json()
+        if data is None:
+            st.error("⚠️ 讀取成功，但資料庫回傳 null (空值)。這代表路徑正確，但該路徑下沒有任何資料。")
+        elif data == {}:
+            st.error("⚠️ 讀取成功，但資料庫是空的 {}。請檢查您是否存入正確的節點。")
         else:
-            # 直接將資料庫裡的 ID (Key) 轉為名單
-            all_ids = sorted(list(res.keys()))
+            st.success("✅ 讀取成功！這是您資料庫的完整結構，請看下方：")
+            st.json(data) # 這會幫您展開資料結構
+    else:
+        st.error(f"連線失敗，狀態碼: {response.status_code}")
+        st.write("錯誤內容:", response.text)
 
-            # 顯示下拉選單
-            selected_id = st.selectbox("請選擇 ID：", all_ids, key="rpg_query_fixed_v2")
-
-            # 根據選擇的 ID 抓取該人員的詳細數值
-            rpg_data = res.get(selected_id, {})
-
-            # 計算數值 (基礎 10 + 資料庫數值)
-            s = 10 + int(rpg_data.get('str', 0))
-            v = 10 + int(rpg_data.get('vit', 0))
-            a = 10 + int(rpg_data.get('agi', 0))
-            c = 10 + int(rpg_data.get('cha', 0))
-
-            # 計算 HP 與 ATK
-            hp = 100 + (v * 2)
-            atk = 10 + (s // 2)
-            total = s + v + a + c
-
-            # 稱謂判斷
-            if total > 150: title = "👑 傳奇宗師"
-            elif total > 100: title = "⚔️ 6S 執行者"
-            else: title = "🌱 新手村村民"
-
-            # 介面顯示
-            st.markdown(f"### {selected_id} (ID: {selected_id})")
-            st.markdown(f"**稱謂：** <span style='color:#fbbf24;'>{title}</span>", unsafe_allow_html=True)
-            st.markdown(f"**HP:** `{hp}`  |  **ATK:** `{atk}`")
-
-            # 四項數值顯示
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("力量", s)
-            c2.metric("體力", v)
-            c3.metric("敏捷", a)
-            c4.metric("智力", c)
-
-    except Exception as e:
-        st.error(f"讀取異常，請稍後再試: {e}")
+except Exception as e:
+    st.error(f"程式執行異常: {e}")
 #============================================================================
 
 
