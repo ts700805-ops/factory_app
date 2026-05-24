@@ -698,40 +698,71 @@ else:
                 st.rerun()
 
 #============================================================================
-  # --- 👤 個人戰力能力查詢 ---
-st.write("")
+import streamlit as st
+import requests
+
+# --- 👤 個人戰力能力查詢 (修正版) ---
 with st.container(border=True):
     st.subheader("👤 個人戰力能力查詢")
-    
+
+    # 1. 人員與 ID 對照表 (這非常重要，請務必將所有成員補上)
+    # 格式為 "名字": "Firebase中的ID"
+    # 若該人員沒有 ID，則對應到 "111" 或您設定的預設值
+    name_to_id = {
+        "陳德文": "111",
+        "444": "444",
+        "徐梓翔": "888",
+        # 請在此處繼續補上您的其他成員對應關係
+    }
+
     try:
-        # 強制重讀人員名單，確保選項不會是空的
-        res = requests.get(f"{BASE_URL}/leader_members.json").json()
-        mapping = res if isinstance(res, dict) else {}
-        all_staff = sorted(list(set([m for members in mapping.values() for m in members])))
-        
-        if not all_staff:
-            st.error("⚠️ 名單讀取異常，請檢查後台資料是否完整。")
+        # 2. 讀取人員名單
+        response = requests.get(f"{BASE_URL}/leader_members.json")
+        if response.status_code == 200:
+            data = response.json()
+            # 展開所有成員到一個列表中
+            all_staff = []
+            for group in data.values():
+                if isinstance(group, list):
+                    all_staff.extend(group)
+            all_staff = sorted(list(set(all_staff)))
         else:
-            # 讓下拉選單直接顯示人員，移除無名單資料的選項
-            selected_user = st.selectbox("請選擇人員姓名：", all_staff, key="rpg_final_v5")
+            all_staff = []
+            st.error("無法連線至人員資料庫")
+
+        if not all_staff:
+            st.warning("⚠️ 目前讀取不到名單，請確認 Firebase 設定是否正確。")
+        else:
+            # 3. 下拉選單
+            selected_user = st.selectbox("請選擇人員姓名：", all_staff, key="rpg_inquiry_final")
             
-            # 讀取 RPG 資料
-            r_rpg = requests.get(f"{DB_BASE_URL}/game_rpg_data/{selected_user}.json").json()
-            r_rpg = r_rpg if isinstance(r_rpg, dict) else {"str": 0, "vit": 0, "agi": 0, "cha": 0}
+            # 取得對應的 ID，如果不在對照表中，預設嘗試用名字抓取(或是給予錯誤提醒)
+            user_id = name_to_id.get(selected_user, selected_user)
             
-            # 計算數值 (基礎 10 + 點數)
+            # 4. 讀取 RPG 資料
+            rpg_res = requests.get(f"{DB_BASE_URL}/game_rpg_data/{user_id}.json")
+            if rpg_res.status_code == 200 and rpg_res.json():
+                r_rpg = rpg_res.json()
+            else:
+                r_rpg = {"str": 0, "vit": 0, "agi": 0, "cha": 0}
+
+            # 5. 計算數值 (基礎 10 + 點數)
             s = 10 + int(r_rpg.get('str', 0))
             v = 10 + int(r_rpg.get('vit', 0))
             a = 10 + int(r_rpg.get('agi', 0))
             c = 10 + int(r_rpg.get('cha', 0))
             
-            # 顯示結果
             hp = 100 + (v * 2)
             atk = 10 + (s // 2)
             total = s + v + a + c
-            title = "傳奇宗師" if total > 100 else "新手村村民"
             
-            st.markdown(f"**稱謂：** {title}")
+            # 稱謂
+            if total > 150: title = "傳奇宗師"
+            elif total > 100: title = "6S 執行者"
+            else: title = "新手村村民"
+
+            # 6. 介面呈現
+            st.markdown(f"**稱謂：** <span style='color: #fbbf24; font-size: 1.2em;'>{title}</span>", unsafe_allow_html=True)
             st.markdown(f"**HP:** `{hp}` | **ATK:** `{atk}`")
             
             c1, c2, c3, c4 = st.columns(4)
@@ -741,7 +772,7 @@ with st.container(border=True):
             c4.metric("智力", c)
             
     except Exception as e:
-        st.error("讀取系統資料時發生錯誤。")
+        st.error(f"系統發生錯誤: {e}")
  
 #============================================================================
 
