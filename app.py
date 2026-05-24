@@ -740,28 +740,25 @@ else:
 
 # --- 資料讀取與顯示區 ---
         
-# --- 資料讀取與顯示區 ---
+        # 1. 初始化變數
         final_display_orders = []
         df_work = pd.DataFrame()
         df_finish = pd.DataFrame()
 
-        # 確保 try 和 except 左右對齊
+        # 2. 資料讀取 (try-except 僅保護讀取過程)
         try:
-            # 抓取並過濾進行中資料
             r_work_raw = requests.get(f"{DB_URL}.json").json()
             r_work = r_work_raw if isinstance(r_work_raw, dict) else {}
             work_rows = [{"db_id": k, **v} for k, v in r_work.items() if isinstance(v, dict)]
             df_work = pd.DataFrame(work_rows) if work_rows else pd.DataFrame()
             if not df_work.empty: df_work = df_work.fillna("NA")
 
-            # 抓取並過濾已完工資料
             r_finish_raw = requests.get(f"{FINISH_URL}.json").json()
             r_finish = r_finish_raw if isinstance(r_finish_raw, dict) else {}
             finish_rows = [v for k, v in r_finish.items() if isinstance(v, dict)]
             df_finish = pd.DataFrame(finish_rows) if finish_rows else pd.DataFrame()
             if not df_finish.empty: df_finish = df_finish.fillna("NA")
 
-            # 篩選製令
             base_orders = [str(o) for o in order_list]
             if s_order != "全部": base_orders = [str(s_order)]
 
@@ -783,14 +780,14 @@ else:
             st.error(f"系統資料讀取發生錯誤：{str(e)}")
             st.warning("目前系統正在緩衝，請稍後再試。")
 
-        # 3. 渲染卡片區 (放在 try...except 外部，確保邏輯分離)
+        # 3. 渲染卡片區 (完全獨立在 try-except 之外)
         if not final_display_orders:
             st.info(f"💡 目前無符合條件的項目")
         else:
             main_cols = st.columns(3) 
             for idx, o_id in enumerate(final_display_orders):
                 o_df = df_work[df_work["製令"] == str(o_id)] if not df_work.empty and "製令" in df_work.columns else pd.DataFrame()
-                f_df_order = df_finish[df_finish["製令"] == str(o_id)] if not df_finish.empty and "製令" in df_finish.columns else pd.DataFrame()
+                f_df_order = df_finish[df_finish["製令"] == str(o_id)] if not df_finish.empty and "製令" in f_df_order.columns else pd.DataFrame()
                 
                 # 抓取通電日期
                 p_date = "未設定"
