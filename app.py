@@ -668,12 +668,11 @@ else:
     if st.session_state.menu_selection == "📊 製造部派工專區":
         st.markdown('<h1 style="text-align:center; color:#34d399; font-weight:900;">📋 製造部派工進度看板</h1>', unsafe_allow_html=True)
 
-        @st.dialog("👥 編輯施工人員", width="medium")
+      @st.dialog("👥 編輯施工人員", width="medium")
         def edit_staff_dialog(order_id, proc_name, current_data):
             st.subheader(f"🛠️ {proc_name}")
             current_leader = st.session_state.user
             my_team = staff_map.get(current_leader, [])
-            # 💡 修正：確保 options 來源正確，如果沒組員就用全體人員
             display_options = my_team if my_team else all_staff
             options = ["NA"] + sorted(list(set(display_options)))
             
@@ -685,26 +684,25 @@ else:
                     sel = st.selectbox(f"人員 {i+1}", options, index=d_idx, key=f"dlg_staff_{order_id}_{proc_name}_{i}")
                     new_wk.append(sel)
                 
-              if st.form_submit_button("💾 儲存修改", use_container_width=True):
-                    # --- 強制將 current_data 確保為字典格式 ---
+                if st.form_submit_button("💾 儲存修改", use_container_width=True):
+                    # 安全檢查：確保 current_data 是字典
                     if not isinstance(current_data, dict):
-                        new_payload = {"製令": str(order_id), "製造工序": proc_name} # 萬一真的爛掉，建立基礎結構
+                        new_payload = {"製令": str(order_id), "製造工序": proc_name}
                     else:
                         new_payload = current_data.copy()
                     
-                    # 使用 update 前確保這是一個標準字典
-                    update_data = {
+                    # 更新資料
+                    new_payload.update({
                         "最後更新": get_now_str(),
                         "人員1": new_wk[0], "人員2": new_wk[1], "人員3": new_wk[2], "人員4": new_wk[3], "人員5": new_wk[4]
-                    }
-                    new_payload.update(update_data)
+                    })
                     
                     db_id = new_payload.pop("db_id", None)
                     if db_id:
-                        # 再次確保發送的資料是純 dict
                         requests.put(f"{DB_URL}/{db_id}.json", data=json.dumps(new_payload))
                         st.success("✅ 人員更新成功！")
-                        time.sleep(0.5); st.rerun()
+                        time.sleep(0.5)
+                        st.rerun()
 
         @st.dialog("📅 修改預計通電日期", width="small")
         def edit_power_date_dialog(order_id, current_date_str, related_records):
