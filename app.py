@@ -698,71 +698,7 @@ else:
                 st.rerun()
 
 #============================================================================
-    # --- 修正後的個人戰力與 RPG 能力查詢 ---
-st.markdown("""
-<div style="background-color: #333; padding: 15px; border-radius: 8px; color: #FFFFFF; font-weight: bold;">
-    👤 個人戰力與 RPG 能力查詢
-</div>
-""", unsafe_allow_html=True)
-
-# 1. 強制建立姓名與 ID 對應表 (請務必將所有人員姓名對應到 Firebase 中的 ID)
-# 確保這裡的 ID (如 '111', '444') 與 Firebase 中的節點名稱完全一致
-name_to_id = {
-    "陳德文": "111",
-    "444": "444",
-    "徐梓翔": "888" 
-    # 您若有其他成員，請依此格式補上： "姓名": "資料庫ID",
-}
-
-# 獲取人員名單
-if 'leader_member_mapping' not in st.session_state:
-    res = requests.get(f"{BASE_URL}/leader_members.json").json()
-    st.session_state.leader_member_mapping = res if isinstance(res, dict) else {}
-
-all_staff = sorted(list(set([m for members in st.session_state.leader_member_mapping.values() for m in members])))
-
-selected_user = st.selectbox("請選擇姓名：", all_staff, key="rpg_final_v3")
-
-# 2. 核心修正：根據姓名取得對應的 Firebase ID
-user_id = name_to_id.get(selected_user, selected_user)
-
-try:
-    # 針對正確的 ID 抓取資料
-    r_rpg = requests.get(f"{DB_BASE_URL}/game_rpg_data/{user_id}.json").json()
-    r_rpg = r_rpg if isinstance(r_rpg, dict) else {"str": 0, "vit": 0, "agi": 0, "cha": 0}
-    
-    # 3. 數值計算：基礎值 10 + 資料庫點數
-    # 確保抓取的是正確的 key (str, vit, agi, cha)
-    str_val = 10 + int(r_rpg.get('str', 0))
-    vit_val = 10 + int(r_rpg.get('vit', 0))
-    agi_val = 10 + int(r_rpg.get('agi', 0))
-    cha_val = 10 + int(r_rpg.get('cha', 0))
-    
-    # HP 與 ATK 計算邏輯
-    hp_display = 100 + (vit_val * 2)
-    atk_display = 10 + (str_val // 2)
-    
-    total = str_val + vit_val + agi_val + cha_val
-    title = "傳奇宗師" if total > 100 else "新手村村民"
-
-    # 4. 顯示結果
-    st.markdown(f"""
-    <div style="background-color: #1a1a1a; padding: 20px; border-radius: 10px; border: 2px solid #fbbf24; color: #FFFFFF;">
-        <h3 style="color: #fbbf24;">{selected_user} (ID: {user_id})</h3>
-        <p><b>稱謂：{title}</b></p>
-        <p style="font-size: 1.2em; color: #00ff00;"><b>HP: {hp_display} / ATK: {atk_display}</b></p>
-        <hr>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <div>💪 力量 (STR): {str_val}</div>
-            <div>❤️ 體力 (VIT): {vit_val}</div>
-            <div>🏃 敏捷 (AGI): {agi_val}</div>
-            <div>🧠 智力 (CHA): {cha_val}</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-except Exception as e:
-    st.error(f"⚠️ 讀取數據錯誤 (ID: {user_id})")
-
+ 
 #============================================================================
 
 
