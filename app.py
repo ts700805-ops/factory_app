@@ -414,6 +414,43 @@ else:
 
 
  # ==========================================
+        # ==========================================
+            # --- 點選組長查看該組員未回報清單 ---
+            st.markdown("---")
+            st.markdown("##### 🔍 點選組長查看組員回報狀況")
+            
+            # 1. 取得所有組長清單
+            all_leaders_list = list(leader_member_mapping.keys())
+            selected_leader = st.selectbox("請選擇組長：", all_leaders_list, key="6s_leader_select")
+            
+            # 2. 獲取該組長名下的組員
+            target_members = leader_member_mapping.get(selected_leader, [])
+            
+            # 3. 取得今日日期
+            import datetime
+            now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
+            today_str = now.strftime("%Y-%m-%d")
+            
+            try:
+                # 4. 抓取 6S 紀錄
+                r_6s = requests.get(f"{DB_BASE_URL}/6s_logs.json").json()
+                r_6s = r_6s if isinstance(r_6s, dict) else {}
+                
+                # 找出今天已回報的人
+                reported_staff = [v.get("姓名") for v in r_6s.values() if isinstance(v, dict) and v.get("日期") == today_str]
+                
+                # 5. 計算該組長名下未回報的人
+                not_reported = [name for name in target_members if name not in reported_staff]
+                
+                # 顯示結果
+                st.write(f"**{selected_leader} 組的狀況：**")
+                if not not_reported:
+                    st.success(f"✅ {selected_leader} 組的所有組員 ({len(target_members)} 人) 皆已完成回報！")
+                else:
+                    st.warning(f"以下 {len(not_reported)} 位成員尚未回報：")
+                    st.write(", ".join(not_reported))
+            except:
+                st.info("ℹ️ 目前暫無 6S 回報資料。")
 # ==========================================
     # 🎮 6S 戰境養成功能區塊
     # ==========================================
