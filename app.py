@@ -740,25 +740,28 @@ else:
 
 # --- 資料讀取與顯示區 ---
         
-        # 1. 初始化變數，確保程式不會因為抓不到資料而報錯
+# --- 資料讀取與顯示區 ---
         final_display_orders = []
         df_work = pd.DataFrame()
         df_finish = pd.DataFrame()
 
-        # 2. 資料讀取與篩選
+        # 確保 try 和 except 左右對齊
         try:
+            # 抓取並過濾進行中資料
             r_work_raw = requests.get(f"{DB_URL}.json").json()
             r_work = r_work_raw if isinstance(r_work_raw, dict) else {}
             work_rows = [{"db_id": k, **v} for k, v in r_work.items() if isinstance(v, dict)]
             df_work = pd.DataFrame(work_rows) if work_rows else pd.DataFrame()
             if not df_work.empty: df_work = df_work.fillna("NA")
 
+            # 抓取並過濾已完工資料
             r_finish_raw = requests.get(f"{FINISH_URL}.json").json()
             r_finish = r_finish_raw if isinstance(r_finish_raw, dict) else {}
             finish_rows = [v for k, v in r_finish.items() if isinstance(v, dict)]
             df_finish = pd.DataFrame(finish_rows) if finish_rows else pd.DataFrame()
             if not df_finish.empty: df_finish = df_finish.fillna("NA")
 
+            # 篩選製令
             base_orders = [str(o) for o in order_list]
             if s_order != "全部": base_orders = [str(s_order)]
 
@@ -768,7 +771,7 @@ else:
                 else:
                     found = False
                     o_df_tmp = df_work[df_work["製令"] == str(o_id)] if not df_work.empty and "製令" in df_work.columns else pd.DataFrame()
-                    f_df_tmp = df_finish[df_finish["製令"] == str(o_id)] if not df_finish.empty and "製令" in f_df_tmp.columns else pd.DataFrame()
+                    f_df_tmp = df_finish[df_finish["製令"] == str(o_id)] if not df_finish.empty and "製令" in df_finish.columns else pd.DataFrame()
                     for df in [o_df_tmp, f_df_tmp]:
                         if not df.empty:
                             for i in range(1, 6):
