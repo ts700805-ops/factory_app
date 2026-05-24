@@ -383,7 +383,7 @@ else:
 
 
 
-        # ==========================================
+     # ==========================================
         # ⚙️ 後台管理專區：維護組員名單 (紅框處功能)
         # ==========================================
         st.write("")
@@ -391,7 +391,7 @@ else:
             st.markdown("##### 📝 編輯對照表")
             st.caption("格式範例：組長名:成員1,成員2,成員3 (每行一位組長)")
             
-            # 將目前的對照表轉換為文字顯示在輸入框中
+            # 1. 編輯名單區
             current_mapping_text = ""
             for l, m in leader_member_mapping.items():
                 current_mapping_text += f"{l}:{','.join(m)}\n"
@@ -401,6 +401,7 @@ else:
             if st.button("💾 儲存並同步名單至雲端", use_container_width=True, key="6s_save_staff_btn"):
                 if new_mapping_raw:
                     try:
+                        # 這裡使用你原本的 URL 變數
                         save_res = requests.put(f"{BASE_URL}/leader_members.json", data=json.dumps(new_mapping_raw.strip()))
                         if save_res.status_code == 200:
                             st.success("✅ 名單儲存成功！下拉選單已同步更新。")
@@ -410,6 +411,44 @@ else:
                             st.error("❌ 儲存失敗，請檢查網路。")
                     except Exception as e:
                         st.error(f"❌ 錯誤：{e}")
+
+            st.markdown("---") # 分隔線
+            
+            # 2. 當日未回報清單區 (新增功能)
+            st.markdown("##### ⚠️ 今日未回報 6S 人員清單")
+            
+            # 取得當前所有人員清單 (從上面的 mapping 自動抓取)
+            all_staff_list = []
+            for members in leader_member_mapping.values():
+                all_staff_list.extend(members)
+            all_staff_list = list(set(all_staff_list)) # 去除重複
+            
+            # 取得今日日期字串
+            today_str = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
+            
+            try:
+                # 抓取 6S 資料庫 (假設路徑為 /6s_logs)
+                r_6s = requests.get(f"{DB_BASE_URL}/6s_logs.json").json()
+                r_6s = r_6s if isinstance(r_6s, dict) else {}
+                
+                # 篩選今日已回報者
+                reported_staff = []
+                for k, v in r_6s.items():
+                    if isinstance(v, dict) and v.get("日期") == today_str:
+                        reported_staff.append(v.get("姓名"))
+                
+                # 比對：全體名單 - 已回報名單
+                not_reported = [name for name in all_staff_list if name not in reported_staff]
+                
+                if not not_reported:
+                    st.success("✅ 今日全員已完成 6S 回報！")
+                else:
+                    st.warning(f"目前還有 {len(not_reported)} 位人員尚未回報：")
+                    # 使用列表顯示未回報人員
+                    st.write(", ".join(not_reported))
+                    
+            except Exception as e:
+                st.info("ℹ️ 目前暫無 6S 回報數據 (或系統緩衝中)。")
 
 
 
