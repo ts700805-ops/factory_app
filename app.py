@@ -698,59 +698,50 @@ else:
                 st.rerun()
 
 #============================================================================
-   # --- 👤 個人戰力與 RPG 系統 (精裝版) ---
+  # --- 👤 個人戰力能力查詢 ---
 st.write("")
-# 使用 container 建立外框，讓介面整潔
 with st.container(border=True):
-    st.subheader("👤 個人戰力與 RPG 能力查詢")
+    st.subheader("👤 個人戰力能力查詢")
     
-    # 1. 確保名單載入 (不影響其他頁面)
     try:
-        if 'leader_member_mapping' not in st.session_state:
-            res = requests.get(f"{BASE_URL}/leader_members.json").json()
-            st.session_state.leader_member_mapping = res if isinstance(res, dict) else {}
-        
-        mapping = st.session_state.leader_member_mapping
-        # 取得所有人員列表
+        # 強制重讀人員名單，確保選項不會是空的
+        res = requests.get(f"{BASE_URL}/leader_members.json").json()
+        mapping = res if isinstance(res, dict) else {}
         all_staff = sorted(list(set([m for members in mapping.values() for m in members])))
         
-        # 下拉選單：若沒有資料顯示提示，有的話顯示名單
-        selected_user = st.selectbox("請選擇您的名字：", all_staff if all_staff else ["無名單資料"], key="rpg_final_select_v4")
-        
-        if selected_user != "無名單資料":
-            # 2. 讀取 RPG 資料 (需確保資料庫節點名稱對應正確，這裡假設以姓名查詢)
-            # 若您的節點是數字 ID，請務必確認 selected_user 與資料庫的 key 一致
+        if not all_staff:
+            st.error("⚠️ 名單讀取異常，請檢查後台資料是否完整。")
+        else:
+            # 讓下拉選單直接顯示人員，移除無名單資料的選項
+            selected_user = st.selectbox("請選擇人員姓名：", all_staff, key="rpg_final_v5")
+            
+            # 讀取 RPG 資料
             r_rpg = requests.get(f"{DB_BASE_URL}/game_rpg_data/{selected_user}.json").json()
             r_rpg = r_rpg if isinstance(r_rpg, dict) else {"str": 0, "vit": 0, "agi": 0, "cha": 0}
             
-            # 3. 計算數值 (基礎 10 + 點數)
+            # 計算數值 (基礎 10 + 點數)
             s = 10 + int(r_rpg.get('str', 0))
             v = 10 + int(r_rpg.get('vit', 0))
             a = 10 + int(r_rpg.get('agi', 0))
             c = 10 + int(r_rpg.get('cha', 0))
             
-            # 4. 顯示數值、稱謂、HP 與 ATK
+            # 顯示結果
             hp = 100 + (v * 2)
             atk = 10 + (s // 2)
             total = s + v + a + c
             title = "傳奇宗師" if total > 100 else "新手村村民"
             
-            # 顯示稱謂與數值 (排版優化)
             st.markdown(f"**稱謂：** {title}")
             st.markdown(f"**HP:** `{hp}` | **ATK:** `{atk}`")
             
-            # 使用四欄呈現四項能力
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("力量", s)
             c2.metric("體力", v)
             c3.metric("敏捷", a)
             c4.metric("智力", c)
             
-        else:
-            st.warning("⚠️ 目前讀取不到名單，請檢查後台資料。")
-            
     except Exception as e:
-        st.error("讀取 RPG 資料時發生錯誤，請檢查資料庫路徑。")
+        st.error("讀取系統資料時發生錯誤。")
  
 #============================================================================
 
