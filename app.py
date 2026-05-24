@@ -383,7 +383,7 @@ else:
 
 
 
-# ==========================================
+        # ==========================================
         # ⚙️ 後台管理專區：維護組員名單 (紅框處功能)
         # ==========================================
         st.write("")
@@ -410,39 +410,43 @@ else:
                             st.error("❌ 儲存失敗，請檢查網路。")
                     except Exception as e:
                         st.error(f"❌ 錯誤：{e}")
+                        
 
-            # --- 以下是您要求的 6S 未回報清單邏輯 ---
+                # --- 6S 未回報清單邏輯 ---
             st.markdown("---")
             st.markdown("##### ⚠️ 今日未回報 6S 人員清單")
             
-            # 1. 取得所有人員 (從您上面的 mapping 提取)
+            # 取得所有人員 (從您原本的 mapping 提取)
             all_staff_set = set()
             for members in leader_member_mapping.values():
                 all_staff_set.update(members)
             
-            # 2. 取得今日日期
-            today_str = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
+            # 修正後的日期寫法
+            import datetime
+            now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
+            today_str = now.strftime("%Y-%m-%d")
             
             try:
-                # 3. 讀取回報資料
+                # 抓取 6S 紀錄
                 r_6s = requests.get(f"{DB_BASE_URL}/6s_logs.json").json()
                 r_6s = r_6s if isinstance(r_6s, dict) else {}
                 
                 # 找出今天已回報的人
                 reported_staff = [v.get("姓名") for v in r_6s.values() if isinstance(v, dict) and v.get("日期") == today_str]
                 
-                # 4. 比對出未回報者
+                # 比對出未回報者
                 not_reported = [name for name in all_staff_set if name not in reported_staff and name]
                 
                 if not not_reported:
                     st.success("✅ 今日全員已回報！")
                 else:
-                    st.warning(", ".join(not_reported))
+                    st.warning("以下人員尚未回報：")
+                    st.write(", ".join(not_reported))
             except:
                 st.info("ℹ️ 目前無 6S 回報資料。")
 
- # ==========================================
-# ==========================================
+    # ==========================================
+    # ==========================================
     # 🎮 6S 戰境養成功能區塊
     # ==========================================
   # 更改為獨立 if 判定，徹底解決 elif 造成的 SyntaxError 語法錯誤
