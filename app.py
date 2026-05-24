@@ -698,25 +698,37 @@ else:
                 st.rerun()
 
 #============================================================================
-     # --- 新增功能：人物能力查詢 ---
+   # --- 新增功能：人物能力查詢 ---
         st.write("")
         with st.expander("👤 個人戰力與稱謂查詢"):
             st.markdown("##### ⚔️ 查看我的 6S 戰境能力")
             
-            # 確保變數存在
-            if 'leader_member_mapping' not in locals():
-                leader_member_mapping = {} # 這裡請確保您程式中有正確載入此變數
+            # 【關鍵修改】強制從 Firebase 重新抓取一次人員資料，確保數據不丟失
+            if 'leader_member_mapping' not in locals() or not leader_member_mapping:
+                try:
+                    res = requests.get(f"{BASE_URL}/leader_members.json").json()
+                    # 將 JSON 字串解析回字典 (處理您後台儲存的格式)
+                    if isinstance(res, str):
+                        leader_member_mapping = {}
+                        for line in res.strip().split('\n'):
+                            if ':' in line:
+                                l, m = line.split(':', 1)
+                                leader_member_mapping[l.strip()] = [x.strip() for x in m.split(',')]
+                    else:
+                        leader_member_mapping = res if res else {}
+                except:
+                    leader_member_mapping = {}
 
-            # 1. 取得所有人員列表
+            # 取得所有人員列表
             all_staff_list = sorted(list(set([m for members in leader_member_mapping.values() for m in members])))
             
             if not all_staff_list:
-                st.warning("目前沒有人員名單資料。")
+                st.warning("⚠️ 目前讀取不到名單，請先至後台確認名單是否已儲存。")
             else:
-                # 2. 修改：選取後直接自動查詢 (移除 st.button)
-                selected_user = st.selectbox("請選擇您的名字：", all_staff_list, key="char_query_select")
+                # 選擇姓名
+                selected_user = st.selectbox("請選擇您的名字：", all_staff_list, key="char_query_select_v2")
                 
-                # 自動進行查詢，不需要再按按鈕
+                # 自動查詢並顯示結果
                 try:
                     r_6s = requests.get(f"{DB_BASE_URL}/6s_logs.json").json()
                     r_6s = r_6s if isinstance(r_6s, dict) else {}
@@ -724,37 +736,37 @@ else:
                     user_reports = [v for v in r_6s.values() if isinstance(v, dict) and v.get("姓名") == selected_user]
                     total_count = len(user_reports)
                     
-                    # 定義稱謂與四項能力值 (體力/智力/力量/敏捷)
+                    # 定義稱謂與數值 (依回報次數決定)
                     if total_count == 0:
                         title, stats = "新手村村民", {"體力": 10, "智力": 10, "力量": 10, "敏捷": 10}
                     elif total_count < 5:
                         title, stats = "6S 見習生", {"體力": 30, "智力": 20, "力量": 25, "敏捷": 20}
                     elif total_count < 15:
-                        title, power = "6S 執行者", {"體力": 50, "智力": 40, "力量": 45, "敏捷": 35}
+                        title, stats = "6S 執行者", {"體力": 50, "智力": 40, "力量": 45, "敏捷": 35}
                     elif total_count < 30:
-                        title, power = "6S 守護者", {"體力": 80, "智力": 70, "力量": 75, "敏捷": 60}
+                        title, stats = "6S 守護者", {"體力": 80, "智力": 70, "力量": 75, "敏捷": 60}
                     else:
-                        title, power = "6S 傳奇宗師", {"體力": 100, "智力": 100, "力量": 100, "敏捷": 100}
+                        title, stats = "6S 傳奇宗師", {"體力": 100, "智力": 100, "力量": 100, "敏捷": 100}
                     
-                    # 樣式調整：使用 st.info 或 st.markdown 搭配顏色，避免白底白字
+                    # 【樣式強制深色】解決白底白字問題
                     st.markdown(f"""
-                    <div style="background-color: #1e3a8a; padding: 15px; border-radius: 10px; color: white;">
-                        <h3 style="color: #fbbf24;">{selected_user} 的戰境資料</h3>
-                        <p><b>稱謂：</b> {title}</p>
-                        <p><b>累積回報：</b> {total_count} 次</p>
-                        <hr>
-                        <p><b>能力值：</b></p>
-                        <ul>
-                            <li>體力：{stats['體力']}</li>
-                            <li>智力：{stats['智力']}</li>
-                            <li>力量：{stats['力量']}</li>
-                            <li>敏捷：{stats['敏捷']}</li>
+                    <div style="background-color: #1a1a1a; padding: 20px; border-radius: 10px; border: 1px solid #444; color: #ffffff;">
+                        <h3 style="color: #fbbf24; margin-top: 0;">{selected_user} 的戰境資料</h3>
+                        <p style="font-size: 1.1em;"><b>稱謂：</b> {title}</p>
+                        <p><b>累積回報次數：</b> {total_count} 次</p>
+                        <hr style="border: 0; border-top: 1px solid #444;">
+                        <p><b>四項能力值：</b></p>
+                        <ul style="list-style: none; padding: 0;">
+                            <li>💪 力量：{stats['力量']}</li>
+                            <li>🧠 智力：{stats['智力']}</li>
+                            <li>🏃 敏捷：{stats['敏捷']}</li>
+                            <li>❤️ 體力：{stats['體力']}</li>
                         </ul>
                     </div>
                     """, unsafe_allow_html=True)
                         
                 except Exception as e:
-                    st.error("暫無法讀取戰力資料。")
+                    st.error("暫無法讀取戰力資料，請檢查網路。")
 #============================================================================
 
 
