@@ -383,96 +383,94 @@ else:
 
 
 
-# --- ⚙️ 設定管理 ---
+# --- ⚙️ 設定管理 (包含人員與系統設定) ---
     elif st.session_state.menu_selection == "⚙️ 設定管理":
         st.title("⚙️ 系統核心設定")
         
-        # 1. 系統參數設定表單 (恢復你原本的邏輯)
+        # 1. 系統參數設定區塊 (包含人員設定與人員對照表)
         with st.form("config_form"):
+            st.subheader("🛠️ 基礎參數設定")
             so = st.text_area("製令清單 (以逗號隔開)", ",".join(order_list))
             sl = st.text_area("組長清單 (以逗號隔開)", ",".join(all_leaders))
             ss = st.text_area("人員清單 (以逗號隔開)", ",".join(all_staff))
             sp = st.text_area("工序清單 (以逗號隔開)", ",".join(process_list))
+            
+            st.divider()
+            st.subheader("👥 人員與工序配置 (重要)")
             sm = st.text_area("組長對應工序 (組長:工序1,工序2)", "\n".join([f"{k}:{','.join(v)}" for k, v in process_map.items()]))
             staff_in = st.text_area("組長屬下人員 (組長:人員1,人員2)", "\n".join([f"{k}:{','.join(v)}" for k, v in staff_map.items()]))
             
-            if st.form_submit_button("💾 儲存所有設定"):
+            if st.form_submit_button("💾 儲存所有系統設定"):
                 def split_s(s): return [x.strip() for x in s.split(",") if x.strip()]
                 
-                # 解析設定
+                # 解析配置
                 new_proc_map = {line.split(":")[0].strip(): split_s(line.split(":")[1]) for line in sm.split("\n") if ":" in line}
                 new_staff_map = {line.split(":")[0].strip(): split_s(line.split(":")[1]) for line in staff_in.split("\n") if ":" in line}
                 
                 new_settings = {
-                    "all_orders": split_s(so),
                     "all_leaders": split_s(sl),
                     "all_staff": split_s(ss),
                     "processes": split_s(sp),
+                    "order_list": split_s(so),
                     "process_map": new_proc_map,
                     "staff_map": new_staff_map
                 }
                 
                 try:
                     requests.put(f"{SETTING_URL}.json", data=json.dumps(new_settings))
-                    st.success("✅ 設定已儲存，請重新整理頁面生效。")
+                    st.success("✅ 設定已更新，請重新整理頁面！")
                 except Exception as e:
                     st.error(f"❌ 儲存失敗：{e}")
 
-        # 2. ⚙️ 管理員專區：維護組員名單
+        # 2. ⚙️ 管理員專區：維護 6S 組員名單 (專供 6S 系統使用)
         st.write("")
-        with st.expander("⚙️ 管理員專區：維護組員名單"):
-            st.markdown("##### 📝 編輯對照表")
-            st.caption("格式範例：組長名:成員1,成員2,成員3 (每行一位組長)")
+        with st.expander("⚙️ 管理員專區：維護 6S 組員名單 (回報系統用)"):
+            st.markdown("##### 📝 編輯 6S 人員對照表")
+            st.caption("格式：組長名:成員1,成員2,成員3 (每行一位組長)")
             
-            current_mapping_text = ""
-            for l, m in leader_member_mapping.items():
-                current_mapping_text += f"{l}:{','.join(m)}\n"
+            # 從 Firebase 重新抓取一次 (避免快取問題)
+            try:
+                curr_leader_members = requests.get(f"{BASE_URL}/leader_members.json").json()
+                if not isinstance(curr_leader_members, str):
+                    curr_leader_members = "" # 初始化
+            except:
+                curr_leader_members = ""
             
-            new_mapping_raw = st.text_area("人員配置資料：", value=current_mapping_text, height=250, key="6s_staff_edit_area")
+            new_6s_mapping = st.text_area("人員配置資料 (6S)：", value=curr_leader_members, height=200, key="6s_admin_edit")
             
-            if st.button("💾 儲存並同步名單至雲端", use_container_width=True, key="6s_save_staff_btn"):
-                if new_mapping_raw:
-                    try:
-                        save_res = requests.put(f"{BASE_URL}/leader_members.json", data=json.dumps(new_mapping_raw.strip()))
-                        if save_res.status_code == 200:
-                            st.success("✅ 名單儲存成功！下拉選單已同步更新。")
-                            time.sleep(1)
-                            st.rerun()
-                        else:
-                            st.error("❌ 儲存失敗，請檢查網路。")
-                    except Exception as e:
-                        st.error(f"❌ 錯誤：{e}")
+            if st.button("💾 儲存 6S 名單至雲端", use_container_width=True):
+                try:
+                    requests.put(f"{BASE_URL}/leader_members.json", data=json.dumps(new_6s_mapping.strip()))
+                    st.success("✅ 6S 名單儲存成功！")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌ 儲存失敗：{e}")
 
-        # 3. 當日未回報 6S 清單 (頁面最下方)
+        # 3. 今日未回報 6S 清單
         st.markdown("---")
         st.subheader("⚠️ 今日未回報 6S 人員清單")
         
+        # 簡單解析一下剛剛設定的資料來計算未回報人員
         all_staff_list = []
-        for members in leader_member_mapping.values():
-            all_staff_list.extend(members)
-        all_staff_list = list(set(all_staff_list)) 
+        for line in new_6s_mapping.splitlines():
+            if ":" in line:
+                m_part = line.split(":")[1].split(",")
+                all_staff_list.extend([m.strip() for m in m_part])
         
         today_str = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
         
         try:
-            r_6s = requests.get(f"{DB_BASE_URL}/6s_logs.json").json()
-            r_6s = r_6s if isinstance(r_6s, dict) else {}
-            
-            reported_staff = []
-            for k, v in r_6s.items():
-                if isinstance(v, dict) and v.get("日期") == today_str:
-                    reported_staff.append(v.get("姓名"))
-            
-            not_reported = [name for name in all_staff_list if name not in reported_staff]
+            r_6s = requests.get(f"{BASE_URL}/daily_6s_report_logs/{today_str}.json").json()
+            reported_staff = list(r_6s.keys()) if r_6s else []
+            not_reported = [name for name in set(all_staff_list) if name not in reported_staff and name]
             
             if not not_reported:
                 st.success("✅ 今日全員已完成 6S 回報！")
             else:
                 st.warning(f"目前還有 {len(not_reported)} 位人員尚未回報：")
                 st.write(", ".join(not_reported))
-                    
-        except Exception as e:
-            st.info("ℹ️ 目前暫無 6S 回報數據。")
+        except:
+            st.info("ℹ️ 暫無今日數據。")
 
 
 
