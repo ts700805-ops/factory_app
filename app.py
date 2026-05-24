@@ -737,29 +737,28 @@ else:
             s_order = st.selectbox("🔍 篩選製令", ["全部"] + sorted(list(set(order_list))), key="filter_order")
         with f_cols[1]: 
             s_staff = st.selectbox("👤 篩選人員", ["全部"] + sorted(my_team_for_filter), key="filter_staff")
-        
-        # 【修正重點】：在 try 之前先初始化這些變數，避免 NameError
+        # --- 資料讀取與顯示區 ---
+        # 1. 預先定義變數，避免 NameError
         final_display_orders = []
         df_work = pd.DataFrame()
         df_finish = pd.DataFrame()
 
-        # --- 資料讀取與顯示區 ---
+        # 2. 開始 try 區塊
         try:
-            # 1. 抓取進行中資料並過濾髒資料
+            # 抓取資料
             r_work_raw = requests.get(f"{DB_URL}.json").json()
             r_work = r_work_raw if isinstance(r_work_raw, dict) else {}
             work_rows = [{"db_id": k, **v} for k, v in r_work.items() if isinstance(v, dict)]
             df_work = pd.DataFrame(work_rows) if work_rows else pd.DataFrame()
             if not df_work.empty: df_work = df_work.fillna("NA")
 
-            # 2. 抓取已完工資料並過濾髒資料
             r_finish_raw = requests.get(f"{FINISH_URL}.json").json()
             r_finish = r_finish_raw if isinstance(r_finish_raw, dict) else {}
             finish_rows = [v for k, v in r_finish.items() if isinstance(v, dict)]
             df_finish = pd.DataFrame(finish_rows) if finish_rows else pd.DataFrame()
             if not df_finish.empty: df_finish = df_finish.fillna("NA")
 
-            # 3. 決定要顯示的製令
+            # 篩選邏輯
             base_orders = [str(o) for o in order_list]
             if s_order != "全部": base_orders = [str(s_order)]
 
@@ -778,6 +777,7 @@ else:
                     if found: final_display_orders.append(o_id)
 
         except Exception as e:
+            # 錯誤處理
             st.error(f"系統資料讀取發生錯誤：{str(e)}")
             st.warning("目前系統正在緩衝，請稍後再試。")
 
