@@ -698,30 +698,33 @@ else:
                 st.rerun()
 
 #============================================================================
- # --- 👤 個人戰力與稱謂查詢 (優化版) ---
+# --- 👤 個人戰力與稱謂查詢 (修正版) ---
         st.write("")
-        # 自訂深色標題，解決 expander 白底白字問題
-        st.markdown("""
-        <div style="background-color: #333; padding: 10px; border-radius: 5px; color: white; border: 1px solid #555;">
-            👤 個人戰力與稱謂查詢
-        </div>
-        """, unsafe_allow_html=True)
         
-        with st.expander("展開查詢面板"):
-            # 強制重新讀取名單
-            if 'leader_member_mapping' not in locals() or not leader_member_mapping:
+        # 1. 強制設定標題與內部顏色，解決白底白字問題
+        st.markdown("""
+        <style>
+        .stExpander div[data-testid="stExpanderDetails"] { color: white !important; }
+        .stExpanderSummary { color: white !important; font-weight: bold; }
+        </style>
+        """, unsafe_allow_html=True)
+
+        with st.expander("👤 個人戰力與稱謂查詢 (點擊展開)"):
+            # 2. 強化變數載入：優先嘗試讀取 session_state，若無則從雲端拉取
+            if 'leader_member_mapping' not in st.session_state:
                 try:
                     res = requests.get(f"{BASE_URL}/leader_members.json").json()
-                    leader_member_mapping = res if isinstance(res, dict) else {}
+                    st.session_state.leader_member_mapping = res if isinstance(res, dict) else {}
                 except:
-                    leader_member_mapping = {}
-
-            all_staff_list = sorted(list(set([m for members in leader_member_mapping.values() for m in members])))
+                    st.session_state.leader_member_mapping = {}
+            
+            mapping = st.session_state.leader_member_mapping
+            all_staff_list = sorted(list(set([m for members in mapping.values() for m in members])))
             
             if not all_staff_list:
-                st.warning("⚠️ 目前讀取不到名單，請先至後台儲存。")
+                st.error("⚠️ 讀取不到人員名單，請確認後台設定是否已正確儲存！")
             else:
-                selected_user = st.selectbox("請選擇您的名字：", all_staff_list, key="char_query_select_v3")
+                selected_user = st.selectbox("請選擇您的名字：", all_staff_list, key="char_query_select_v4")
                 
                 try:
                     r_6s = requests.get(f"{DB_BASE_URL}/6s_logs.json").json()
@@ -729,27 +732,26 @@ else:
                     user_reports = [v for v in r_6s.values() if isinstance(v, dict) and v.get("姓名") == selected_user]
                     total_count = len(user_reports)
                     
-                    # 【核心修改】能力值計算公式：基礎 10 + (回報次數 * 成長係數)
+                    # 動態成長能力值
                     stats = {
-                        "體力": 10 + (total_count * 3),
-                        "智力": 10 + (total_count * 2),
                         "力量": 10 + (total_count * 4),
-                        "敏捷": 10 + (total_count * 2)
+                        "智力": 10 + (total_count * 2),
+                        "敏捷": 10 + (total_count * 2),
+                        "體力": 10 + (total_count * 3)
                     }
                     
-                    # 動態稱謂
                     if total_count < 5: title = "新手村村民"
                     elif total_count < 15: title = "6S 見習生"
                     elif total_count < 30: title = "6S 執行者"
                     else: title = "6S 傳奇宗師"
                     
-                    # 顯示結果 (使用深色主題 CSS)
+                    # 顯示結果 (強制白色字體)
                     st.markdown(f"""
-                    <div style="background-color: #1a1a1a; padding: 20px; border-radius: 10px; border: 1px solid #444; color: #ffffff;">
+                    <div style="background-color: #262730; padding: 15px; border-radius: 10px; color: #ffffff;">
                         <h3 style="color: #fbbf24; margin-top: 0;">{selected_user} 的戰境資料</h3>
                         <p><b>稱謂：</b> {title}</p>
                         <p><b>累積回報：</b> {total_count} 次</p>
-                        <hr style="border-top: 1px solid #444;">
+                        <hr style="border-top: 1px solid #555;">
                         <p><b>四項能力值：</b></p>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                             <div>💪 力量：{stats['力量']}</div>
