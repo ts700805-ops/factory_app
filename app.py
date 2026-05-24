@@ -740,49 +740,34 @@ else:
             s_staff = st.selectbox("👤 篩選人員", ["全部"] + sorted(my_team_for_filter), key="filter_staff")
         
   # --- 資料讀取與顯示區 ---
+        # --- 資料讀取與顯示區 ---
         try:
             # 1. 抓取進行中資料並強化防錯
             r_work_raw = requests.get(f"{DB_URL}.json").json()
-            # 確保 r_work 永遠是 dict 格式
-            if isinstance(r_work_raw, dict):
-                r_work = r_work_raw
-            else:
-                r_work = {}
+            r_work = r_work_raw if isinstance(r_work_raw, dict) else {}
             
-            df_work = pd.DataFrame([dict(v, db_id=k) for k, v in r_work.items()]) if r_work else pd.DataFrame()
-            if not df_work.empty: df_work = df_work.fillna("NA")
+            # 【關鍵修復】：使用迴圈檢查每一筆資料，過濾掉非字典的髒資料
+            work_rows = []
+            for k, v in r_work.items():
+                if isinstance(v, dict):
+                    temp_row = v.copy()
+                    temp_row['db_id'] = k
+                    work_rows.append(temp_row)
+            df_work = pd.DataFrame(work_rows) if work_rows else pd.DataFrame()
+            
+            if not df_work.empty:
+                df_work = df_work.fillna("NA")
 
             # 2. 抓取已完工資料並強化防錯
             r_finish_raw = requests.get(f"{FINISH_URL}.json").json()
-            # 確保 r_finish 永遠是 dict 格式
-            if isinstance(r_finish_raw, dict):
-                r_finish = r_finish_raw
-            else:
-                r_finish = {}
-                
-            df_finish = pd.DataFrame([v for k, v in r_finish.items()]) if r_finish else pd.DataFrame()
-            if not df_finish.empty: df_finish = df_finish.fillna("NA")
-
-            # 3. 決定要顯示的製令
-            base_orders = [str(o) for o in order_list]
-            if s_order != "全部": base_orders = [str(s_order)]
-
-            final_display_orders = []
-            for o_id in base_orders:
-                # 篩選人員邏輯
-                if s_staff == "全部":
-                    final_display_orders.append(o_id)
-                else:
-                    found = False
-                    o_df_tmp = df_work[df_work["製令"] == str(o_id)] if not df_work.empty and "製令" in df_work.columns else pd.DataFrame()
-                    f_df_tmp = df_finish[df_finish["製令"] == str(o_id)] if not df_finish.empty and "製令" in df_finish.columns else pd.DataFrame()
-                    for df in [o_df_tmp, f_df_tmp]:
-                        if not df.empty:
-                            for i in range(1, 6):
-                                col_name = f"人員{i}"
-                                if col_name in df.columns and (df[col_name] == s_staff).any():
-                                    found = True; break
-                    if found: final_display_orders.append(o_id)
+            r_finish = r_finish_raw if isinstance(r_finish_raw, dict) else {}
+            
+            # 【關鍵修復】：同樣過濾已完工的髒資料
+            finish_rows = [v for k, v in r_finish.items() if isinstance(v, dict)]
+            df_finish = pd.DataFrame(finish_rows) if finish_rows else pd.DataFrame()
+            
+            if not df_finish.empty:
+                df_finish = df_finish.fillna("NA")
 
             # 4. 渲染卡片
             if not final_display_orders:
