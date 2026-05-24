@@ -698,73 +698,71 @@ else:
                 st.rerun()
 
 #============================================================================
-# --- 👤 個人戰力能力查詢 ---
+# --- 👤 個人戰力能力查詢 (除錯修復版) ---
 with st.container(border=True):
     st.subheader("👤 個人戰力能力查詢")
-    
-    # 【重要設定】請在此補齊您的姓名對應 ID，這能解決數值讀不到的問題
-    # 範例： "陳德文": "111", "徐梓翔": "888"
-    name_to_id_map = {
-        "陳德文": "111",
-        "444": "444", 
-        "徐梓翔": "888"
-    }
+
+    # 1. 除錯用：顯示目前的路徑
+    # st.caption(f"路徑測試: {BASE_URL}/leader_members.json")
 
     try:
-        # 1. 讀取人員名單 (處理各種可能的 JSON 格式)
-        res = requests.get(f"{BASE_URL}/leader_members.json").json()
-        all_staff = []
-        if isinstance(res, dict):
-            for val in res.values():
-                if isinstance(val, list): all_staff.extend(val)
-        elif isinstance(res, list):
-            all_staff = res
+        # 進行請求
+        response = requests.get(f"{BASE_URL}/leader_members.json")
+        
+        if response.status_code == 200:
+            res = response.json()
             
-        all_staff = sorted(list(set(all_staff)))
-
-        if not all_staff:
-            st.error("⚠️ 無法讀取人員名單，請確認路徑或後台設定。")
+            # --- 解析邏輯 ---
+            all_staff = []
+            if isinstance(res, dict):
+                # 如果是字典，把所有 value 當作列表處理
+                for val in res.values():
+                    if isinstance(val, list): all_staff.extend(val)
+            elif isinstance(res, list):
+                all_staff = res
+            
+            all_staff = sorted(list(set(all_staff)))
+            
+            if not all_staff:
+                st.warning("⚠️ 名單讀取成功，但名單內容是空的。請檢查 Firebase 該路徑下的資料是否確實有存入。")
+                st.write("收到的原始資料內容：", res)
+            else:
+                # 正常運作：顯示下拉選單
+                selected_user = st.selectbox("選擇人員：", all_staff, key="rpg_query_debug")
+                
+                # --- 取得數值 ---
+                # 這裡假設您的資料庫節點 ID 與名字一致，若不一致請調整 name_to_id
+                rpg_res = requests.get(f"{DB_BASE_URL}/game_rpg_data/{selected_user}.json").json()
+                rpg_data = rpg_res if isinstance(rpg_res, dict) else {"str": 0, "vit": 0, "agi": 0, "cha": 0}
+                
+                # 計算數值
+                s = 10 + int(rpg_data.get('str', 0))
+                v = 10 + int(rpg_data.get('vit', 0))
+                a = 10 + int(rpg_data.get('agi', 0))
+                c = 10 + int(rpg_data.get('cha', 0))
+                
+                hp = 100 + (v * 2)
+                atk = 10 + (s // 2)
+                total = s + v + a + c
+                title = "👑 傳奇宗師" if total > 150 else ("⚔️ 執行者" if total > 100 else "🌱 新手村村民")
+                
+                # 介面顯示
+                st.markdown(f"**稱謂：** <span style='color:#fbbf24;'>{title}</span>", unsafe_allow_html=True)
+                st.markdown(f"**HP:** `{hp}` | **ATK:** `{atk}`")
+                
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("力量", s)
+                c2.metric("體力", v)
+                c3.metric("敏捷", a)
+                c4.metric("智力", c)
+        
         else:
-            # 2. 下拉選單
-            selected_user = st.selectbox("請選擇人員姓名：", all_staff, key="rpg_query_final_v7")
-            
-            # 3. 取得 ID (優先使用對照表，找不到則使用名字本身)
-            user_id = name_to_id_map.get(selected_user, selected_user)
-            
-            # 4. 讀取 RPG 資料
-            rpg_data = requests.get(f"{DB_BASE_URL}/game_rpg_data/{user_id}.json").json()
-            if not isinstance(rpg_data, dict): 
-                rpg_data = {"str": 0, "vit": 0, "agi": 0, "cha": 0}
-            
-            # 5. 計算數值 (基礎 10 + 點數)
-            s = 10 + int(rpg_data.get('str', 0))
-            v = 10 + int(rpg_data.get('vit', 0))
-            a = 10 + int(rpg_data.get('agi', 0))
-            c = 10 + int(rpg_data.get('cha', 0))
-            
-            # 6. 計算 HP 與 ATK
-            hp = 100 + (v * 2)
-            atk = 10 + (s // 2)
-            total = s + v + a + c
-            
-            # 7. 稱謂判斷
-            if total > 150: title = "👑 傳奇宗師"
-            elif total > 100: title = "⚔️ 6S 執行者"
-            else: title = "🌱 新手村村民"
-            
-            # --- 介面呈現 ---
-            st.markdown(f"**稱謂：** <span style='font-size:1.2em; color:#fbbf24;'>{title}</span>", unsafe_allow_html=True)
-            st.markdown(f"**HP:** `{hp}`  |  **ATK:** `{atk}`")
-            
-            # 四項數值顯示
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("力量", s)
-            c2.metric("體力", v)
-            c3.metric("敏捷", a)
-            c4.metric("智力", c)
+            st.error(f"⚠️ 連線錯誤 (Status: {response.status_code})。請確認 {BASE_URL}/leader_members.json 是否正確。")
+            with st.expander("查看錯誤詳情"):
+                st.write(response.text)
 
     except Exception as e:
-        st.error("⚠️ 讀取資料異常，請檢查網路與資料庫路徑。")
+        st.error(f"系統異常: {e}")
 #============================================================================
 
 
