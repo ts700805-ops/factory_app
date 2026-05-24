@@ -685,14 +685,23 @@ else:
                     sel = st.selectbox(f"人員 {i+1}", options, index=d_idx, key=f"dlg_staff_{order_id}_{proc_name}_{i}")
                     new_wk.append(sel)
                 
-                if st.form_submit_button("💾 儲存修改", use_container_width=True):
-                    new_payload = current_data.copy()
-                    new_payload.update({
+              if st.form_submit_button("💾 儲存修改", use_container_width=True):
+                    # --- 強制將 current_data 確保為字典格式 ---
+                    if not isinstance(current_data, dict):
+                        new_payload = {"製令": str(order_id), "製造工序": proc_name} # 萬一真的爛掉，建立基礎結構
+                    else:
+                        new_payload = current_data.copy()
+                    
+                    # 使用 update 前確保這是一個標準字典
+                    update_data = {
                         "最後更新": get_now_str(),
                         "人員1": new_wk[0], "人員2": new_wk[1], "人員3": new_wk[2], "人員4": new_wk[3], "人員5": new_wk[4]
-                    })
+                    }
+                    new_payload.update(update_data)
+                    
                     db_id = new_payload.pop("db_id", None)
                     if db_id:
+                        # 再次確保發送的資料是純 dict
                         requests.put(f"{DB_URL}/{db_id}.json", data=json.dumps(new_payload))
                         st.success("✅ 人員更新成功！")
                         time.sleep(0.5); st.rerun()
