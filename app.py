@@ -670,6 +670,14 @@ else:
 
         @st.dialog("👥 編輯施工人員", width="medium")
         def edit_staff_dialog(order_id, proc_name, current_data):
+            # --- 關鍵修正：強制將輸入資料轉為純 Python 字典 ---
+            if hasattr(current_data, "to_dict"):
+                work_data = current_data.to_dict() # 如果是 Pandas Series，轉為 dict
+            elif isinstance(current_data, dict):
+                work_data = current_data.copy()
+            else:
+                work_data = {"製令": str(order_id), "製造工序": proc_name} # 保底機制
+            
             st.subheader(f"🛠️ {proc_name}")
             current_leader = st.session_state.user
             my_team = staff_map.get(current_leader, [])
@@ -679,38 +687,31 @@ else:
             with st.form(f"staff_edit_form_{order_id}_{proc_name}"):
                 new_wk = []
                 for i in range(5):
-                    p_val = current_data.get(f"人員{i+1}", "NA")
+                    # 從轉換好的 work_data 取值
+                    p_val = work_data.get(f"人員{i+1}", "NA")
                     d_idx = options.index(p_val) if p_val in options else 0
                     sel = st.selectbox(f"人員 {i+1}", options, index=d_idx, key=f"dlg_staff_{order_id}_{proc_name}_{i}")
                     new_wk.append(sel)
                 
                 if st.form_submit_button("💾 儲存修改", use_container_width=True):
-                    # 【防禦機制】：直接建立一個全新的字典，完全不依賴可能有問題的 current_data
-                    new_payload = {
-                        "製令": str(order_id),
-                        "製造工序": proc_name,
-                        "最後更新": get_now_str(),
-                        "人員1": new_wk[0],
-                        "人員2": new_wk[1],
-                        "人員3": new_wk[2],
-                        "人員4": new_wk[3],
-                        "人員5": new_wk[4]
-                    }
+                    # --- 重新組裝資料 ---
+                    work_data["最後更新"] = get_now_str()
+                    work_data["人員1"] = new_wk[0]
+                    work_data["人員2"] = new_wk[1]
+                    work_data["人員3"] = new_wk[2]
+                    work_data["人員4"] = new_wk[3]
+                    work_data["人員5"] = new_wk[4]
                     
-                    # 嘗試從 current_data 找回 db_id
-                    # 如果 current_data 不是字典，這裡就不會拿到 db_id
-                    db_id = current_data.get("db_id") if isinstance(current_data, dict) else None
+                    # 確保 db_id 在寫入前從字典中移除，避免污染資料庫
+                    db_id = work_data.pop("db_id", None)
                     
                     if db_id:
-                        # 正常更新
-                        requests.put(f"{DB_URL}/{db_id}.json", data=json.dumps(new_payload))
+                        requests.put(f"{DB_URL}/{db_id}.json", data=json.dumps(work_data))
                         st.success("✅ 人員更新成功！")
+                        time.sleep(0.5)
+                        st.rerun()
                     else:
-                        # 錯誤處理：如果沒有 db_id，代表資料庫該路徑已損毀
-                        st.error("⚠️ 資料結構異常，請聯繫管理員清理該筆製令資料。")
-                    
-                    time.sleep(0.5)
-                    st.rerun()
+                        st.error("❌ 系統找不到資料編號，無法儲存。")
 
         @st.dialog("📅 修改預計通電日期", width="small")
         def edit_power_date_dialog(order_id, current_date_str, related_records):
