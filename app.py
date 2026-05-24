@@ -698,69 +698,39 @@ else:
                 st.rerun()
 
 #============================================================================
-# 將所有邏輯封裝在一個函數內，避免與其他頁面變數衝突
-def render_rpg_system():
-    # 確保模組可用
-    import random
-    import time
-    import json
-    
-    st.markdown('<div style="text-align:center;"><h1>🎮 6S 戰境養成系統</h1></div>', unsafe_allow_html=True)
+# --- 6S 戰境養成系統與查詢 (修正版) ---
 
-    # 1. 安全獲取路徑 (使用預設值防呆)
-    base = globals().get('DB_URL') or globals().get('DB_BASE_URL') or "https://my-factory-system-default-rtdb.firebaseio.com"
-    GAME_DB_URL = f"{base}/game_rpg_data"
-    
-    # 2. 統一讀取資料 (使用防快取設定)
-    try:
-        response = requests.get(f"{GAME_DB_URL}.json", headers={"Cache-Control": "no-cache"}, timeout=10)
-        all_players_data = response.json() or {}
-    except:
-        st.error("⚠️ 無法連線至戰境資料庫")
-        return
-
-    # 3. 當前使用者
-    current_user = str(st.session_state.get("user", "未登入同仁")).strip()
-    user_stats = all_players_data.get(current_user, {"str": 0, "vit": 0, "agi": 0, "cha": 0, "avail_pts": 0, "level_name": "🌾 平民"})
-
-    # 4. 能力面板
-    st.markdown(f"### 🥷 個人戰力：【{user_stats.get('level_name')}】 ({current_user})")
-    
-    # 顯示屬性並提供配點
-    cols = st.columns(5)
-    attrs = [("💪 力量", "str", 2), ("🔋 體力", "vit", 30), ("⚡ 敏捷", "agi", 2), ("✨ 魅力", "cha", 5)]
-    
-    for i, (label, key, bonus) in enumerate(attrs):
-        val = int(user_stats.get(key, 0))
-        cols[i].metric(label, f"{val} 點", f"+{val*bonus}")
-        if user_stats.get("avail_pts", 0) > 0:
-            if cols[i].button(f"➕ {label.split(' ')[1]}", key=f"btn_{key}"):
-                user_stats[key] = val + 1
-                user_stats["avail_pts"] = int(user_stats.get("avail_pts", 0)) - 1
-                requests.put(f"{GAME_DB_URL}/{current_user}.json", data=json.dumps(user_stats))
-                st.rerun()
-
-    cols[4].metric("💎 剩餘點數", user_stats.get("avail_pts", 0))
-
-    st.divider()
-
-    # 5. 獨立的能力查詢 (查詢他人)
-    with st.expander("🔍 查詢其他同仁戰力"):
-        all_names = sorted(list(all_players_data.keys()))
-        search_target = st.selectbox("選擇要查詢的對手：", all_names, key="search_other")
-        target_stats = all_players_data.get(search_target, {})
-        
-        c1, c2, c3, c4 = st.columns(4)
-        c1.write(f"💪 力量: {target_stats.get('str', 0)}")
-        c2.write(f"🔋 體力: {target_stats.get('vit', 0)}")
-        c3.write(f"⚡ 敏捷: {target_stats.get('agi', 0)}")
-        c4.write(f"✨ 魅力: {target_stats.get('cha', 0)}")
-
-# ==========================================
-# 最終執行區塊 (請將這段貼在你的主程式 menu_selection 判斷內)
-# ==========================================
+# 檢查當前頁面是否為 "6S戰境養成"
 if st.session_state.get("menu_selection") == "6S戰境養成":
-    render_rpg_system()
+    
+    st.markdown("### 🎮 6S 戰境養成系統")
+    
+    # 讀取資料的函數 (只在需要時執行)
+    try:
+        url = "https://my-factory-system-default-rtdb.firebaseio.com/game_rpg_data.json"
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            data = response.json() or {}
+            
+            if not data:
+                st.warning("目前無任何戰境資料。")
+            else:
+                # 簡單顯示能力查詢列表
+                st.markdown("#### 🔍 同仁戰力查詢")
+                selected_user = st.selectbox("選擇要查詢的同仁:", sorted(list(data.keys())))
+                
+                user_data = data.get(selected_user, {})
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("力量", user_data.get('str', 0))
+                c2.metric("體力", user_data.get('vit', 0))
+                c3.metric("敏捷", user_data.get('agi', 0))
+                c4.metric("魅力", user_data.get('cha', 0))
+        else:
+            st.error("無法連接至資料庫。")
+    except Exception as e:
+        st.error(f"系統錯誤: {e}")
+
+# (除此之外，這段程式碼對其他頁面不會有任何影響)
 
 #============================================================================
 
