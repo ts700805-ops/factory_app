@@ -739,26 +739,26 @@ else:
             s_staff = st.selectbox("👤 篩選人員", ["全部"] + sorted(my_team_for_filter), key="filter_staff")
 
 # --- 資料讀取與顯示區 ---
-        
-        # 1. 初始化變數
         final_display_orders = []
         df_work = pd.DataFrame()
         df_finish = pd.DataFrame()
 
-        # 2. 資料讀取 (try-except 僅保護讀取過程)
         try:
+            # 1. 抓取並過濾進行中資料
             r_work_raw = requests.get(f"{DB_URL}.json").json()
             r_work = r_work_raw if isinstance(r_work_raw, dict) else {}
             work_rows = [{"db_id": k, **v} for k, v in r_work.items() if isinstance(v, dict)]
             df_work = pd.DataFrame(work_rows) if work_rows else pd.DataFrame()
             if not df_work.empty: df_work = df_work.fillna("NA")
 
+            # 2. 抓取並過濾已完工資料
             r_finish_raw = requests.get(f"{FINISH_URL}.json").json()
             r_finish = r_finish_raw if isinstance(r_finish_raw, dict) else {}
             finish_rows = [v for k, v in r_finish.items() if isinstance(v, dict)]
             df_finish = pd.DataFrame(finish_rows) if finish_rows else pd.DataFrame()
             if not df_finish.empty: df_finish = df_finish.fillna("NA")
 
+            # 3. 篩選邏輯
             base_orders = [str(o) for o in order_list]
             if s_order != "全部": base_orders = [str(s_order)]
 
@@ -777,10 +777,10 @@ else:
                     if found: final_display_orders.append(o_id)
 
         except Exception as e:
-            st.error(f"系統資料讀取發生錯誤：{str(e)}")
-            st.warning("目前系統正在緩衝，請稍後再試。")
+            st.error(f"系統偵測到錯誤：{str(e)}")
+            st.warning("目前系統資料緩衝中，請稍後再試。")
 
-        # 3. 渲染卡片區 (完全獨立在 try-except 之外)
+        # --- 渲染卡片區 ---
         if not final_display_orders:
             st.info(f"💡 目前無符合條件的項目")
         else:
@@ -845,9 +845,6 @@ else:
                                 st.markdown('<div class="status-assign-box">⚠️ 請指派</div>', unsafe_allow_html=True)
                         st.markdown('</div>', unsafe_allow_html=True)
                     st.markdown('</div>', unsafe_allow_html=True)
-except Exception as e:
-            st.error(f"系統偵測到錯誤：{str(e)}")
-            st.warning("目前系統資料緩衝中，請稍後再試。")
             
 # --- 📈💡2o26上半年技能考核進度 ---
     elif st.session_state.menu_selection == "💡2o26上半年技能考核進度":
