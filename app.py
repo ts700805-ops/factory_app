@@ -698,28 +698,28 @@ else:
                 st.rerun()
 
 #============================================================================
-# --- 👤 6S 戰境養成系統 (穩定讀取版) ---
+# --- 👤 6S 戰境養成系統 (優化讀取版) ---
 with st.container(border=True):
     st.subheader("👤 戰境養成資料庫")
 
-    # 強制指定網址，確保連結正確
+    # 強制指定網址
     TARGET_URL = "https://my-factory-system-default-rtdb.firebaseio.com/game_rpg_data.json"
 
     try:
-        # 發送請求獲取資料
-        response = requests.get(TARGET_URL)
+        # 加入 headers: {"Cache-Control": "no-cache"} 確保讀到最新資料
+        response = requests.get(TARGET_URL, headers={"Cache-Control": "no-cache"}, timeout=10)
         
         if response.status_code == 200:
             res = response.json()
             
             if res is None:
-                st.warning("⚠️ 系統提示：目前資料庫暫無角色數據 (空值)。")
+                st.warning("⚠️ 系統提示：資料庫回傳為空，請確認 Firebase 該路徑是否存在資料。")
             else:
-                # 成功取得資料，將 ID 排序
+                # 成功取得資料
                 all_ids = sorted(list(res.keys()))
                 
-                # 讓使用者選擇 ID
-                selected_id = st.selectbox("請選擇角色 ID:", all_ids, key="rpg_id_select")
+                # key 加上後綴，避免與其他頁面重複導致錯誤
+                selected_id = st.selectbox("請選擇角色 ID:", all_ids, key="rpg_db_view_select")
 
                 # 讀取對應數據
                 rpg_data = res.get(selected_id, {})
@@ -736,10 +736,10 @@ with st.container(border=True):
                 c3.metric("敏捷", a)
                 c4.metric("魅力", c)
         else:
-            st.error(f"⚠️ 連線失敗 (錯誤碼: {response.status_code})，請稍後再試。")
+            st.error(f"⚠️ 連線異常 (錯誤碼: {response.status_code})")
 
     except Exception as e:
-        st.error(f"⚠️ 讀取異常，錯誤內容: {e}")
+        st.error(f"⚠️ 讀取失敗: {e}")
 #============================================================================
 
 
