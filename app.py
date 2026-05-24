@@ -698,50 +698,69 @@ else:
                 st.rerun()
 
 #============================================================================
-# --- 強制防禦載入 (放在程式最上方) ---
-import streamlit as st
-import requests
-
-# 檢查資料庫狀態的函式
-def get_rpg_data_or_error():
-    try:
-        url = "https://my-factory-system-default-rtdb.firebaseio.com/game_rpg_data.json"
-        res = requests.get(url, headers={"Cache-Control": "no-cache"}, timeout=5).json()
-        if res is None or not isinstance(res, dict) or not res:
-            return None
-        return res
-    except:
-        return None
-
-# 執行檢查
-rpg_db = get_rpg_data_or_error()
-
-# 如果讀不到資料，直接顯示錯誤並中斷程式，不執行後續頁面
-if rpg_db is None:
-    st.error("⚠️ 目前資料庫沒有任何角色資料，系統暫停執行。")
-    st.stop() # 這行是關鍵，直接讓網頁剩下的程式碼都不會跑
-    # --- 👤 獨立能力查詢區塊 ---
-with st.container(border=True):
-    st.subheader("👤 角色能力查詢")
+# 將所有邏輯封裝在一個函數內，避免與其他頁面變數衝突
+def render_rpg_system():
+    # 確保模組可用
+    import random
+    import time
+    import json
     
-    try:
-        # 單獨且強制地讀取資料，不使用全域變數
-        data_resp = requests.get("https://my-factory-system-default-rtdb.firebaseio.com/game_rpg_data.json", timeout=5)
-        rpg_db = data_resp.json() if data_resp.status_code == 200 else None
+    st.markdown('<div style="text-align:center;"><h1>🎮 6S 戰境養成系統</h1></div>', unsafe_allow_html=True)
 
-        if not rpg_db or not isinstance(rpg_db, dict):
-            st.error("⚠️ 目前資料庫沒有任何角色資料。")
-        else:
-            # 建立本地選單，只在該區塊內運作
-            target = st.selectbox("請選擇查詢角色:", sorted(list(rpg_db.keys())), key="query_solo_select")
-            stats = rpg_db.get(target, {})
-            
-            # 使用兩欄顯示，保持版面簡潔
-            c1, c2 = st.columns(2)
-            c1.metric("力量 (ATK)", 10 + int(stats.get('str', 0)))
-            c2.metric("體力 (HP)", 100 + int(stats.get('vit', 0)) * 2)
+    # 1. 安全獲取路徑 (使用預設值防呆)
+    base = globals().get('DB_URL') or globals().get('DB_BASE_URL') or "https://my-factory-system-default-rtdb.firebaseio.com"
+    GAME_DB_URL = f"{base}/game_rpg_data"
+    
+    # 2. 統一讀取資料 (使用防快取設定)
+    try:
+        response = requests.get(f"{GAME_DB_URL}.json", headers={"Cache-Control": "no-cache"}, timeout=10)
+        all_players_data = response.json() or {}
     except:
-        st.error("⚠️ 資料庫連線中斷。")
+        st.error("⚠️ 無法連線至戰境資料庫")
+        return
+
+    # 3. 當前使用者
+    current_user = str(st.session_state.get("user", "未登入同仁")).strip()
+    user_stats = all_players_data.get(current_user, {"str": 0, "vit": 0, "agi": 0, "cha": 0, "avail_pts": 0, "level_name": "🌾 平民"})
+
+    # 4. 能力面板
+    st.markdown(f"### 🥷 個人戰力：【{user_stats.get('level_name')}】 ({current_user})")
+    
+    # 顯示屬性並提供配點
+    cols = st.columns(5)
+    attrs = [("💪 力量", "str", 2), ("🔋 體力", "vit", 30), ("⚡ 敏捷", "agi", 2), ("✨ 魅力", "cha", 5)]
+    
+    for i, (label, key, bonus) in enumerate(attrs):
+        val = int(user_stats.get(key, 0))
+        cols[i].metric(label, f"{val} 點", f"+{val*bonus}")
+        if user_stats.get("avail_pts", 0) > 0:
+            if cols[i].button(f"➕ {label.split(' ')[1]}", key=f"btn_{key}"):
+                user_stats[key] = val + 1
+                user_stats["avail_pts"] = int(user_stats.get("avail_pts", 0)) - 1
+                requests.put(f"{GAME_DB_URL}/{current_user}.json", data=json.dumps(user_stats))
+                st.rerun()
+
+    cols[4].metric("💎 剩餘點數", user_stats.get("avail_pts", 0))
+
+    st.divider()
+
+    # 5. 獨立的能力查詢 (查詢他人)
+    with st.expander("🔍 查詢其他同仁戰力"):
+        all_names = sorted(list(all_players_data.keys()))
+        search_target = st.selectbox("選擇要查詢的對手：", all_names, key="search_other")
+        target_stats = all_players_data.get(search_target, {})
+        
+        c1, c2, c3, c4 = st.columns(4)
+        c1.write(f"💪 力量: {target_stats.get('str', 0)}")
+        c2.write(f"🔋 體力: {target_stats.get('vit', 0)}")
+        c3.write(f"⚡ 敏捷: {target_stats.get('agi', 0)}")
+        c4.write(f"✨ 魅力: {target_stats.get('cha', 0)}")
+
+# ==========================================
+# 最終執行區塊 (請將這段貼在你的主程式 menu_selection 判斷內)
+# ==========================================
+if st.session_state.get("menu_selection") == "6S戰境養成":
+    render_rpg_system()
 
 #============================================================================
 
