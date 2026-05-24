@@ -776,7 +776,7 @@ else:
                                     found = True; break
                     if found: final_display_orders.append(o_id)
 
-         except Exception as e:
+        except Exception as e:
             st.error(f"系統資料讀取發生錯誤：{str(e)}")
             st.warning("目前系統正在緩衝，請稍後再試。")
 
