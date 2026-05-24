@@ -728,9 +728,8 @@ else:
                 st.success("✅ 日期已更新")
                 time.sleep(0.5); st.rerun()
 
-        # --- 頁面篩選列 (放在 try 外面確保不會被 catch) ---
+      # --- 頁面篩選列 ---
         my_procs = process_map.get(st.session_state.user, process_list)
-        # 💡 這裡定義篩選用的名單
         my_team_for_filter = staff_map.get(st.session_state.user, all_staff)
         
         f_cols = st.columns([1, 1, 1])
@@ -739,35 +738,54 @@ else:
         with f_cols[1]: 
             s_staff = st.selectbox("👤 篩選人員", ["全部"] + sorted(my_team_for_filter), key="filter_staff")
         
-  # --- 資料讀取與顯示區 ---
+        # 【修正重點】：在 try 之前先初始化這些變數，避免 NameError
+        final_display_orders = []
+        df_work = pd.DataFrame()
+        df_finish = pd.DataFrame()
+
         # --- 資料讀取與顯示區 ---
         try:
-            # 1. 抓取進行中資料並強化防錯
+            # 1. 抓取進行中資料並過濾髒資料
             r_work_raw = requests.get(f"{DB_URL}.json").json()
             r_work = r_work_raw if isinstance(r_work_raw, dict) else {}
-            
-            # 【關鍵修復】：使用迴圈檢查每一筆資料，過濾掉非字典的髒資料
-            work_rows = []
-            for k, v in r_work.items():
-                if isinstance(v, dict):
-                    temp_row = v.copy()
-                    temp_row['db_id'] = k
-                    work_rows.append(temp_row)
+            work_rows = [{"db_id": k, **v} for k, v in r_work.items() if isinstance(v, dict)]
             df_work = pd.DataFrame(work_rows) if work_rows else pd.DataFrame()
-            
-            if not df_work.empty:
-                df_work = df_work.fillna("NA")
+            if not df_work.empty: df_work = df_work.fillna("NA")
 
-            # 2. 抓取已完工資料並強化防錯
+            # 2. 抓取已完工資料並過濾髒資料
             r_finish_raw = requests.get(f"{FINISH_URL}.json").json()
             r_finish = r_finish_raw if isinstance(r_finish_raw, dict) else {}
-            
-            # 【關鍵修復】：同樣過濾已完工的髒資料
             finish_rows = [v for k, v in r_finish.items() if isinstance(v, dict)]
             df_finish = pd.DataFrame(finish_rows) if finish_rows else pd.DataFrame()
-            
-            if not df_finish.empty:
-                df_finish = df_finish.fillna("NA")
+            if not df_finish.empty: df_finish = df_finish.fillna("NA")
+
+            # 3. 決定要顯示的製令
+            base_orders = [str(o) for o in order_list]
+            if s_order != "全部": base_orders = [str(s_order)]
+
+            for o_id in base_orders:
+                if s_staff == "全部":
+                    final_display_orders.append(o_id)
+                else:
+                    found = False
+                    o_df_tmp = df_work[df_work["製令"] == str(o_id)] if not df_work.empty and "製令" in df_work.columns else pd.DataFrame()
+                    f_df_tmp = df_finish[df_finish["製令"] == str(o_id)] if not df_finish.empty and "製令" in df_finish.columns else pd.DataFrame()
+                    for df in [o_df_tmp, f_df_tmp]:
+                        if not df.empty:
+                            for i in range(1, 6):
+                                if f"人員{i}" in df.columns and (df[f"人員{i}"] == s_staff).any():
+                                    found = True; break
+                    if found: final_display_orders.append(o_id)
+
+        except Exception as e:
+            st.error(f"系統資料讀取發生錯誤：{str(e)}")
+            st.warning("目前系統正在緩衝，請稍後再試。")
+
+        # --- 渲染區 (放在 try 外面，即使資料抓取失敗也不會報錯) ---
+        if not final_display_orders and not df_work.empty:
+             st.info(f"💡 目前無符合條件的項目")
+        elif final_display_orders:
+             # ... (後續渲染卡片的邏輯保持不變) ...
 
             # 4. 渲染卡片
             if not final_display_orders:
