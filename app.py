@@ -737,15 +737,16 @@ else:
             s_order = st.selectbox("🔍 篩選製令", ["全部"] + sorted(list(set(order_list))), key="filter_order")
         with f_cols[1]: 
             s_staff = st.selectbox("👤 篩選人員", ["全部"] + sorted(my_team_for_filter), key="filter_staff")
-        # --- 資料讀取與顯示區 ---
-        # 1. 預先定義變數，避免 NameError
+
+# --- 資料讀取與顯示區 ---
+        
+        # 1. 初始化變數，確保程式不會因為抓不到資料而報錯
         final_display_orders = []
         df_work = pd.DataFrame()
         df_finish = pd.DataFrame()
 
-        # 2. 開始 try 區塊
+        # 2. 資料讀取與篩選
         try:
-            # 抓取資料
             r_work_raw = requests.get(f"{DB_URL}.json").json()
             r_work = r_work_raw if isinstance(r_work_raw, dict) else {}
             work_rows = [{"db_id": k, **v} for k, v in r_work.items() if isinstance(v, dict)]
@@ -758,7 +759,6 @@ else:
             df_finish = pd.DataFrame(finish_rows) if finish_rows else pd.DataFrame()
             if not df_finish.empty: df_finish = df_finish.fillna("NA")
 
-            # 篩選邏輯
             base_orders = [str(o) for o in order_list]
             if s_order != "全部": base_orders = [str(s_order)]
 
@@ -768,7 +768,7 @@ else:
                 else:
                     found = False
                     o_df_tmp = df_work[df_work["製令"] == str(o_id)] if not df_work.empty and "製令" in df_work.columns else pd.DataFrame()
-                    f_df_tmp = df_finish[df_finish["製令"] == str(o_id)] if not df_finish.empty and "製令" in df_finish.columns else pd.DataFrame()
+                    f_df_tmp = df_finish[df_finish["製令"] == str(o_id)] if not df_finish.empty and "製令" in f_df_tmp.columns else pd.DataFrame()
                     for df in [o_df_tmp, f_df_tmp]:
                         if not df.empty:
                             for i in range(1, 6):
@@ -777,82 +777,75 @@ else:
                     if found: final_display_orders.append(o_id)
 
         except Exception as e:
-            # 錯誤處理
             st.error(f"系統資料讀取發生錯誤：{str(e)}")
             st.warning("目前系統正在緩衝，請稍後再試。")
 
-        # --- 渲染區 (放在 try 外面，即使資料抓取失敗也不會報錯) ---
-        if not final_display_orders and not df_work.empty:
-             st.info(f"💡 目前無符合條件的項目")
-        elif final_display_orders:
-             # ... (後續渲染卡片的邏輯保持不變) ...
+        # 3. 渲染卡片區 (放在 try...except 外部，確保邏輯分離)
+        if not final_display_orders:
+            st.info(f"💡 目前無符合條件的項目")
+        else:
+            main_cols = st.columns(3) 
+            for idx, o_id in enumerate(final_display_orders):
+                o_df = df_work[df_work["製令"] == str(o_id)] if not df_work.empty and "製令" in df_work.columns else pd.DataFrame()
+                f_df_order = df_finish[df_finish["製令"] == str(o_id)] if not df_finish.empty and "製令" in df_finish.columns else pd.DataFrame()
+                
+                # 抓取通電日期
+                p_date = "未設定"
+                if not o_df.empty and "通電日期" in o_df.columns:
+                    p_date = str(o_df.iloc[0].get("通電日期", "未設定"))
+                elif not f_df_order.empty and "通電日期" in f_df_order.columns:
+                    p_date = str(f_df_order.iloc[0].get("通電日期", "未設定"))
 
-            # 4. 渲染卡片
-            if not final_display_orders:
-                st.info(f"💡 目前無符合條件的項目")
-            else:
-                main_cols = st.columns(3) 
-                for idx, o_id in enumerate(final_display_orders):
-                    o_df = df_work[df_work["製令"] == str(o_id)] if not df_work.empty and "製令" in df_work.columns else pd.DataFrame()
-                    f_df_order = df_finish[df_finish["製令"] == str(o_id)] if not df_finish.empty and "製令" in df_finish.columns else pd.DataFrame()
-                    
-                    # 抓取通電日期
-                    p_date = "未設定"
-                    if not o_df.empty and "通電日期" in o_df.columns:
-                        p_date = str(o_df.iloc[0].get("通電日期", "未設定"))
-                    elif not f_df_order.empty and "通電日期" in f_df_order.columns:
-                        p_date = str(f_df_order.iloc[0].get("通電日期", "未設定"))
+                with main_cols[idx % 3]:
+                    st.markdown(f'<div class="order-card"><div class="order-header"><span>📦 製令：{o_id}</span><span class="power-date-tag">⚡ 通電：{p_date}</span></div>', unsafe_allow_html=True)
+                    if st.button("📅", key=f"date_edit_{o_id}"):
+                        related = {k: v for k, v in r_work.items() if v.get("製令") == str(o_id)}
+                        edit_power_date_dialog(o_id, p_date, related)
 
-                    with main_cols[idx % 3]:
-                        st.markdown(f'<div class="order-card"><div class="order-header"><span>📦 製令：{o_id}</span><span class="power-date-tag">⚡ 通電：{p_date}</span></div>', unsafe_allow_html=True)
-                        if st.button("📅", key=f"date_edit_{o_id}"):
-                            related = {k: v for k, v in r_work.items() if v.get("製令") == str(o_id)}
-                            edit_power_date_dialog(o_id, p_date, related)
-
-                        for p_idx, proc in enumerate(my_procs):
-                            u_key = f"v21_{str(o_id).replace('-','_')}_{p_idx}"
-                            m_w = o_df[o_df["製造工序"] == proc] if not o_df.empty and "製造工序" in o_df.columns else pd.DataFrame()
-                            m_f = f_df_order[f_df_order["製造工序"] == proc] if not f_df_order.empty and "製造工序" in f_df_order.columns else pd.DataFrame()
-                            
-                            is_done = not m_f.empty
-                            target_row = m_w.iloc[0] if not m_w.empty else (m_f.iloc[0] if not m_f.empty else None)
-                            
-                            st.markdown('<div class="proc-row-container">', unsafe_allow_html=True)
-                            r_ui = st.columns([3.2, 4.0, 0.8, 2.0])
-                            with r_ui[0]: st.markdown(f'<div class="proc-name">{proc}</div>', unsafe_allow_html=True)
-                            with r_ui[1]:
-                                if target_row is not None:
-                                    staff_html = "".join([f'<span class="badge-staff">{target_row.get(f"人員{i}")}</span> ' for i in range(1,6) if target_row.get(f"人員{i}") not in ["NA", None]])
-                                    st.markdown(f'<div style="display:flex; flex-wrap:wrap; gap:4px;">{staff_html if staff_html else "尚未派工"}</div>', unsafe_allow_html=True)
+                    for p_idx, proc in enumerate(my_procs):
+                        u_key = f"v21_{str(o_id).replace('-','_')}_{p_idx}"
+                        m_w = o_df[o_df["製造工序"] == proc] if not o_df.empty and "製造工序" in o_df.columns else pd.DataFrame()
+                        m_f = f_df_order[f_df_order["製造工序"] == proc] if not f_df_order.empty and "製造工序" in f_df_order.columns else pd.DataFrame()
+                        
+                        is_done = not m_f.empty
+                        target_row = m_w.iloc[0] if not m_w.empty else (m_f.iloc[0] if not m_f.empty else None)
+                        
+                        st.markdown('<div class="proc-row-container">', unsafe_allow_html=True)
+                        r_ui = st.columns([3.2, 4.0, 0.8, 2.0])
+                        with r_ui[0]: st.markdown(f'<div class="proc-name">{proc}</div>', unsafe_allow_html=True)
+                        with r_ui[1]:
+                            if target_row is not None:
+                                staff_html = "".join([f'<span class="badge-staff">{target_row.get(f"人員{i}")}</span> ' for i in range(1,6) if target_row.get(f"人員{i}") not in ["NA", None]])
+                                st.markdown(f'<div style="display:flex; flex-wrap:wrap; gap:4px;">{staff_html if staff_html else "尚未派工"}</div>', unsafe_allow_html=True)
+                            else:
+                                st.markdown('<div style="color:#cbd5e1; font-weight:700; font-size:0.95rem;">尚未派工</div>', unsafe_allow_html=True)
+                        
+                        with r_ui[2]:
+                            if not is_done and st.button("✏️", key=f"eb_staff_{u_key}"):
+                                if m_w.empty:
+                                    init_data = {"製令": str(o_id), "製造工序": proc, "組長": st.session_state.user, "通電日期": p_date, "人員1": "NA", "人員2": "NA", "人員3": "NA", "人員4": "NA", "人員5": "NA"}
+                                    res = requests.post(f"{DB_URL}.json", data=json.dumps(init_data))
+                                    init_data["db_id"] = res.json().get("name")
+                                    edit_staff_dialog(o_id, proc, init_data)
                                 else:
-                                    st.markdown('<div style="color:#cbd5e1; font-weight:700; font-size:0.95rem;">尚未派工</div>', unsafe_allow_html=True)
-                            
-                            with r_ui[2]:
-                                if not is_done and st.button("✏️", key=f"eb_staff_{u_key}"):
-                                    if m_w.empty:
-                                        init_data = {"製令": str(o_id), "製造工序": proc, "組長": st.session_state.user, "通電日期": p_date, "人員1": "NA", "人員2": "NA", "人員3": "NA", "人員4": "NA", "人員5": "NA"}
-                                        res = requests.post(f"{DB_URL}.json", data=json.dumps(init_data))
-                                        init_data["db_id"] = res.json().get("name")
-                                        edit_staff_dialog(o_id, proc, init_data)
-                                    else:
-                                        edit_staff_dialog(o_id, proc, target_row.to_dict())
-                            
-                            with r_ui[3]:
-                                if is_done: 
-                                    st.markdown('<div class="status-done-box">✅ 已完工</div>', unsafe_allow_html=True)
-                                elif target_row is not None and any(target_row.get(f"人員{i}") != "NA" for i in range(1,6)):
-                                    if st.button("完工", key=f"db_{u_key}", type="primary", use_container_width=True):
-                                        dat = m_w.iloc[0].to_dict()
-                                        db_id = dat.pop('db_id')
-                                        dat["完工時間"] = get_now_str()
-                                        dat["完工人員"] = st.session_state.user
-                                        requests.post(f"{FINISH_URL}.json", data=json.dumps(dat))
-                                        requests.delete(f"{DB_URL}/{db_id}.json"); st.rerun()
-                                else: 
-                                    st.markdown('<div class="status-assign-box">⚠️ 請指派</div>', unsafe_allow_html=True)
-                            st.markdown('</div>', unsafe_allow_html=True)
+                                    edit_staff_dialog(o_id, proc, target_row.to_dict())
+                        
+                        with r_ui[3]:
+                            if is_done: 
+                                st.markdown('<div class="status-done-box">✅ 已完工</div>', unsafe_allow_html=True)
+                            elif target_row is not None and any(target_row.get(f"人員{i}") != "NA" for i in range(1,6)):
+                                if st.button("完工", key=f"db_{u_key}", type="primary", use_container_width=True):
+                                    dat = m_w.iloc[0].to_dict()
+                                    db_id = dat.pop('db_id')
+                                    dat["完工時間"] = get_now_str()
+                                    dat["完工人員"] = st.session_state.user
+                                    requests.post(f"{FINISH_URL}.json", data=json.dumps(dat))
+                                    requests.delete(f"{DB_URL}/{db_id}.json"); st.rerun()
+                            else: 
+                                st.markdown('<div class="status-assign-box">⚠️ 請指派</div>', unsafe_allow_html=True)
                         st.markdown('</div>', unsafe_allow_html=True)
-except Exception as e:
+                    st.markdown('</div>', unsafe_allow_html=True)
+ except Exception as e:
             st.error(f"系統偵測到錯誤：{str(e)}")
             st.warning("目前系統資料緩衝中，請稍後再試。")
             
