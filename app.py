@@ -698,71 +698,56 @@ else:
                 st.rerun()
 
 #============================================================================
-# --- 👤 個人戰力能力查詢 (除錯修復版) ---
+# --- 👤 個人戰力能力查詢 (修正版) ---
 with st.container(border=True):
     st.subheader("👤 個人戰力能力查詢")
 
-    # 1. 除錯用：顯示目前的路徑
-    # st.caption(f"路徑測試: {BASE_URL}/leader_members.json")
-
     try:
-        # 進行請求
-        response = requests.get(f"{BASE_URL}/leader_members.json")
-        
-        if response.status_code == 200:
-            res = response.json()
-            
-            # --- 解析邏輯 ---
-            all_staff = []
-            if isinstance(res, dict):
-                # 如果是字典，把所有 value 當作列表處理
-                for val in res.values():
-                    if isinstance(val, list): all_staff.extend(val)
-            elif isinstance(res, list):
-                all_staff = res
-            
-            all_staff = sorted(list(set(all_staff)))
-            
-            if not all_staff:
-                st.warning("⚠️ 名單讀取成功，但名單內容是空的。請檢查 Firebase 該路徑下的資料是否確實有存入。")
-                st.write("收到的原始資料內容：", res)
-            else:
-                # 正常運作：顯示下拉選單
-                selected_user = st.selectbox("選擇人員：", all_staff, key="rpg_query_debug")
-                
-                # --- 取得數值 ---
-                # 這裡假設您的資料庫節點 ID 與名字一致，若不一致請調整 name_to_id
-                rpg_res = requests.get(f"{DB_BASE_URL}/game_rpg_data/{selected_user}.json").json()
-                rpg_data = rpg_res if isinstance(rpg_res, dict) else {"str": 0, "vit": 0, "agi": 0, "cha": 0}
-                
-                # 計算數值
-                s = 10 + int(rpg_data.get('str', 0))
-                v = 10 + int(rpg_data.get('vit', 0))
-                a = 10 + int(rpg_data.get('agi', 0))
-                c = 10 + int(rpg_data.get('cha', 0))
-                
-                hp = 100 + (v * 2)
-                atk = 10 + (s // 2)
-                total = s + v + a + c
-                title = "👑 傳奇宗師" if total > 150 else ("⚔️ 執行者" if total > 100 else "🌱 新手村村民")
-                
-                # 介面顯示
-                st.markdown(f"**稱謂：** <span style='color:#fbbf24;'>{title}</span>", unsafe_allow_html=True)
-                st.markdown(f"**HP:** `{hp}` | **ATK:** `{atk}`")
-                
-                c1, c2, c3, c4 = st.columns(4)
-                c1.metric("力量", s)
-                c2.metric("體力", v)
-                c3.metric("敏捷", a)
-                c4.metric("智力", c)
-        
+        # 直接讀取 game_rpg_data 整個節點，抓出所有 ID
+        res = requests.get(f"{DB_BASE_URL}/game_rpg_data.json").json()
+
+        if not isinstance(res, dict):
+            st.warning("⚠️ 目前資料庫沒有資料，請確認 Firebase 路徑。")
         else:
-            st.error(f"⚠️ 連線錯誤 (Status: {response.status_code})。請確認 {BASE_URL}/leader_members.json 是否正確。")
-            with st.expander("查看錯誤詳情"):
-                st.write(response.text)
+            # 直接將資料庫裡的 ID (Key) 轉為名單
+            all_ids = sorted(list(res.keys()))
+
+            # 顯示下拉選單
+            selected_id = st.selectbox("請選擇 ID：", all_ids, key="rpg_query_fixed_v2")
+
+            # 根據選擇的 ID 抓取該人員的詳細數值
+            rpg_data = res.get(selected_id, {})
+
+            # 計算數值 (基礎 10 + 資料庫數值)
+            s = 10 + int(rpg_data.get('str', 0))
+            v = 10 + int(rpg_data.get('vit', 0))
+            a = 10 + int(rpg_data.get('agi', 0))
+            c = 10 + int(rpg_data.get('cha', 0))
+
+            # 計算 HP 與 ATK
+            hp = 100 + (v * 2)
+            atk = 10 + (s // 2)
+            total = s + v + a + c
+
+            # 稱謂判斷
+            if total > 150: title = "👑 傳奇宗師"
+            elif total > 100: title = "⚔️ 6S 執行者"
+            else: title = "🌱 新手村村民"
+
+            # 介面顯示
+            st.markdown(f"### {selected_id} (ID: {selected_id})")
+            st.markdown(f"**稱謂：** <span style='color:#fbbf24;'>{title}</span>", unsafe_allow_html=True)
+            st.markdown(f"**HP:** `{hp}`  |  **ATK:** `{atk}`")
+
+            # 四項數值顯示
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("力量", s)
+            c2.metric("體力", v)
+            c3.metric("敏捷", a)
+            c4.metric("智力", c)
 
     except Exception as e:
-        st.error(f"系統異常: {e}")
+        st.error(f"讀取異常，請稍後再試: {e}")
 #============================================================================
 
 
