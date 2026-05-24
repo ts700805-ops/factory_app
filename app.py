@@ -698,72 +698,65 @@ else:
                 st.rerun()
 
 #============================================================================
-import streamlit as st
-import requests
-
-# --- 👤 個人戰力能力查詢 (修正版) ---
-with st.container(border=True):
+# --- 👤 個人戰力能力查詢 (修正錯誤版) ---
+st.write("")
+with st.container(border=True): # 1. 設計外框
     st.subheader("👤 個人戰力能力查詢")
-
-    # 1. 人員與 ID 對照表 (這非常重要，請務必將所有成員補上)
-    # 格式為 "名字": "Firebase中的ID"
-    # 若該人員沒有 ID，則對應到 "111" 或您設定的預設值
+    
+    # 建立 ID 對照表 (請將您的名單 ID 對應正確，確保資料讀取正確)
     name_to_id = {
         "陳德文": "111",
         "444": "444",
-        "徐梓翔": "888",
-        # 請在此處繼續補上您的其他成員對應關係
+        "徐梓翔": "888"
     }
 
     try:
-        # 2. 讀取人員名單
-        response = requests.get(f"{BASE_URL}/leader_members.json")
-        if response.status_code == 200:
-            data = response.json()
-            # 展開所有成員到一個列表中
-            all_staff = []
-            for group in data.values():
-                if isinstance(group, list):
-                    all_staff.extend(group)
-            all_staff = sorted(list(set(all_staff)))
-        else:
-            all_staff = []
-            st.error("無法連線至人員資料庫")
+        # 強健型寫法：處理可能發生的格式錯誤
+        res = requests.get(f"{BASE_URL}/leader_members.json").json()
+        
+        # 解析名單：無論是字典還是列表，都轉換成名字列表
+        all_staff = []
+        if isinstance(res, dict):
+            for members in res.values():
+                if isinstance(members, list): all_staff.extend(members)
+        elif isinstance(res, list):
+            all_staff = res
+            
+        all_staff = sorted(list(set(all_staff)))
 
         if not all_staff:
-            st.warning("⚠️ 目前讀取不到名單，請確認 Firebase 設定是否正確。")
+            st.warning("⚠️ 目前讀取不到名單，請確認資料庫路徑。")
         else:
-            # 3. 下拉選單
-            selected_user = st.selectbox("請選擇人員姓名：", all_staff, key="rpg_inquiry_final")
+            # 5. 切換人物時數值會跟著變 (Streamlit 的自動特性)
+            selected_user = st.selectbox("請選擇人員：", all_staff, key="rpg_query_unique_key")
             
-            # 取得對應的 ID，如果不在對照表中，預設嘗試用名字抓取(或是給予錯誤提醒)
+            # 取得對應 ID
             user_id = name_to_id.get(selected_user, selected_user)
             
-            # 4. 讀取 RPG 資料
-            rpg_res = requests.get(f"{DB_BASE_URL}/game_rpg_data/{user_id}.json")
-            if rpg_res.status_code == 200 and rpg_res.json():
-                r_rpg = rpg_res.json()
-            else:
-                r_rpg = {"str": 0, "vit": 0, "agi": 0, "cha": 0}
-
-            # 5. 計算數值 (基礎 10 + 點數)
+            # 讀取 RPG 資料
+            r_rpg = requests.get(f"{DB_BASE_URL}/game_rpg_data/{user_id}.json").json()
+            # 若無資料則預設給 0
+            if not isinstance(r_rpg, dict): r_rpg = {"str": 0, "vit": 0, "agi": 0, "cha": 0}
+            
+            # 計算數值 (基礎 10 + 點數)
             s = 10 + int(r_rpg.get('str', 0))
             v = 10 + int(r_rpg.get('vit', 0))
             a = 10 + int(r_rpg.get('agi', 0))
             c = 10 + int(r_rpg.get('cha', 0))
             
+            # 3. 計算 HP 與 ATK
             hp = 100 + (v * 2)
             atk = 10 + (s // 2)
-            total = s + v + a + c
             
-            # 稱謂
-            if total > 150: title = "傳奇宗師"
-            elif total > 100: title = "6S 執行者"
-            else: title = "新手村村民"
-
-            # 6. 介面呈現
-            st.markdown(f"**稱謂：** <span style='color: #fbbf24; font-size: 1.2em;'>{title}</span>", unsafe_allow_html=True)
-            st.markdown(f"**HP:** `{hp}` | **ATK:** `{atk}`")
+            # 2. 稱謂判斷
+            total = s + v + a + c
+            if total > 150: title = "👑 傳奇宗師"
+            elif total > 100: title = "⚔️ 6S 執行者"
+            else: title = "🌱 新手村村民"
+            
+            # 呈現介面 (包含 2. 稱謂, 3. HP/ATK, 4. 4個數值)
+            st.markdown(f"### 稱謂：{title}")
+            st.markdown(f"**HP:** `{hp}`  |  **ATK:** `{atk}`")
             
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("力量", s)
@@ -772,7 +765,7 @@ with st.container(border=True):
             c4.metric("智力", c)
             
     except Exception as e:
-        st.error(f"系統發生錯誤: {e}")
+        st.error(f"系統錯誤，請確認網路連線或資料庫設定。")
  
 #============================================================================
 
