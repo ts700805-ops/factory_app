@@ -958,11 +958,11 @@ else:
         except:
             pass
 
-        st.markdown(f'<p style="font-size:1.2rem; font-weight:bold; color:#1e3a8a;">👥 正在檢視：【{selected_leader} 組長】的組員技能考核狀態 (每格刻度 20%)：</p>', unsafe_allow_html=True)
+        st.markdown(f'<p style="font-size:1.2rem; font-weight:bold; color:#1e3a8a;">👥 正在檢視：【{selected_leader} 組長】的組員技能考核狀態 (每格刻度 10%)：</p>', unsafe_allow_html=True)
         st.divider()
 
         # 固定 0% 到 100% 的選單選項
-        options_10 = [f"{x}%" for x in range(0, 101, 20)]
+        options_10 = [f"{x}%" for x in range(0, 101, 10)]
 
         # 4. 一個畫面左右與上下並列顯示（2列 × 4欄 = 8個人）
         if display_list:
