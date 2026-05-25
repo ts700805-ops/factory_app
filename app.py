@@ -958,7 +958,7 @@ else:
         except:
             pass
 
-        st.markdown(f'<p style="font-size:1.2rem; font-weight:bold; color:#1e3a8a;">👥 正在檢視：【{selected_leader} 組長】的組員技能考核狀態 (每格刻度 ˇ0%)：</p>', unsafe_allow_html=True)
+        st.markdown(f'<p style="font-size:1.2rem; font-weight:bold; color:#1e3a8a;">👥 正在檢視：【{selected_leader} 組長】的組員技能考核狀態 (每格刻度 20%)：</p>', unsafe_allow_html=True)
         st.divider()
 
         # 固定 0% 到 100% 的選單選項
