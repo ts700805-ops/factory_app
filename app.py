@@ -962,7 +962,7 @@ else:
         st.divider()
 
         # 固定 0% 到 100% 的選單選項
-        options_10 = [f"{x}%" for x in range(0, 101, 10)]
+        options_10 = [f"{x}%" for x in range(0, 101, 20)]
 
         # 4. 一個畫面左右與上下並列顯示（2列 × 4欄 = 8個人）
         if display_list:
