@@ -707,55 +707,52 @@ else:
                 st.rerun()
       
 
-# --- 👤 6S 個人能力查詢 (同步組長與組員版) ---
+# --- 👤 6S 個人能力查詢 (同步顯示完整屬性) ---
 st.subheader("👤 個人能力查詢")
 
-# 1. 取得所有必要資料
 try:
-    # 讀取 Firebase 資料
-    data_res = requests.get(f"{DB_URL}/game_rpg_data.json", timeout=10).json() or {}
-    members_res = requests.get(f"{DB_URL}/leader_members.json", timeout=10).json() or ""
+    # 讀取必要資料
+    rpg_data = requests.get(f"{DB_URL}/game_rpg_data.json", timeout=10).json() or {}
+    members_raw = requests.get(f"{DB_URL}/leader_members.json", timeout=10).json() or ""
     
-    # 2. 處理組長與組員結構
-    # 將字串格式轉換為字典 {組長: [組員1, 組員2]}
+    # 處理組長組員名單結構
     leader_dict = {}
-    if isinstance(members_res, str):
-        for line in members_res.splitlines():
+    if isinstance(members_raw, str):
+        for line in members_raw.splitlines():
             if ":" in line:
                 leader, members = line.split(":", 1)
                 leader_dict[leader.strip()] = [m.strip() for m in members.split(",") if m.strip()]
 
-    # 3. 介面選擇
-    # 組長選單
+    # 選擇組長
     leaders = sorted(list(leader_dict.keys()))
     if not leaders:
-        st.warning("⚠️ 系統尚未設定組長名單。")
+        st.warning("⚠️ 目前無組長名單。")
     else:
-        selected_leader = st.selectbox("請選擇組長:", leaders, key="select_leader_sync")
+        selected_leader = st.selectbox("請選擇組長:", leaders, key="sel_leader")
         
-        # 根據組長篩選組員
+        # 選擇組員
         group_members = leader_dict.get(selected_leader, [])
         if not group_members:
-            st.info(f"💡 目前 {selected_leader} 組別無組員名單。")
+            st.info(f"💡 {selected_leader} 組別目前無組員。")
         else:
-            # 組員選單
-            selected_member = st.selectbox(f"請選擇 {selected_leader} 組的組員:", group_members, key="select_member_sync")
+            selected_member = st.selectbox(f"請選擇 {selected_leader} 組的組員:", group_members, key="sel_member")
             
-            # 4. 顯示該組員能力 (只有選定後才嘗試讀取)
-            if selected_member in data_res:
-                stats = data_res[selected_member]
-                st.markdown(f"### 🛡️ 【{selected_member}】 能力值")
-                c1, c2, c3, c4 = st.columns(4)
-                c1.metric("力量", stats.get('str', 0))
-                c2.metric("體力", stats.get('vit', 0))
-                c3.metric("敏捷", stats.get('agi', 0))
-                c4.metric("魅力", stats.get('cha', 0))
+            # 顯示能力值
+            if selected_member in rpg_data:
+                stats = rpg_data[selected_member]
+                st.markdown(f"### 🛡️ 【{selected_member}】 能力素質")
+                
+                # 並列顯示四項能力
+                cols = st.columns(4)
+                cols[0].metric("💪 力量 (ATK)", stats.get('str', 0))
+                cols[1].metric("🔋 體力 (HP)", stats.get('vit', 0))
+                cols[2].metric("⚡ 敏捷 (閃避)", stats.get('agi', 0))
+                cols[3].metric("✨ 魅力 (加成)", stats.get('cha', 0))
             else:
-                st.info(f"ℹ️ {selected_member} 尚未有戰境養成資料。")
+                st.info(f"ℹ️ {selected_member} 尚未有養成資料。")
 
 except Exception as e:
-    st.error(f"⚠️ 資料讀取異常: 請檢查網路連線或系統設定。")
-
+    st.error("⚠️ 資料讀取異常，請稍後再試。")
     
 
 
