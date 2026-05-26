@@ -229,6 +229,214 @@ else:
         st.rerun()
 
 
+    # --- 📈💡2o26上半年技能考核進度 ---
+    elif st.session_state.menu_selection == "💡2o26上半年技能考核進度":
+        st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">💡2o26上半年技能考核進度</h1>', unsafe_allow_html=True)
+        
+        # 1. 取得當前登入的組長名字
+        logged_in_user = st.session_state.user 
+        
+        # 2. 先從資料庫抓取全體組長清單，做為切換選單的選項
+        leader_options = []
+        try:
+            map_res = requests.get(f"{DB_BASE_URL}/settings/staff_map.json")
+            if map_res.status_code == 200:
+                staff_data = map_res.json() or {}
+                # 抓出所有的組長鍵值 (Key)
+                leader_options = sorted([str(k).strip() for k in staff_data.keys() if k])
+        except Exception as e:
+            st.error(f"無法讀取組長清單: {e}")
+            
+        # 防呆：如果資料庫撈不到，至少包含當前登入者
+        if not leader_options:
+            leader_options = [str(logged_in_user).strip()]
+        elif str(logged_in_user).strip() not in leader_options:
+            leader_options.insert(0, str(logged_in_user).strip())
+
+        # --- 👑 【新增功能：切換組長選單】 ---
+        try:
+            default_leader_idx = leader_options.index(str(logged_in_user).strip())
+        except:
+            default_leader_idx = 0
+
+        selected_leader = st.selectbox(
+            "👑 請選擇要檢視/評核的組長：",
+            options=leader_options,
+            index=default_leader_idx,
+            key="global_leader_selector"
+        )
+
+        # 3. 根據選定的組長，嚴格清洗並抓取該組長的組員名單
+        display_list = []
+        try:
+            if map_res.status_code == 200:
+                raw_team_data = staff_data.get(selected_leader, [])
+                
+                if isinstance(raw_team_data, list):
+                    for item in raw_team_data:
+                        item_str = str(item).strip()
+                        if "," in item_str:
+                            display_list.extend([x.strip() for x in item_str.split(",") if x.strip()])
+                        else:
+                            if item_str: display_list.append(item_str)
+                elif isinstance(raw_team_data, str):
+                    display_list = [x.strip() for x in raw_team_data.split(",") if x.strip()]
+                
+            if not display_list:
+                display_list = [str(selected_leader).strip()]
+        except:
+            display_list = [str(selected_leader).strip()]
+
+        # 去除重複的人員名稱
+        display_list = sorted(list(set(display_list)))
+
+        # --- 🌐 核心讀取：從 Firebase 讀取目前全體員工的最新考核分數 (讓資料永久存在) ---
+        db_saved_scores = {}
+        try:
+            latest_eval_res = requests.get(f"{DB_BASE_URL}/skills_current_status.json")
+            if latest_eval_res.status_code == 200:
+                db_saved_scores = latest_eval_res.json() or {}
+        except:
+            pass
+
+        st.markdown(f'<p style="font-size:1.2rem; font-weight:bold; color:#1e3a8a;">👥 正在檢視：【{selected_leader} 組長】的組員技能考核狀態 (每格刻度 20%)：</p>', unsafe_allow_html=True)
+        st.divider()
+
+        # 固定 0% 到 100% 的選單選項
+        options_10 = [f"{x}%" for x in range(0, 101, 20)]
+
+        # 4. 一個畫面左右與上下並列顯示（2列 × 4欄 = 8個人）
+        if display_list:
+            # 每 4 個人切換成一橫列
+            for i in range(0, len(display_list), 4):
+                chunk = display_list[i:i+4]
+                cols = st.columns(4)  # 建立左右 4 個欄位
+                
+                for idx, member in enumerate(chunk):
+                    m_name = str(member).strip()
+                    if not m_name: continue
+                    
+                    # 優先從資料庫歷史紀錄讀取百分比，如果資料庫沒紀錄，預設才顯示 50%
+                    member_score_in_db = db_saved_scores.get(m_name, {}).get("技能考核完成度", 0)
+                    default_str = f"{member_score_in_db}%"
+                    
+                    # 確保數值在選單內，防呆機制
+                    if default_str not in options_10:
+                        default_str = "50%"
+                    current_index = options_10.index(default_str)
+                    
+                    with cols[idx]:
+                        # 精美黑框卡片外觀
+                        st.markdown(f'<div style="background:#1e3a8a; color:white; padding:8px 10px; border-radius:10px 10px 0 0; font-weight:bold; font-size:1.1rem; text-align:center;">👤 {m_name}</div>', unsafe_allow_html=True)
+                        
+                        with st.container(border=True):
+                            # 下拉式選單
+                            selected_str = st.selectbox(
+                                "技能考核進度",
+                                options=options_10,
+                                index=current_index,
+                                key="pct_select_" + m_name,
+                                label_visibility="collapsed"
+                            )
+                            
+                            # 轉回純數字供圖表使用
+                            pct_val = int(selected_str.replace("%", ""))
+                            
+                            # 【核心聯動】如果使用者調整了選單數值，立刻自動同步寫入 Firebase 更新，達到永久保存
+                            if pct_val != member_score_in_db:
+                                sync_url = f"{DB_BASE_URL}/skills_current_status/{m_name}.json"
+                                sync_data = {
+                                    "技能考核完成度": pct_val,
+                                    "更新時間": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                }
+                                requests.put(sync_url, data=json.dumps(sync_data))
+                                st.rerun()
+                            
+                            # 根據百分比動態決定彩色圓形的顏色 (低於40紅, 40-70橘, 80以上綠)
+                            if pct_val <= 30:
+                                circle_color = "#ef4444"  # 紅色
+                            elif pct_val <= 70:
+                                circle_color = "#f97316"  # 橘色
+                            else:
+                                circle_color = "#22c55e"  # 綠色
+                                
+                            # 用 HTML/CSS 畫出彩色的圓形百分比圖表
+                            st.components.v1.html(f"""
+                                <div style="display: flex; justify-content: center; align-items: center; height: 110px; font-family: sans-serif;">
+                                    <div style="position: relative; width: 90px; height: 90px; border-radius: 50%; background: conic-gradient({circle_color} {pct_val * 3.6}deg, #e2e8f0 0deg); display: flex; justify-content: center; align-items: center;">
+                                        <div style="position: absolute; width: 72px; height: 72px; border-radius: 50%; background: white; display: flex; justify-content: center; align-items: center; flex-direction: column;">
+                                            <span style="font-size: 1.4rem; font-weight: 900; color: #1e3a8a;">{pct_val}%</span>
+                                            <span style="font-size: 0.65rem; color: #64748b; font-weight: bold; margin-top: 2px;">技能考核</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            """, height=110)
+                            
+                            # 獨立的儲存核准歷史按鈕 (按下即發送一筆正式報表到歷史資料庫)
+                            if st.button("💾 儲存歷史", key="save_btn_" + m_name, use_container_width=True, type="primary"):
+                                eval_db_url = f"{DB_BASE_URL}/skills_evaluations"
+                                new_eval = {
+                                    "人員": m_name,
+                                    "技能考核完成度": pct_val,
+                                    "評核月份": datetime.datetime.now().strftime("%Y-%m"),
+                                    "評核時間": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                }
+                                try:
+                                    res = requests.post(f"{eval_db_url}.json", data=json.dumps(new_eval))
+                                    if res.status_code == 200:
+                                        st.success(f"{m_name} 已存檔!")
+                                    else:
+                                        st.error("錯誤")
+                                except Exception as save_err:
+                                    st.error(f"出錯: {save_err}")
+                
+                st.markdown('<div style="margin-bottom:15px;"></div>', unsafe_allow_html=True)
+        else:
+            st.info("💡 目前此組別無成員資料。")
+
+# --- 📜 完工紀錄查詢 (原功能完全保留，一律不修改) ---
+    elif st.session_state.menu_selection == "📜 完工紀錄查詢":
+        st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📜 歷史完工紀錄</h1>', unsafe_allow_html=True)
+        
+        all_logs = requests.get(f"{FINISH_URL}.json").json()
+        if all_logs:
+            df = pd.DataFrame([dict(v, db_id=k) for k, v in all_logs.items()])
+            search_q = st.text_input("🔍 搜尋紀錄")
+            if search_q: 
+                df = df[df.astype(str).apply(lambda x: x.str.contains(search_q, case=False)).any(axis=1)]
+            
+            if not df.empty:
+                for o_id, group in df.groupby("製令"):
+                    display_df = group.copy()
+                    
+                    # 1. 計算每筆工時(分)與總工時(分鐘數相加)
+                    total_all_minutes = 0.0
+                    if '秒數' in display_df.columns:
+                        display_df['工時(分)'] = (display_df['秒數'] / 60).round(2)
+                        total_all_minutes = round(display_df['工時(分)'].sum(), 2) 
+                        
+                        # 2. 逆推開始時間
+                        try:
+                            temp_finish = pd.to_datetime(display_df['完工時間'])
+                            display_df['開始時間'] = (temp_finish - pd.to_timedelta(display_df['秒數'], unit='s')).dt.strftime('%Y-%m-%d %H:%M:%S')
+                        except:
+                            display_df['開始時間'] = "計算失敗"
+
+                    # 3. 在標題顯示
+                    with st.expander(f"📦 製令：{o_id} ({len(group)} 項 | 總工時：{total_all_minutes} 分鐘)"):
+                        
+                        # 設定表格順序
+                        cols = ["工序", "開始時間", "完工時間", "工時(分)"]
+                        existing_cols = [c for c in cols if c in display_df.columns]
+                        
+                        st.table(display_df[existing_cols])
+                        
+                        if st.button(f"🗑️ 刪除紀錄", key=f"del_{o_id}"):
+                            for d_id in group['db_id']: requests.delete(f"{FINISH_URL}/{d_id}.json")
+                            st.rerun()
+            else: st.warning("查無紀錄。")
+        else: st.info("💡 目前尚無紀錄。")
+
 
 
 
@@ -874,213 +1082,6 @@ except Exception as e:
 
     
             
-# --- 📈💡2o26上半年技能考核進度 ---
-    elif st.session_state.menu_selection == "💡2o26上半年技能考核進度":
-        st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">💡2o26上半年技能考核進度</h1>', unsafe_allow_html=True)
-        
-        # 1. 取得當前登入的組長名字
-        logged_in_user = st.session_state.user 
-        
-        # 2. 先從資料庫抓取全體組長清單，做為切換選單的選項
-        leader_options = []
-        try:
-            map_res = requests.get(f"{DB_BASE_URL}/settings/staff_map.json")
-            if map_res.status_code == 200:
-                staff_data = map_res.json() or {}
-                # 抓出所有的組長鍵值 (Key)
-                leader_options = sorted([str(k).strip() for k in staff_data.keys() if k])
-        except Exception as e:
-            st.error(f"無法讀取組長清單: {e}")
-            
-        # 防呆：如果資料庫撈不到，至少包含當前登入者
-        if not leader_options:
-            leader_options = [str(logged_in_user).strip()]
-        elif str(logged_in_user).strip() not in leader_options:
-            leader_options.insert(0, str(logged_in_user).strip())
-
-        # --- 👑 【新增功能：切換組長選單】 ---
-        try:
-            default_leader_idx = leader_options.index(str(logged_in_user).strip())
-        except:
-            default_leader_idx = 0
-
-        selected_leader = st.selectbox(
-            "👑 請選擇要檢視/評核的組長：",
-            options=leader_options,
-            index=default_leader_idx,
-            key="global_leader_selector"
-        )
-
-        # 3. 根據選定的組長，嚴格清洗並抓取該組長的組員名單
-        display_list = []
-        try:
-            if map_res.status_code == 200:
-                raw_team_data = staff_data.get(selected_leader, [])
-                
-                if isinstance(raw_team_data, list):
-                    for item in raw_team_data:
-                        item_str = str(item).strip()
-                        if "," in item_str:
-                            display_list.extend([x.strip() for x in item_str.split(",") if x.strip()])
-                        else:
-                            if item_str: display_list.append(item_str)
-                elif isinstance(raw_team_data, str):
-                    display_list = [x.strip() for x in raw_team_data.split(",") if x.strip()]
-                
-            if not display_list:
-                display_list = [str(selected_leader).strip()]
-        except:
-            display_list = [str(selected_leader).strip()]
-
-        # 去除重複的人員名稱
-        display_list = sorted(list(set(display_list)))
-
-        # --- 🌐 核心讀取：從 Firebase 讀取目前全體員工的最新考核分數 (讓資料永久存在) ---
-        db_saved_scores = {}
-        try:
-            latest_eval_res = requests.get(f"{DB_BASE_URL}/skills_current_status.json")
-            if latest_eval_res.status_code == 200:
-                db_saved_scores = latest_eval_res.json() or {}
-        except:
-            pass
-
-        st.markdown(f'<p style="font-size:1.2rem; font-weight:bold; color:#1e3a8a;">👥 正在檢視：【{selected_leader} 組長】的組員技能考核狀態 (每格刻度 20%)：</p>', unsafe_allow_html=True)
-        st.divider()
-
-        # 固定 0% 到 100% 的選單選項
-        options_10 = [f"{x}%" for x in range(0, 101, 20)]
-
-        # 4. 一個畫面左右與上下並列顯示（2列 × 4欄 = 8個人）
-        if display_list:
-            # 每 4 個人切換成一橫列
-            for i in range(0, len(display_list), 4):
-                chunk = display_list[i:i+4]
-                cols = st.columns(4)  # 建立左右 4 個欄位
-                
-                for idx, member in enumerate(chunk):
-                    m_name = str(member).strip()
-                    if not m_name: continue
-                    
-                    # 優先從資料庫歷史紀錄讀取百分比，如果資料庫沒紀錄，預設才顯示 50%
-                    member_score_in_db = db_saved_scores.get(m_name, {}).get("技能考核完成度", 0)
-                    default_str = f"{member_score_in_db}%"
-                    
-                    # 確保數值在選單內，防呆機制
-                    if default_str not in options_10:
-                        default_str = "50%"
-                    current_index = options_10.index(default_str)
-                    
-                    with cols[idx]:
-                        # 精美黑框卡片外觀
-                        st.markdown(f'<div style="background:#1e3a8a; color:white; padding:8px 10px; border-radius:10px 10px 0 0; font-weight:bold; font-size:1.1rem; text-align:center;">👤 {m_name}</div>', unsafe_allow_html=True)
-                        
-                        with st.container(border=True):
-                            # 下拉式選單
-                            selected_str = st.selectbox(
-                                "技能考核進度",
-                                options=options_10,
-                                index=current_index,
-                                key="pct_select_" + m_name,
-                                label_visibility="collapsed"
-                            )
-                            
-                            # 轉回純數字供圖表使用
-                            pct_val = int(selected_str.replace("%", ""))
-                            
-                            # 【核心聯動】如果使用者調整了選單數值，立刻自動同步寫入 Firebase 更新，達到永久保存
-                            if pct_val != member_score_in_db:
-                                sync_url = f"{DB_BASE_URL}/skills_current_status/{m_name}.json"
-                                sync_data = {
-                                    "技能考核完成度": pct_val,
-                                    "更新時間": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                                }
-                                requests.put(sync_url, data=json.dumps(sync_data))
-                                st.rerun()
-                            
-                            # 根據百分比動態決定彩色圓形的顏色 (低於40紅, 40-70橘, 80以上綠)
-                            if pct_val <= 30:
-                                circle_color = "#ef4444"  # 紅色
-                            elif pct_val <= 70:
-                                circle_color = "#f97316"  # 橘色
-                            else:
-                                circle_color = "#22c55e"  # 綠色
-                                
-                            # 用 HTML/CSS 畫出彩色的圓形百分比圖表
-                            st.components.v1.html(f"""
-                                <div style="display: flex; justify-content: center; align-items: center; height: 110px; font-family: sans-serif;">
-                                    <div style="position: relative; width: 90px; height: 90px; border-radius: 50%; background: conic-gradient({circle_color} {pct_val * 3.6}deg, #e2e8f0 0deg); display: flex; justify-content: center; align-items: center;">
-                                        <div style="position: absolute; width: 72px; height: 72px; border-radius: 50%; background: white; display: flex; justify-content: center; align-items: center; flex-direction: column;">
-                                            <span style="font-size: 1.4rem; font-weight: 900; color: #1e3a8a;">{pct_val}%</span>
-                                            <span style="font-size: 0.65rem; color: #64748b; font-weight: bold; margin-top: 2px;">技能考核</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            """, height=110)
-                            
-                            # 獨立的儲存核准歷史按鈕 (按下即發送一筆正式報表到歷史資料庫)
-                            if st.button("💾 儲存歷史", key="save_btn_" + m_name, use_container_width=True, type="primary"):
-                                eval_db_url = f"{DB_BASE_URL}/skills_evaluations"
-                                new_eval = {
-                                    "人員": m_name,
-                                    "技能考核完成度": pct_val,
-                                    "評核月份": datetime.datetime.now().strftime("%Y-%m"),
-                                    "評核時間": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                                }
-                                try:
-                                    res = requests.post(f"{eval_db_url}.json", data=json.dumps(new_eval))
-                                    if res.status_code == 200:
-                                        st.success(f"{m_name} 已存檔!")
-                                    else:
-                                        st.error("錯誤")
-                                except Exception as save_err:
-                                    st.error(f"出錯: {save_err}")
-                
-                st.markdown('<div style="margin-bottom:15px;"></div>', unsafe_allow_html=True)
-        else:
-            st.info("💡 目前此組別無成員資料。")
-
-# --- 📜 完工紀錄查詢 (原功能完全保留，一律不修改) ---
-    elif st.session_state.menu_selection == "📜 完工紀錄查詢":
-        st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📜 歷史完工紀錄</h1>', unsafe_allow_html=True)
-        
-        all_logs = requests.get(f"{FINISH_URL}.json").json()
-        if all_logs:
-            df = pd.DataFrame([dict(v, db_id=k) for k, v in all_logs.items()])
-            search_q = st.text_input("🔍 搜尋紀錄")
-            if search_q: 
-                df = df[df.astype(str).apply(lambda x: x.str.contains(search_q, case=False)).any(axis=1)]
-            
-            if not df.empty:
-                for o_id, group in df.groupby("製令"):
-                    display_df = group.copy()
-                    
-                    # 1. 計算每筆工時(分)與總工時(分鐘數相加)
-                    total_all_minutes = 0.0
-                    if '秒數' in display_df.columns:
-                        display_df['工時(分)'] = (display_df['秒數'] / 60).round(2)
-                        total_all_minutes = round(display_df['工時(分)'].sum(), 2) 
-                        
-                        # 2. 逆推開始時間
-                        try:
-                            temp_finish = pd.to_datetime(display_df['完工時間'])
-                            display_df['開始時間'] = (temp_finish - pd.to_timedelta(display_df['秒數'], unit='s')).dt.strftime('%Y-%m-%d %H:%M:%S')
-                        except:
-                            display_df['開始時間'] = "計算失敗"
-
-                    # 3. 在標題顯示
-                    with st.expander(f"📦 製令：{o_id} ({len(group)} 項 | 總工時：{total_all_minutes} 分鐘)"):
-                        
-                        # 設定表格順序
-                        cols = ["工序", "開始時間", "完工時間", "工時(分)"]
-                        existing_cols = [c for c in cols if c in display_df.columns]
-                        
-                        st.table(display_df[existing_cols])
-                        
-                        if st.button(f"🗑️ 刪除紀錄", key=f"del_{o_id}"):
-                            for d_id in group['db_id']: requests.delete(f"{FINISH_URL}/{d_id}.json")
-                            st.rerun()
-            else: st.warning("查無紀錄。")
-        else: st.info("💡 目前尚無紀錄。")
 
 
             
