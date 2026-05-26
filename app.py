@@ -597,8 +597,7 @@ def main():
     # ==========================================
     # 🎮 6S 戰境養成功能區塊
     # ==========================================
-    elif menu_selection == "🎮6S戰境養成":
-    st.title("🎮 6S 戰境養成系統")
+  if st.session_state.get("menu_selection") and "6S戰境養成" in str(st.session_state.menu_selection):
         import random
         import time
         import json 
