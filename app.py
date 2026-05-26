@@ -707,7 +707,7 @@ else:
                 st.rerun()
       
 
-# --- 👤 6S 個人能力查詢 (同步顯示完整屬性) ---
+# --- 👤 6S 個人能力查詢 (帶加成數值顯示) ---
 st.subheader("👤 個人能力查詢")
 
 try:
@@ -728,32 +728,36 @@ try:
     if not leaders:
         st.warning("⚠️ 目前無組長名單。")
     else:
-        selected_leader = st.selectbox("請選擇組長:", leaders, key="sel_leader")
+        selected_leader = st.selectbox("請選擇組長:", leaders, key="sel_leader_v3")
         
         # 選擇組員
         group_members = leader_dict.get(selected_leader, [])
         if not group_members:
             st.info(f"💡 {selected_leader} 組別目前無組員。")
         else:
-            selected_member = st.selectbox(f"請選擇 {selected_leader} 組的組員:", group_members, key="sel_member")
+            selected_member = st.selectbox(f"請選擇 {selected_leader} 組的組員:", group_members, key="sel_member_v3")
             
-            # 顯示能力值
+            # 顯示能力值與對應加成
             if selected_member in rpg_data:
                 stats = rpg_data[selected_member]
+                s = int(stats.get('str', 0))
+                v = int(stats.get('vit', 0))
+                a = int(stats.get('agi', 0))
+                c = int(stats.get('cha', 0))
+                
                 st.markdown(f"### 🛡️ 【{selected_member}】 能力素質")
                 
-                # 並列顯示四項能力
+                # 並列顯示四項能力與加成
                 cols = st.columns(4)
-                cols[0].metric("💪 力量 (ATK)", stats.get('str', 0))
-                cols[1].metric("🔋 體力 (HP)", stats.get('vit', 0))
-                cols[2].metric("⚡ 敏捷 (閃避)", stats.get('agi', 0))
-                cols[3].metric("✨ 魅力 (加成)", stats.get('cha', 0))
+                cols[0].metric("💪 力量 (ATK)", s, f"+{s * 2} 攻擊力")
+                cols[1].metric("🔋 體力 (HP)", v, f"+{v * 30} 生命值")
+                cols[2].metric("⚡ 敏捷 (避)", a, f"+{a * 2}% 閃避")
+                cols[3].metric("✨ 魅力 (加)", c, f"+{c * 5}% 加成")
             else:
                 st.info(f"ℹ️ {selected_member} 尚未有養成資料。")
 
 except Exception as e:
     st.error("⚠️ 資料讀取異常，請稍後再試。")
-    
 
 
 
