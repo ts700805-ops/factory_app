@@ -394,7 +394,7 @@ else:
         else:
             st.info("💡 目前此組別無成員資料。")
 
-# --- 📜 完工紀錄查詢 (原功能完全保留，一律不修改) ---
+   # --- 📜 完工紀錄查詢 (原功能完全保留，一律不修改) ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📜 歷史完工紀錄</h1>', unsafe_allow_html=True)
         
@@ -597,7 +597,8 @@ def main():
     # ==========================================
     # 🎮 6S 戰境養成功能區塊
     # ==========================================
-    if st.session_state.get("menu_selection") and "6S戰境養成" in str(st.session_state.menu_selection):
+    elif menu_selection == "🎮6S戰境養成":
+    st.title("🎮 6S 戰境養成系統")
         import random
         import time
         import json 
