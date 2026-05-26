@@ -388,83 +388,13 @@ else:
                     st.session_state.menu_selection = "🎮6S戰境養成"
                     st.rerun()
 
-        
-        # ==========================================
-        # ⚙️ 後台管理專區：維護組員名單 (紅框處功能)
-        # ==========================================
-        st.write("")
-        with st.expander("⚙️ 管理員專區：維護組員名單"):
-            st.markdown("##### 📝 編輯對照表")
-            st.caption("格式範例：組長名:成員1,成員2,成員3 (每行一位組長)")
-            
-            # 將目前的對照表轉換為文字顯示在輸入框中
-            current_mapping_text = ""
-            for l, m in leader_member_mapping.items():
-                current_mapping_text += f"{l}:{','.join(m)}\n"
-            
-            new_mapping_raw = st.text_area("人員配置資料：", value=current_mapping_text, height=250, key="6s_staff_edit_area")
-            
-            if st.button("💾 儲存並同步名單至雲端", use_container_width=True, key="6s_save_staff_btn"):
-                if new_mapping_raw:
-                    try:
-                        save_res = requests.put(f"{BASE_URL}/leader_members.json", data=json.dumps(new_mapping_raw.strip()))
-                        if save_res.status_code == 200:
-                            st.success("✅ 名單儲存成功！下拉選單已同步更新。")
-                            time.sleep(1)
-                            st.rerun()
-                        else:
-                            st.error("❌ 儲存失敗，請檢查網路。")
-                    except Exception as e:
-                        st.error(f"❌ 錯誤：{e}")
-
-
-
- # ==========================================
-        # ==========================================
-            # --- 點選組長查看該組員未回報清單 ---
-            st.markdown("---")
-            st.markdown("##### 🔍 點選組長查看組員回報狀況")
-            
-            # 1. 取得所有組長清單
-            all_leaders_list = list(leader_member_mapping.keys())
-            selected_leader = st.selectbox("請選擇組長：", all_leaders_list, key="6s_leader_select")
-            
-            # 2. 獲取該組長名下的組員
-            target_members = leader_member_mapping.get(selected_leader, [])
-            
-            # 3. 取得今日日期
-            import datetime
-            now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
-            today_str = now.strftime("%Y-%m-%d")
-            
-            try:
-                # 4. 抓取 6S 紀錄
-                r_6s = requests.get(f"{DB_BASE_URL}/6s_logs.json").json()
-                r_6s = r_6s if isinstance(r_6s, dict) else {}
-                
-                # 找出今天已回報的人
-                reported_staff = [v.get("姓名") for v in r_6s.values() if isinstance(v, dict) and v.get("日期") == today_str]
-                
-                # 5. 計算該組長名下未回報的人
-                not_reported = [name for name in target_members if name not in reported_staff]
-                
-                # 顯示結果
-                st.write(f"**{selected_leader} 組的狀況：**")
-                if not not_reported:
-                    st.success(f"✅ {selected_leader} 組的所有組員 ({len(target_members)} 人) 皆已完成回報！")
-                else:
-                    st.warning(f"以下 {len(not_reported)} 位成員尚未回報：")
-                    st.write(", ".join(not_reported))
-            except:
-                st.info("ℹ️ 目前暫無 6S 回報資料。")
-# ==========================================
+    # ==========================================
     # 🎮 6S 戰境養成功能區塊
     # ==========================================
-  # 更改為獨立 if 判定，徹底解決 elif 造成的 SyntaxError 語法錯誤
     if st.session_state.get("menu_selection") and "6S戰境養成" in str(st.session_state.menu_selection):
         import random
         import time
-        import json # 確保有載入 json 模組
+        import json 
 
         st.markdown(
             '''
@@ -555,7 +485,6 @@ else:
             )
 
         st.divider()
-
        # ==========================================
         # ⚔️ 尋找現場同仁發起決鬥系統
         # ==========================================
