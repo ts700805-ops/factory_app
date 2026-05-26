@@ -439,13 +439,11 @@ else:
 
 
 
-
-
-
-    # ==========================================
-    # 📝 頁面一：每日 6S 任務回報中心 (後台優先同步版)
-    # ==========================================
-    elif st.session_state.menu_selection == "📝每日6S任務回報":
+# --- 2. 主程式與頁面控制 ---
+def main():
+    # 初始化 session_state
+    if "menu_selection" not in st.session_state:
+        st.session_state.menu_selection = "📝每日6S任務回報"
         import requests
         import json
         from datetime import datetime, timedelta, timezone
