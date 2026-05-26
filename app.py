@@ -1,3 +1,172 @@
+import streamlit as st
+import pandas as pd
+import datetime
+import requests
+import json
+import time
+
+# --- 1. 資料庫路徑設定 ---
+DB_BASE_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
+DB_URL = f"{DB_BASE_URL}/work_logs"
+FINISH_URL = f"{DB_BASE_URL}/completed_logs"
+SETTING_URL = f"{DB_BASE_URL}/settings"
+# 新增手工具相關路徑
+TOOL_LIST_URL = f"{DB_BASE_URL}/tool_settings"     # 儲存手工具下拉選單內容
+USER_TOOLS_URL = f"{DB_BASE_URL}/user_tool_logs"  # 儲存人員手工具紀錄表
+
+def get_now_str():
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
+    return now.strftime("%Y-%m-%d %H:%M:%S")
+
+def get_settings():
+    default_settings = {
+        "all_leaders": ["陳德文", "劉志偉", "吳政昌", "蘇萬紘"],
+        "all_staff": ["徐梓翔", "陳德文", "胡瑄芸", "蕭詩瓊"], 
+        "processes": ["骨架作業", "前置作業", "配電作業", "模組作業", "水平調整", "通電作業", "IPQC表單查檢", "S.T作業", "收機清潔", "包機作業", "PACKING", "前置作業(門板組立)"],
+        "order_list": ["26M0041-01", "26M0041-02", "12345", "77777"],
+        "process_map": {
+            "陳德文": ["骨架作業", "前置作業", "配電作業", "模組作業", "水平調整", "通電作業", "IPQC表單查檢"],
+            "吳政昌": ["S.T作業"],
+            "劉志偉": ["收機清潔", "包機作業", "PACKING", "前置作業(門板組立)"]
+        },
+        "staff_map": {} 
+    }
+    try:
+        r = requests.get(f"{SETTING_URL}.json", timeout=10)
+        if r.status_code == 200:
+            data = r.json()
+            if data and isinstance(data, dict): return data
+        return default_settings
+    except:
+        return default_settings
+
+# --- 2. 介面樣式設定 (全面升級為照片中的高質感深綠色漸層主題) ---
+st.set_page_config(page_title="超慧科技管理系統", layout="wide")
+
+st.markdown("""
+    <style>
+    /* 全網頁背景改成深綠至黑綠色漸層 */
+    .stApp { 
+        background: linear-gradient(135deg, #04241a 0%, #01140f 100%) !important; 
+        color: #e2e8f0 !important;
+    }
+    
+    /* 側邊欄與相關表單文字顏色微調 */
+    .stSidebar, [data-testid="stSidebarUserContent"] {
+        background-color: #021a14 !important;
+        color: #f0fdf4 !important;
+    }
+    
+    /* 製令卡片改為深綠色帶金屬感的漸層外框 */
+    .order-card { 
+        background: linear-gradient(145deg, #083b2e 0%, #031c16 100%); 
+        border-radius: 14px; 
+        border: 1px solid #10b981; 
+        margin-bottom: 25px; 
+        overflow: hidden; 
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5); 
+    }
+    
+    /* 卡片標頭：亮綠色漸層，配上清楚白字 */
+    .order-header { 
+        background: linear-gradient(90deg, #059669 0%, #047857 100%); 
+        color: white; 
+        padding: 14px 18px; 
+        font-weight: 800; 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        font-size: 1.25rem; 
+        border-bottom: 1px solid #10b981;
+    }
+    
+    /* 通電日期標籤改為顯眼明亮的冰藍或黃金配色 */
+    .power-date-tag { 
+        background: #06b6d4; 
+        color: #ffffff; 
+        padding: 4px 12px; 
+        border-radius: 8px; 
+        font-size: 0.9rem; 
+        font-weight: 800; 
+        display: flex; 
+        align-items: center; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    /* 工序橫條：改為半透明深色底，帶有翠綠邊線 */
+    .proc-row-container { 
+        padding: 15px 18px; 
+        border-bottom: 1px solid #064e3b; 
+        background-color: rgba(2, 44, 34, 0.6); 
+    }
+    
+    /* 工序名稱字體：亮白色，左邊改為亮綠色條 */
+    .proc-name { 
+        font-weight: 900; 
+        color: #ffffff; 
+        font-size: 1.1rem; 
+        border-left: 5px solid #34d399; 
+        padding-left: 12px; 
+    }
+    
+    /* 人員標籤：優化背景與文字對比度，改為明亮清晰字體 */
+    .badge-staff { 
+        background: #059669; 
+        color: #ffffff; 
+        padding: 4px 10px; 
+        border-radius: 6px; 
+        font-size: 0.95rem; 
+        font-weight: 700; 
+        border: 1px solid #34d399; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    /* 狀態框：已完工 (明亮綠) */
+    .status-done-box { 
+        background: #065f46; 
+        color: #34d399; 
+        font-weight: 800; 
+        font-size: 0.9rem; 
+        padding: 6px 12px; 
+        border-radius: 6px; 
+        border: 1px solid #34d399; 
+        display: inline-block; 
+        text-align: center;
+    }
+    
+    /* 狀態框：請指派 (鮮艷橘黃) */
+    .status-assign-box { 
+        background: #78350f; 
+        color: #fcd34d; 
+        font-weight: 700; 
+        padding: 6px 12px; 
+        border-radius: 6px; 
+        border: 1px solid #f59e0b; 
+        font-size: 0.9rem; 
+        text-align: center;
+    }
+    
+    /* 修正下拉選單與一般標題文字在黑底下的顏色 */
+    h1, h2, h3, p, label, .stWidgetLabel {
+        color: #ffffff !important;
+    }
+    
+    .status-empty { color: #cbd5e1; font-style: italic; font-weight: 700; font-size: 0.95rem; }
+    </style>
+""", unsafe_allow_html=True)
+
+# --- 3. 讀取設定 ---
+settings = get_settings()
+all_leaders = settings.get("all_leaders", [])
+all_staff = settings.get("all_staff", [])
+process_list = settings.get("processes", [])
+order_list = settings.get("order_list", [])
+process_map = settings.get("process_map", {})
+staff_map = settings.get("staff_map", {}) 
+
+if "menu_selection" not in st.session_state:
+    st.session_state.menu_selection = "📊 製造部派工專區"
+
 # --- 4. 登入介面 ---
 if "user" not in st.session_state:
     st.markdown('<div style="height:100px;"></div>', unsafe_allow_html=True)
@@ -9,49 +178,57 @@ if "user" not in st.session_state:
                 st.session_state.user = u
                 st.rerun()
 else:
-    # 側邊欄導航
+    # 側邊欄導航 (新增手工具相關選項)
     st.sidebar.markdown(f"### 👤 當前人員：**{st.session_state.user}**")
+    nav = st.sidebar.radio("功能導航", [
+   
+    "💡2o26上半年技能考核進度", 
+    "🧾組長待辦事項",
+    "🛡️🛡️🛡️🛡️🛡️🛡️",
+    "📝每日6S任務回報", 
+    "🎮6S戰境養成", 
+    "🟢6S個人能力查詢",
+    "🛡️🛡️🛡️🛡️🛡️🛡️",
+    "📊 製造部派工專區", 
+    "📜 完工紀錄查詢", 
+    "🔧 固資&手工具紀錄表",
+    "⚙️ 資產編輯清單", 
+    "⚙️ 設定管理"
+
+    ])
     
-    # 預先定義所有選項
-    nav_options = [
-        "💡2o26上半年技能考核進度", 
-        "🧾組長待辦事項",
-        "🛡️🛡️🛡️🛡️🛡️🛡️",
-        "📝每日6S任務回報", 
-        "🎮6S戰境養成", 
-        "🟢6S個人能力查詢",
-        "🛡️🛡️🛡️🛡️🛡️🛡️",
-        "📊 製造部派工專區", 
-        "📜 完工紀錄查詢", 
-        "🔧 固資&手工具紀錄表",
-        "⚙️ 資產編輯清單", 
-        "⚙️ 設定管理"
-    ]
-    
-    # 使用當前狀態作為 radio 的預設值
-    nav = st.sidebar.radio("功能導航", nav_options, index=nav_options.index(st.session_state.get("menu_selection", nav_options[0])))
-    
-    # 登出按鈕
-    st.sidebar.markdown("""
+    # --- 登出系統按鈕（放到側邊欄 radio 下方，確保 100% 執行與顯示）---
+    st.sidebar.markdown(
+        """
         <div style="padding: 10px 0; text-align: center;">
             <a href="/?logout=true" target="_self" style="
-                display: block; padding: 12px; color: #ffffff !important; 
-                background-color: #dc2626 !important; border-radius: 8px; 
-                text-decoration: none !important; font-size: 1.2rem; font-weight: 900;
+                display: block; 
+                padding: 12px; 
+                color: #ffffff !important; 
+                background-color: #dc2626 !important; 
+                border-radius: 8px; 
+                text-decoration: none !important; 
+                font-size: 1.2rem; 
+                font-weight: 900; 
+                box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
             ">🚪 點此登出系統</a>
         </div>
-    """, unsafe_allow_html=True)
+        """, 
+        unsafe_allow_html=True
+    )
 
-    # 處理登出
+    # 檢查是否點擊了登出連結
     if "logout" in st.query_params:
         st.query_params.clear()
         st.session_state.clear()
         st.rerun()
 
-    # 頁面切換機制 (關鍵優化)
-    if nav != st.session_state.get("menu_selection"):
+    # 導航頁面重整判斷（移至登出按鈕下方，不阻斷程式執行）
+    if nav != st.session_state.menu_selection:
         st.session_state.menu_selection = nav
         st.rerun()
+
+
     # --- 📈💡2o26上半年技能考核進度 ---
     elif st.session_state.menu_selection == "💡2o26上半年技能考核進度":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">💡2o26上半年技能考核進度</h1>', unsafe_allow_html=True)
@@ -217,7 +394,7 @@ else:
         else:
             st.info("💡 目前此組別無成員資料。")
 
-   # --- 📜 完工紀錄查詢 (原功能完全保留，一律不修改) ---
+# --- 📜 完工紀錄查詢 (原功能完全保留，一律不修改) ---
     elif st.session_state.menu_selection == "📜 完工紀錄查詢":
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📜 歷史完工紀錄</h1>', unsafe_allow_html=True)
         
@@ -262,11 +439,13 @@ else:
 
 
 
-# --- 2. 主程式與頁面控制 ---
-def main():
-    # 初始化 session_state
-    if "menu_selection" not in st.session_state:
-        st.session_state.menu_selection = "📝每日6S任務回報"
+
+
+
+    # ==========================================
+    # 📝 頁面一：每日 6S 任務回報中心 (後台優先同步版)
+    # ==========================================
+    elif st.session_state.menu_selection == "📝每日6S任務回報":
         import requests
         import json
         from datetime import datetime, timedelta, timezone
