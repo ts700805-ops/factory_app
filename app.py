@@ -442,46 +442,53 @@ else:
 
 
 # ==========================================
-    # 📝 頁面一：每日 6S 任務回報中心
+    # 📝 頁面一：每日 6S 任務回報中心 (強制修正版)
     # ==========================================
     elif st.session_state.menu_selection == "📝每日6S任務回報":
         st.markdown('### 📋 每日 6S 任務回報中心')
 
-        # 1. 強制定義「全域性」的初始資料，確保變數一定存在
-        # 從 777.txt 的設定邏輯讀取或是給予預設值
-        all_leaders = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
-        
-        # 定義人員對應表，這就是您要的「設定管理」基礎
-        staff_map = {
-            "陳德文": ["徐梓翔", "牟育玄", "林建安", "魏瑄毅", "羅立昕", "江金福"],
+        # 1. 強制宣告變數 (確保 NameError 消失)
+        # 如果後台沒東西，這就是安全預設值
+        default_leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
+        default_mapping = {
+            "陳德文": ["徐梓翔", "牟育玄", "林建安", "魏瑄毅", "羅立昕"],
             "劉志偉": ["劉定澤", "胡瑄芸", "蕭詩瓊", "劉秀鳳", "龍才華"],
             "吳政昌": ["吳政昌", "劉韋廷", "張佳銓", "陳長彥"],
-            "蘇萬紘": ["梁志宏", "謝宛庭", "潘威傑", "徐兆生"]
+            "蘇萬紘": ["梁志宏", "謝宛庭", "潘威傑", "徐兆生"],
+            "陳文山": ["蘇雍盛", "張文品", "趙健浩", "洪敏強"],
+            "李俊霖": ["陳育信", "陳凱彥", "111", "222"]
         }
 
-        # 2. 設定管理區塊 (讓您可以在頁面上直接修改)
-        with st.expander("⚙️ 點此展開設定：人員管理"):
-            with st.form("6s_staff_config"):
-                staff_text = "\n".join([f"{k}:{','.join(v)}" for k, v in staff_map.items()])
-                edit_area = st.text_area("編輯組長與成員 (組長:人員1,人員2)", staff_text, height=150)
-                if st.form_submit_button("儲存設定"):
-                    st.success("設定已更新！")
+        # 將變數賦值，確保無論如何都有東西
+        leader_list = default_leader_list
+        leader_member_mapping = default_mapping
 
-        # 3. 回報區塊 (使用上面定義好的變數，保證不會報錯)
-        st.markdown("### 🔍 第一步：確認您的身份")
-        col_leader, col_member = st.columns(2)
-        
-        with col_leader:
-            # 這裡使用 all_leaders 變數，它在上方已經被定義，絕不會報 NameError
-            selected_leader = st.selectbox("👤 選擇所屬組長：", all_leaders, key="leader_sel_1")
-        
-        with col_member:
-            # 這裡使用 staff_map 變數
-            members = staff_map.get(selected_leader, [])
-            selected_user = st.selectbox("🎯 選擇回報同仁姓名：", members, key="user_sel_1")
+        # 2. 設定管理介面 (Tab 頁籤)
+        tab_report, tab_setting = st.tabs(["📝 回報任務", "⚙️ 設定管理"])
 
-        st.divider()
-        st.write(f"當前作業：組長 **{selected_leader}** / 同仁 **{selected_user}**")
+        with tab_setting:
+            st.subheader("編輯人員對應")
+            with st.form("config_form"):
+                current_text = "\n".join([f"{k}:{','.join(v)}" for k, v in leader_member_mapping.items()])
+                config_input = st.text_area("編輯區 (組長:人員1,人員2)", current_text, height=150, key="cfg_input")
+                st.form_submit_button("儲存設定")
+
+        # 3. 回報介面 (確保變數存在)
+        with tab_report:
+            st.markdown("### 👤 確認您的身份")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # 使用 key 避免 ID 重複錯誤
+                selected_leader = st.selectbox("選擇組長：", leader_list, key="rep_leader_select")
+            
+            with col_member_key := col2:
+                members = leader_member_mapping.get(selected_leader, [])
+                selected_user = st.selectbox("選擇同仁：", members, key="rep_member_select")
+
+            st.write(f"當前選擇：{selected_leader} - {selected_user}")
+
+        
         # 介面渲染：選擇組長與成員
         st.markdown("### 🔍 第一步：確認您的身份")
         col_leader, col_member = st.columns(2)
