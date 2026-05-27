@@ -441,56 +441,43 @@ else:
 
 
 
-
-  # ==========================================
-    # 📝 每日 6S 任務回報中心 (優化版)
+# ==========================================
+    # 📝 頁面一：每日 6S 任務回報中心 (修正版)
     # ==========================================
     elif st.session_state.menu_selection == "📝每日6S任務回報":
-        st.markdown('''
-            <div style="text-align:center; margin-bottom:2rem;">
-                <h1 style="color: #000000 !important; font-weight:900 !important; font-size: 3.5rem !important;">📋 每日 6S 任務回報中心</h1>
-            </div>
-            ''', unsafe_allow_html=True)
+        st.markdown('### 📋 每日 6S 任務回報中心')
 
-        # 1. 初始化路徑
-        BASE_URL = globals().get('DB_URL') or globals().get('DB_BASE_URL') or "https://my-factory-system-default-rtdb.firebaseio.com"
-        
-        # 2. 讀取並解析人員設定
+        # 【核心修正：強制定義變數以避免 NameError】
+        BASE_URL = globals().get('DB_URL') or "https://my-factory-system-default-rtdb.firebaseio.com"
+        leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"] # 設定保底預設值
+        leader_member_mapping = {}
+
         try:
-            r1 = requests.get(f"{BASE_URL}/leader_members.json")
-            r2 = requests.get(f"{BASE_URL}/leader_members_2.json")
-            
-            raw_data_1 = r1.json() if r1.status_code == 200 else ""
-            raw_data_2 = r2.json() if r2.status_code == 200 else ""
-            
-            combined_lines = []
-            if isinstance(raw_data_1, str): combined_lines.extend(raw_data_1.splitlines())
-            if isinstance(raw_data_2, str): combined_lines.extend(raw_data_2.splitlines())
-            
-            # 建立映射表
-            leader_member_mapping = {}
-            for line in combined_lines:
-                line = line.strip().replace("：", ":")
-                if ":" in line:
-                    parts = line.split(":")
-                    l_name = parts[0].strip()
-                    m_list = [m.strip() for m in parts[1].split(",") if m.strip()]
-                    if l_name: leader_member_mapping[l_name] = m_list
-            
-            # 3. 檢查是否有讀到資料
-            if not leader_member_mapping:
-                st.warning("⚠️ 系統偵測到人員資料為空，請檢查後台 'leader_members.json' 是否有正確輸入內容。")
+            # 嘗試抓取最新設定
+            res = requests.get(f"{BASE_URL}/leaders_list.json").json()
+            if res:
+                leader_list = [l.strip() for l in str(res).split(",") if l.strip()]
+        except:
+            pass
+
+        # 確保 leader_list 不會因為抓取失敗而變成 None
+        if not leader_list:
+            leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
+
+        # 介面渲染：確保變數已經存在才執行
+        st.markdown("### 🔍 第一步：確認您的身份")
+        col_leader, col_member = st.columns(2)
+        
+        with col_leader:
+            selected_leader = st.selectbox("👤 選擇所屬組長：", leader_list)
+        
+        with col_member:
+            # 這裡也會用到 leader_member_mapping，所以上面也定義好了
+            available_members = leader_member_mapping.get(selected_leader, [])
+            if available_members:
+                selected_user = st.selectbox("🎯 選擇回報同仁姓名：", available_members)
             else:
-                # 測試顯示：印出讀到的組長與人數
-                st.success(f"✅ 系統已成功載入 {len(leader_member_mapping)} 位組長的人員配置。")
-                
-                # 這裡放入您後續的選擇組長與回報邏輯
-                selected_leader = st.selectbox("請選擇組長：", list(leader_member_mapping.keys()))
-                target_members = leader_member_mapping.get(selected_leader, [])
-                st.write(f"該組成員：{', '.join(target_members)}")
-                
-        except Exception as e:
-            st.error(f"❌ 讀取人員資料時發生錯誤：{e}")
+                st.info("尚未載入組員資料")
             
 
         # 如果後台完全沒讀到任何資料，才啟用保底名單
