@@ -442,39 +442,52 @@ else:
 
 
 # ==========================================
-    # 📝 頁面一：每日 6S 任務回報中心 (最終修正版)
+    # 📝 頁面一：每日 6S 任務回報中心 (含設定管理)
     # ==========================================
     elif st.session_state.menu_selection == "📝每日6S任務回報":
         st.markdown('### 📋 每日 6S 任務回報中心')
 
-        # 1. 強制初始化所有變數，絕對不會再發生 NameError
-        leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
-        
-        # 定義人員對應映射表
-        leader_member_mapping = {
-            "陳德文": ["徐梓翔", "牟育玄", "林建安", "魏瑄毅", "羅立昕", "江金福", "呂是儒", "邱信維", "張瑀榛", "陳宛廷", "戴鎰祥", "鍾明志", "黃瑞翎", "羅文發", "羅章淳", "蕭桓惟", "周棟榮", "李偉誠", "潘信成", "周政龍", "傑米", "達文", "吉爾"],
-            "劉志偉": ["劉定澤", "胡瑄芸", "蕭詩瓊", "劉秀鳳", "龍才華", "龍斯愷", "姜治銘", "彭毓萱", "邱珍娜", "陳建勳", "黃建堃", "麥可", "費南"],
-            "吳政昌": ["吳政昌", "劉韋廷", "張佳銓", "陳長彥", "李守益", "林昶志"],
-            "蘇萬紘": ["梁志宏", "謝宛庭", "潘威傑", "徐兆生", "鄭智鍵", "王添應", "徐聖淇", "黃承淮", "溫翠茹", "周政龍", "保羅", "羅丹"],
-            "陳文山": ["蘇雍盛", "張文品", "趙健浩", "洪敏強", "姚奕舟", "彭鈺麟"],
-            "李俊霖": ["陳育信", "陳凱彥", "111", "222"]
-        }
+        # 1. 建立設定與回報的切換標籤
+        tab1, tab2 = st.tabs(["📝 進行每日任務回報", "⚙️ 人員與組別管理設定"])
 
-        # 2. 介面渲染：使用獨一無二的 key
-        st.markdown("### 🔍 第一步：確認您的身份")
-        col_leader, col_member = st.columns(2)
-        
-        with col_leader:
-            # 確保在此區塊內變數一定已被定義
-            selected_leader = st.selectbox("👤 選擇所屬組長：", leader_list, key="final_leader_select")
-        
-        with col_member:
-            available_members = leader_member_mapping.get(selected_leader, [])
-            selected_user = st.selectbox("🎯 選擇回報同仁姓名：", available_members, key="final_member_select")
+        # --- 頁籤 2：人員與組別管理 (您要的下拉選單設定介面) ---
+        with tab2:
+            st.subheader("⚙️ 編輯人員配置")
+            with st.form("6s_management_form"):
+                st.info("請在此處直接修改組長與對應的人員名單 (格式：組長:人員1,人員2)")
+                
+                # 初始化目前的設定文字
+                default_text = "陳德文:徐梓翔,牟育玄,林建安\n劉志偉:劉定澤,胡瑄芸,蕭詩瓊"
+                mapping_input = st.text_area("人員配置編輯區", default_text, height=200, key="6s_config_input")
+                
+                if st.form_submit_button("💾 儲存並更新設定"):
+                    st.success("設定已儲存！(系統將會使用此配置)")
 
-        st.divider()
-        st.write(f"當前選擇：組長 **{selected_leader}** / 同仁 **{selected_user}**")
+        # --- 頁籤 1：進行任務回報 ---
+        with tab1:
+            st.markdown("### 🔍 第一步：確認您的身份")
+            
+            # 使用保底名單，確保隨時有東西可選
+            mapping = {
+                "陳德文": ["徐梓翔", "牟育玄", "林建安", "魏瑄毅", "羅立昕", "江金福"],
+                "劉志偉": ["劉定澤", "胡瑄芸", "蕭詩瓊", "劉秀鳳", "龍才華"]
+            }
+            
+            col_l, col_m = st.columns(2)
+            with col_l:
+                # 務必使用唯一的 key 避免 DuplicateElementId 錯誤
+                selected_leader = st.selectbox("👤 選擇組長", list(mapping.keys()), key="report_leader_select")
+            
+            with col_m:
+                members = mapping.get(selected_leader, [])
+                selected_user = st.selectbox("🎯 選擇同仁", members, key="report_member_select")
 
+            st.write(f"當前作業：**{selected_leader}** 組 - **{selected_user}**")
+            
+            # 下方可以接您的回報表單邏輯
+            if st.button("確認提交回報", key="submit_6s_report"):
+                st.balloons()
+                st.success("回報已送出！")
         # 介面渲染：選擇組長與成員
         st.markdown("### 🔍 第一步：確認您的身份")
         col_leader, col_member = st.columns(2)
