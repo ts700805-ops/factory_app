@@ -438,7 +438,10 @@ else:
         else: st.info("💡 目前尚無紀錄。")
 
 
-       
+
+
+
+
     # ==========================================
     # 📝 頁面一：每日 6S 任務回報中心 (後台優先同步版)
     # ==========================================
@@ -510,7 +513,7 @@ else:
         if not leader_member_mapping:
             leader_member_mapping = {
                 "陳德文": ["徐梓翔", "牟育玄", "林建安", "魏瑄毅", "羅立昕", "江金福", "呂是儒", "邱信維", "張瑀榛", "陳宛廷", "戴鎰祥", "鍾明志", "黃瑞翎", "羅文發", "羅章淳", "蕭桓惟", "周棟榮", "李偉誠", "潘信成", "張瑀榛", "周政龍", "傑米", "達文", "吉爾"],
-                "劉志偉": ["劉定澤", "胡瑄芸", "蕭詩瓊", "劉秀鳳", "龍才華", "龍斯愷", "姜治銘", "彭毓萱", "邱珍娜", "陳建勳", "黃建堃", "麥可", "費南", "阿杰"],
+                "劉志偉": ["劉定澤", "胡瑄芸", "蕭詩瓊", "劉秀鳳", "龍才華", "龍斯愷", "姜治銘", "彭毓萱", "邱珍娜", "陳建勳", "黃建堃", "麥可", "費南"],
                 "吳政昌": ["吳政昌", "劉韋廷", "張佳銓", "陳長彥", "李守益", "林昶志"],
                 "蘇萬紘": ["梁志宏", "謝宛庭", "潘威傑", "徐兆生", "鄭智鍵", "王添應", "徐聖淇", "黃承淮", "溫翠茹", "張瑀榛", "張瑀榛", "周政龍", "保羅", "羅丹"],
                 "陳文山": ["蘇雍盛", "張文品", "趙健浩", "洪敏強", "姚奕舟", "彭鈺麟"],
@@ -520,9 +523,6 @@ else:
         if not leader_list:
             leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
 
-
-        
-        
         # 介面渲染：選擇組長與成員
         st.markdown("### 🔍 第一步：確認您的身份")
         col_leader, col_member = st.columns(2)
@@ -596,107 +596,6 @@ else:
                     st.session_state.menu_selection = "🎮6S戰境養成"
                     st.rerun()
 
-
-        # ==========================================
-        # ⚙️ 新增人員管理區塊 (找回設定功能)
-        # ==========================================
-        st.divider()
-        st.markdown("### ⚙️ 人員與組別管理")
-        
-        with st.expander("點此展開人員編輯設定"):
-            with st.form("admin_edit_members"):
-                # 將目前的字典轉回字串格式，方便在文字框編輯
-                current_text = "\n".join([f"{k}:{','.join(v)}" for k, v in leader_member_mapping.items()])
-                edit_input = st.text_area("編輯組員清單 (格式：組長:組員1,組員2)", current_text, height=200)
-                
-                if st.form_submit_button("💾 儲存並更新名單到後台"):
-                    # 執行邏輯：將編輯框內容更新到 Firebase
-                    try:
-                        # 這裡將內容存入 leader_members.json
-                        requests.put(f"{BASE_URL}/leader_members.json", json=edit_input)
-                        st.success("設定已成功儲存至後台！請重新整理頁面。")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"儲存失敗: {e}")
-        
-        
-        # 介面渲染：選擇組長與成員
-        st.markdown("### 🔍 第一步：確認您的身份")
-        col_leader, col_member = st.columns(2)
-        
-        with col_leader:
-            selected_leader = st.selectbox("👤 選擇所屬組長：", leader_list)
-        
-        with col_member:
-            available_members = leader_member_mapping.get(selected_leader, [])
-            
-            if available_members:
-                selected_user = st.selectbox("🎯 選擇回報同仁姓名：", available_members)
-                has_members = True
-            else:
-                st.warning("⚠️ 此組長尚未在後台配置屬下同仁")
-                selected_user = None
-                has_members = False
-
-        st.divider()
-
-        st.markdown("### 🚀 第二步：送出回報領取獎勵")
-        
-        if not has_members:
-            st.error("❌ 無法回報：請確認後台設定管理中的配置。")
-        else:
-            st.warning(f"⚠️ 請注意：每人每日限領取一次。送出後系統會撥發 1 點自由屬性點給【{selected_user}】")
-
-            if st.button(f"✨ 繳交今日 6S 成果，領取點數！", use_container_width=True, type="primary"):
-                safe_user_key = str(selected_user).strip()
-                
-                # 檢查今日是否已重複回報
-                check_exist = requests.get(f"{REPORT_LOG_URL}/{today_tw_str}/{safe_user_key}.json").json()
-
-                if check_exist is not None:
-                    st.error(f"❌ 提示：【{selected_user}】您今天 ({today_tw_str}) 已經完成過任務回報囉！明天再開工領點數吧！")
-                else:
-                    # 寫入今日回報歷史紀錄
-                    report_payload = {
-                        "reported_at": str(datetime.now(tz_taiwan).strftime("%Y-%m-%d %H:%M:%S")),
-                        "leader": str(selected_leader),
-                        "status": "已完成"
-                    }
-                    requests.put(f"{REPORT_LOG_URL}/{today_tw_str}/{safe_user_key}.json", data=json.dumps(report_payload))
-
-                    # 讀取原本的 RPG 帳戶點數，並進行加點處理
-                    player_rpg_data = requests.get(f"{GAME_DB_URL}/{safe_user_key}.json").json() or {}
-                    
-                    current_avail_pts = int(player_rpg_data.get("avail_pts", 0))
-                    new_avail_pts = current_avail_pts + 1
-
-                    # 寫回資料庫
-                    update_rpg_payload = {
-                        "str": int(player_rpg_data.get("str", 0)),
-                        "vit": int(player_rpg_data.get("vit", 0)),
-                        "agi": int(player_rpg_data.get("agi", 0)),
-                        "cha": int(player_rpg_data.get("cha", 0)),
-                        "avail_pts": int(new_avail_pts)
-                    }
-                    requests.put(f"{GAME_DB_URL}/{safe_user_key}.json", data=json.dumps(update_rpg_payload))
-
-                    # 同步登入名稱
-                    st.session_state.user = safe_user_key
-
-                    st.balloons()
-                    st.success(f"🎉 大成功！【{selected_user}】今日 6S 回報完畢！自由點數已成功加 1 點！")
-                    
-                    st.markdown("---")
-                    st.info("系統正準備為您開啟修煉大門... 正在自動跳轉至配點戰境面板！")
-                    
-                    time.sleep(1.2)
-                    st.session_state.menu_selection = "🎮6S戰境養成"
-                    st.rerun()
-
-
-
-
-    
     # ==========================================
     # 🎮 6S 戰境養成功能區塊
     # ==========================================
@@ -794,8 +693,6 @@ else:
             )
 
         st.divider()
-
-        
        # ==========================================
         # ⚔️ 尋找現場同仁發起決鬥系統
         # ==========================================
@@ -943,8 +840,6 @@ else:
                 time.sleep(1)
                 st.rerun()
       
-
-
 
 
 
