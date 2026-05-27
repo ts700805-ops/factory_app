@@ -439,59 +439,213 @@ else:
 
 
 
-
 # ==========================================
-    # 📝 頁面一：每日 6S 任務回報中心 (結構修正版)
+
+    # 📝 頁面一：每日 6S 任務回報中心 (後台優先同步版)
+
     # ==========================================
+
     elif st.session_state.menu_selection == "📝每日6S任務回報":
+
         import requests
+
         import json
+
         from datetime import datetime, timedelta, timezone
+
         import time
 
-        # --- 基礎資料設定 ---
-        if 'DB_URL' in globals() or 'DB_URL' in locals(): BASE_URL = DB_URL
-        elif 'DB_BASE_URL' in globals() or 'DB_BASE_URL' in locals(): BASE_URL = DB_BASE_URL
-        else: BASE_URL = "https://your-firebase-url"
-        
+
+
+        st.markdown(
+
+            '''
+
+            <div style="text-align:center; margin-bottom:2rem;">
+
+                <h1 style="color: #000000 !important; font-weight:900 !important; font-size: 3.5rem !important; display:inline-block;">
+
+                    📋 每日 6S 任務回報中心
+
+                </h1>
+
+                <p style="color:#9CA3AF;">完成今日現場回報，即可領取 1 點自由屬性點數！</p>
+
+            </div>
+
+            ''',
+
+            unsafe_allow_html=True
+
+        )
+
+
+
+        # 【安全路徑自適應】
+
+        if 'DB_URL' in globals() or 'DB_URL' in locals():
+
+            BASE_URL = DB_URL
+
+        elif 'DB_BASE_URL' in globals() or 'DB_BASE_URL' in locals():
+
+            BASE_URL = DB_BASE_URL
+
+        else:
+
+            BASE_URL = "https://your-firebase-url"
+
+
+
+        GAME_DB_URL = f"{BASE_URL}/game_rpg_data"
+
+        REPORT_LOG_URL = f"{BASE_URL}/daily_6s_report_logs"
+
+
+
+        # 1. 取得當前台灣時間日期 (UTC+8)
+
         tz_taiwan = timezone(timedelta(hours=8))
+
         today_tw_str = datetime.now(tz_taiwan).strftime("%Y-%m-%d")
 
-        # 讀取資料
+
+
+        st.info(f"📅 任務結算基準日（台北時間）：**{today_tw_str}**")
+
+
+
+        # 2. 讀取組長主清單
+
         leaders_raw = requests.get(f"{BASE_URL}/leaders_list.json").json() or ""
-        leader_list = [l.strip() for l in leaders_raw.split(",") if l.strip()] if isinstance(leaders_raw, str) else ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
+
+        leader_list = [l.strip() for l in leaders_raw.split(",") if l.strip()] if isinstance(leaders_raw, str) else []
+
+
+
+        # 3. 完全依照後台資料解析
+
+        raw_data_1 = requests.get(f"{BASE_URL}/leader_members.json").json() or ""
+
+        raw_data_2 = requests.get(f"{BASE_URL}/leader_members_2.json").json() or "" 
+
         
-        raw_data = requests.get(f"{BASE_URL}/leader_members.json").json() or ""
-        leader_member_mapping = json.loads(raw_data) if isinstance(raw_data, str) and raw_data.startswith('{') else {"陳德文": ["徐梓翔"], "劉志偉": ["劉定澤"]}
 
-        # --- 1. 回報介面區 ---
-        st.markdown("### 📋 每日 6S 任務回報中心")
-        col_leader, col_member = st.columns(2)
-        with col_leader:
-            selected_leader = st.selectbox("👤 選擇組長", leader_list)
-        with col_member:
-            available_members = leader_member_mapping.get(selected_leader, [])
-            selected_user = st.selectbox("🎯 選擇回報同仁", available_members) if available_members else None
+        combined_lines = []
 
-        if selected_user and st.button("✨ 繳交今日 6S 成果"):
-            st.success(f"已送出 {selected_user} 的回報！")
+        if isinstance(raw_data_1, str):
 
-        # --- 2. 管理介面區 (置於最下方) ---
+            combined_lines.extend(raw_data_1.splitlines())
+
+        if isinstance(raw_data_2, str):
+
+            combined_lines.extend(raw_data_2.splitlines())
+
+
+
+        # 建立空的映射表
+
+        leader_member_mapping = {}
+
+
+
+        # 解析後台設定
+
+        for line in combined_lines:
+
+            line = line.strip()
+
+            if not line: continue
+
+            line_fixed = line.replace("：", ":")
+
+            if ":" in line_fixed:
+
+                parts = line_fixed.split(":")
+
+                l_name = parts[0].strip()
+
+                m_list = [m.strip() for m in parts[1].split(",") if m.strip()]
+
+                if l_name and m_list:
+
+                    leader_member_mapping[l_name] = m_list
+
+
+
+        # 如果後台完全沒讀到任何資料，才啟用保底名單
+
+        if not leader_member_mapping:
+
+            leader_member_mapping = {
+
+                "陳德文": ["徐梓翔", "牟育玄", "林建安", "魏瑄毅", "羅立昕", "江金福", "呂是儒", "邱信維", "張瑀榛", "陳宛廷", "戴鎰祥", "鍾明志", "黃瑞翎", "羅文發", "羅章淳", "蕭桓惟", "周棟榮", "李偉誠", "潘信成", "張瑀榛", "周政龍", "傑米", "達文", "吉爾"],
+
+                "劉志偉": ["劉定澤", "胡瑄芸", "蕭詩瓊", "劉秀鳳", "龍才華", "龍斯愷", "姜治銘", "彭毓萱", "邱珍娜", "陳建勳", "黃建堃", "麥可", "費南", "阿杰"],
+
+                "吳政昌": ["吳政昌", "劉韋廷", "張佳銓", "陳長彥", "李守益", "林昶志"],
+
+                "蘇萬紘": ["梁志宏", "謝宛庭", "潘威傑", "徐兆生", "鄭智鍵", "王添應", "徐聖淇", "黃承淮", "溫翠茹", "張瑀榛", "張瑀榛", "周政龍", "保羅", "羅丹"],
+
+                "陳文山": ["蘇雍盛", "張文品", "趙健浩", "洪敏強", "姚奕舟", "彭鈺麟"],
+
+                "李俊霖": ["陳育信", "陳凱彥", "111", "222"]
+
+            }
+
+
+
+        if not leader_list:
+
+            leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
+
+
+
+
+
+
+
+        # ==========================================
+
+        # ⚙️ 新增人員管理區塊 (找回設定功能)
+
+        # ==========================================
+
         st.divider()
-        with st.expander("⚙️ 點此展開：人員與組別管理 (新增/編輯)"):
-            with st.form("admin_edit_members"):
-                # 將字典轉為易於編輯的字串
-                current_text = json.dumps(leader_member_mapping, ensure_ascii=False)
-                edit_input = st.text_area("編輯資料 (JSON格式)", current_text, height=150)
-                
-                if st.form_submit_button("💾 儲存並更新到後台"):
-                    try:
-                        requests.put(f"{BASE_URL}/leader_members.json", json=edit_input)
-                        st.success("儲存成功！請重新整理。")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"儲存失敗: {e}")
 
+        st.markdown("### ⚙️ 人員與組別管理")
+
+        
+
+        with st.expander("點此展開人員編輯設定"):
+
+            with st.form("admin_edit_members"):
+
+                # 將目前的字典轉回字串格式，方便在文字框編輯
+
+                current_text = "\n".join([f"{k}:{','.join(v)}" for k, v in leader_member_mapping.items()])
+
+                edit_input = st.text_area("編輯組員清單 (格式：組長:組員1,組員2)", current_text, height=200)
+
+                
+
+                if st.form_submit_button("💾 儲存並更新名單到後台"):
+
+                    # 執行邏輯：將編輯框內容更新到 Firebase
+
+                    try:
+
+                        # 這裡將內容存入 leader_members.json
+
+                        requests.put(f"{BASE_URL}/leader_members.json", json=edit_input)
+
+                        st.success("設定已成功儲存至後台！請重新整理頁面。")
+
+                        st.rerun()
+
+                    except Exception as e:
+
+                        st.error(f"儲存失敗: {e}")
         
         
         # 介面渲染：選擇組長與成員
