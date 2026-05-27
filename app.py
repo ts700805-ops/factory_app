@@ -442,72 +442,56 @@ else:
 
 
 
-    # ==========================================
-    # 📝 頁面一：每日 6S 任務回報中心 (後台優先同步版)
+  # ==========================================
+    # 📝 每日 6S 任務回報中心 (優化版)
     # ==========================================
     elif st.session_state.menu_selection == "📝每日6S任務回報":
-        import requests
-        import json
-        from datetime import datetime, timedelta, timezone
-        import time
-
-        st.markdown(
-            '''
+        st.markdown('''
             <div style="text-align:center; margin-bottom:2rem;">
-                <h1 style="color: #000000 !important; font-weight:900 !important; font-size: 3.5rem !important; display:inline-block;">
-                    📋 每日 6S 任務回報中心
-                </h1>
-                <p style="color:#9CA3AF;">完成今日現場回報，即可領取 1 點自由屬性點數！</p>
+                <h1 style="color: #000000 !important; font-weight:900 !important; font-size: 3.5rem !important;">📋 每日 6S 任務回報中心</h1>
             </div>
-            ''',
-            unsafe_allow_html=True
-        )
+            ''', unsafe_allow_html=True)
 
-        # 【安全路徑自適應】
-        if 'DB_URL' in globals() or 'DB_URL' in locals():
-            BASE_URL = DB_URL
-        elif 'DB_BASE_URL' in globals() or 'DB_BASE_URL' in locals():
-            BASE_URL = DB_BASE_URL
-        else:
-            BASE_URL = "https://your-firebase-url"
-
-        GAME_DB_URL = f"{BASE_URL}/game_rpg_data"
-        REPORT_LOG_URL = f"{BASE_URL}/daily_6s_report_logs"
-
-        # 1. 取得當前台灣時間日期 (UTC+8)
-        tz_taiwan = timezone(timedelta(hours=8))
-        today_tw_str = datetime.now(tz_taiwan).strftime("%Y-%m-%d")
-
-        st.info(f"📅 任務結算基準日（台北時間）：**{today_tw_str}**")
-
-        # 2. 讀取組長主清單
-        leaders_raw = requests.get(f"{BASE_URL}/leaders_list.json").json() or ""
-        leader_list = [l.strip() for l in leaders_raw.split(",") if l.strip()] if isinstance(leaders_raw, str) else []
-
-        # 3. 完全依照後台資料解析
-        raw_data_1 = requests.get(f"{BASE_URL}/leader_members.json").json() or ""
-        raw_data_2 = requests.get(f"{BASE_URL}/leader_members_2.json").json() or "" 
+        # 1. 初始化路徑
+        BASE_URL = globals().get('DB_URL') or globals().get('DB_BASE_URL') or "https://my-factory-system-default-rtdb.firebaseio.com"
         
-        combined_lines = []
-        if isinstance(raw_data_1, str):
-            combined_lines.extend(raw_data_1.splitlines())
-        if isinstance(raw_data_2, str):
-            combined_lines.extend(raw_data_2.splitlines())
-
-        # 建立空的映射表
-        leader_member_mapping = {}
-
-        # 解析後台設定
-        for line in combined_lines:
-            line = line.strip()
-            if not line: continue
-            line_fixed = line.replace("：", ":")
-            if ":" in line_fixed:
-                parts = line_fixed.split(":")
-                l_name = parts[0].strip()
-                m_list = [m.strip() for m in parts[1].split(",") if m.strip()]
-                if l_name and m_list:
-                    leader_member_mapping[l_name] = m_list
+        # 2. 讀取並解析人員設定
+        try:
+            r1 = requests.get(f"{BASE_URL}/leader_members.json")
+            r2 = requests.get(f"{BASE_URL}/leader_members_2.json")
+            
+            raw_data_1 = r1.json() if r1.status_code == 200 else ""
+            raw_data_2 = r2.json() if r2.status_code == 200 else ""
+            
+            combined_lines = []
+            if isinstance(raw_data_1, str): combined_lines.extend(raw_data_1.splitlines())
+            if isinstance(raw_data_2, str): combined_lines.extend(raw_data_2.splitlines())
+            
+            # 建立映射表
+            leader_member_mapping = {}
+            for line in combined_lines:
+                line = line.strip().replace("：", ":")
+                if ":" in line:
+                    parts = line.split(":")
+                    l_name = parts[0].strip()
+                    m_list = [m.strip() for m in parts[1].split(",") if m.strip()]
+                    if l_name: leader_member_mapping[l_name] = m_list
+            
+            # 3. 檢查是否有讀到資料
+            if not leader_member_mapping:
+                st.warning("⚠️ 系統偵測到人員資料為空，請檢查後台 'leader_members.json' 是否有正確輸入內容。")
+            else:
+                # 測試顯示：印出讀到的組長與人數
+                st.success(f"✅ 系統已成功載入 {len(leader_member_mapping)} 位組長的人員配置。")
+                
+                # 這裡放入您後續的選擇組長與回報邏輯
+                selected_leader = st.selectbox("請選擇組長：", list(leader_member_mapping.keys()))
+                target_members = leader_member_mapping.get(selected_leader, [])
+                st.write(f"該組成員：{', '.join(target_members)}")
+                
+        except Exception as e:
+            st.error(f"❌ 讀取人員資料時發生錯誤：{e}")
+            
 
         # 如果後台完全沒讀到任何資料，才啟用保底名單
         if not leader_member_mapping:
