@@ -441,54 +441,86 @@ else:
 
 
 
-elif st.session_state.menu_selection == "📝每日6S任務回報":
-        st.markdown('### 📋 每日 6S 任務回報中心')
-        tab_report, tab_setting = st.tabs(["📝 回報任務", "⚙️ 設定管理"])
+ # ==========================================
+    # 📝 頁面一：每日 6S 任務回報中心 (後台優先同步版)
+    # ==========================================
+    elif st.session_state.menu_selection == "📝每日6S任務回報":
+        import requests
+        import json
+        from datetime import datetime, timedelta, timezone
+        import time
 
-        # 1. 設定管理邏輯：將輸入的文字轉為字典，並存入 session_state
-        with tab_setting:
-            st.subheader("⚙️ 組長與人員配置管理")
-            # 使用 session_state 來儲存人員設定，這樣頁面切換才不會遺失
-            if "staff_map" not in st.session_state:
-                st.session_state.staff_map = {
-                    "陳德文": ["徐梓翔", "牟育玄", "林建安"],
-                    "劉志偉": ["劉定澤", "胡瑄芸", "蕭詩瓊"]
-                }
+        st.markdown(
+            '''
+            <div style="text-align:center; margin-bottom:2rem;">
+                <h1 style="color: #000000 !important; font-weight:900 !important; font-size: 3.5rem !important; display:inline-block;">
+                    📋 每日 6S 任務回報中心
+                </h1>
+                <p style="color:#9CA3AF;">完成今日現場回報，即可領取 1 點自由屬性點數！</p>
+            </div>
+            ''',
+            unsafe_allow_html=True
+        )
 
-            with st.form("6s_config_form"):
-                # 將字典轉為文字顯示在格子中
-                current_text = "\n".join([f"{k}:{','.join(v)}" for k, v in st.session_state.staff_map.items()])
-                config_input = st.text_area("編輯區 (組長:人員1,人員2)", current_text, height=200)
-                
-                if st.form_submit_button("💾 儲存設定"):
-                    # 將文字轉回字典並更新
-                    new_map = {}
-                    for line in config_input.splitlines():
-                        if ":" in line:
-                            l_name, m_names = line.split(":", 1)
-                            new_map[l_name.strip()] = [m.strip() for m in m_names.split(",")]
-                    st.session_state.staff_map = new_map
-                    st.success("儲存成功！下拉選單已同步更新。")
-                    st.rerun() # 強制刷新頁面以更新選單
+        # 【安全路徑自適應】
+        if 'DB_URL' in globals() or 'DB_URL' in locals():
+            BASE_URL = DB_URL
+        elif 'DB_BASE_URL' in globals() or 'DB_BASE_URL' in locals():
+            BASE_URL = DB_BASE_URL
+        else:
+            BASE_URL = "https://your-firebase-url"
 
-        # 2. 回報介面：直接從 session_state.staff_map 讀取
-        with tab_report:
-            st.markdown("### 👤 確認您的身份")
-            # 確保有資料才顯示，避免報錯
-            if "staff_map" in st.session_state:
-                leaders = list(st.session_state.staff_map.keys())
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    sel_leader = st.selectbox("選擇組長：", leaders, key="rep_leader")
-                with col2:
-                    members = st.session_state.staff_map.get(sel_leader, [])
-                    sel_user = st.selectbox("選擇同仁：", members, key="rep_user")
-                
-                st.write(f"當前作業：**{sel_leader}** - **{sel_user}**")
-            else:
-                st.warning("請先在設定管理頁面儲存一次人員配置。")
+        GAME_DB_URL = f"{BASE_URL}/game_rpg_data"
+        REPORT_LOG_URL = f"{BASE_URL}/daily_6s_report_logs"
 
+        # 1. 取得當前台灣時間日期 (UTC+8)
+        tz_taiwan = timezone(timedelta(hours=8))
+        today_tw_str = datetime.now(tz_taiwan).strftime("%Y-%m-%d")
+
+        st.info(f"📅 任務結算基準日（台北時間）：**{today_tw_str}**")
+
+        # 2. 讀取組長主清單
+        leaders_raw = requests.get(f"{BASE_URL}/leaders_list.json").json() or ""
+        leader_list = [l.strip() for l in leaders_raw.split(",") if l.strip()] if isinstance(leaders_raw, str) else []
+
+        # 3. 完全依照後台資料解析
+        raw_data_1 = requests.get(f"{BASE_URL}/leader_members.json").json() or ""
+        raw_data_2 = requests.get(f"{BASE_URL}/leader_members_2.json").json() or "" 
+        
+        combined_lines = []
+        if isinstance(raw_data_1, str):
+            combined_lines.extend(raw_data_1.splitlines())
+        if isinstance(raw_data_2, str):
+            combined_lines.extend(raw_data_2.splitlines())
+
+        # 建立空的映射表
+        leader_member_mapping = {}
+
+        # 解析後台設定
+        for line in combined_lines:
+            line = line.strip()
+            if not line: continue
+            line_fixed = line.replace("：", ":")
+            if ":" in line_fixed:
+                parts = line_fixed.split(":")
+                l_name = parts[0].strip()
+                m_list = [m.strip() for m in parts[1].split(",") if m.strip()]
+                if l_name and m_list:
+                    leader_member_mapping[l_name] = m_list
+
+        # 如果後台完全沒讀到任何資料，才啟用保底名單
+        if not leader_member_mapping:
+            leader_member_mapping = {
+                "陳德文": ["徐梓翔", "牟育玄", "林建安", "魏瑄毅", "羅立昕", "江金福", "呂是儒", "邱信維", "張瑀榛", "陳宛廷", "戴鎰祥", "鍾明志", "黃瑞翎", "羅文發", "羅章淳", "蕭桓惟", "周棟榮", "李偉誠", "潘信成", "張瑀榛", "周政龍", "傑米", "達文", "吉爾"],
+                "劉志偉": ["劉定澤", "胡瑄芸", "蕭詩瓊", "劉秀鳳", "龍才華", "龍斯愷", "姜治銘", "彭毓萱", "邱珍娜", "陳建勳", "黃建堃", "麥可", "費南", "阿杰"],
+                "吳政昌": ["吳政昌", "劉韋廷", "張佳銓", "陳長彥", "李守益", "林昶志"],
+                "蘇萬紘": ["梁志宏", "謝宛庭", "潘威傑", "徐兆生", "鄭智鍵", "王添應", "徐聖淇", "黃承淮", "溫翠茹", "張瑀榛", "張瑀榛", "周政龍", "保羅", "羅丹"],
+                "陳文山": ["蘇雍盛", "張文品", "趙健浩", "洪敏強", "姚奕舟", "彭鈺麟"],
+                "李俊霖": ["陳育信", "陳凱彥", "111", "222"]
+            }
+
+        if not leader_list:
+            leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
 
 
         
