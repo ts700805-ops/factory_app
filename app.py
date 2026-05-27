@@ -442,44 +442,47 @@ else:
 
 
 # ==========================================
-    # 📝 頁面一：每日 6S 任務回報中心 (精簡整合版)
+    # 📝 頁面一：每日 6S 任務回報中心 (徹底修正 NameError)
     # ==========================================
     elif st.session_state.menu_selection == "📝每日6S任務回報":
         st.markdown('### 📋 每日 6S 任務回報中心')
 
-        # 1. 建立頁籤，將「設定」與「回報」完全分離
+        # 1. 強制變數宣告 (放在最上方，確保不會有 NameError)
+        # 如果要從後台讀取，請放在這裡，否則先賦予預設值
+        leader_member_mapping = {
+            "陳德文": ["徐梓翔", "牟育玄", "林建安", "魏瑄毅", "羅立昕"],
+            "劉志偉": ["劉定澤", "胡瑄芸", "蕭詩瓊", "劉秀鳳", "龍才華"],
+            "吳政昌": ["吳政昌", "劉韋廷", "張佳銓", "陳長彥"],
+            "蘇萬紘": ["梁志宏", "謝宛庭", "潘威傑", "徐兆生"]
+        }
+        leader_list = list(leader_member_mapping.keys())
+
+        # 2. 建立頁籤
         tab_report, tab_setting = st.tabs(["📝 回報任務", "⚙️ 設定管理"])
 
         with tab_setting:
             st.subheader("⚙️ 組長與人員配置管理")
-            # 這是您在 image_30046c.png 看到的設定介面
             with st.form("6s_config_form"):
-                current_data = "陳德文:徐梓翔,牟育玄,林建安,魏瑄毅,羅立昕\n劉志偉:劉定澤,胡瑄芸,蕭詩瓊\n吳政昌:吳政昌,劉韋廷,張佳銓\n蘇萬紘:梁志宏,謝宛庭,潘威傑"
-                st.text_area("組長屬下人員 (組長:人員1,人員2)", current_data, height=200, key="config_area")
-                st.form_submit_button("💾 儲存")
+                st.text_area("組長屬下人員 (組長:人員1,人員2)", "陳德文:徐梓翔,牟育玄", height=200, key="config_area")
+                st.form_submit_button("💾 儲存設定")
 
         with tab_report:
-            # 這是您回報時唯一會看到的選單區域 (image_307146.jpg 的紅框處)
-            st.markdown("### 👤 確認您的身份")
-            
-            # 定義清單
-            leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
-            mapping = {
-                "陳德文": ["徐梓翔", "牟育玄", "林建安", "魏瑄毅", "羅立昕"],
-                "劉志偉": ["劉定澤", "胡瑄芸", "蕭詩瓊", "劉秀鳳", "龍才華"]
-            }
-            
+            # 3. 回報介面 (此時 leader_member_mapping 與 leader_list 已確定存在)
             col1, col2 = st.columns(2)
+            
             with col1:
                 selected_leader = st.selectbox("選擇組長：", leader_list, key="rep_leader")
+            
             with col2:
-                selected_user = st.selectbox("選擇同仁：", mapping.get(selected_leader, []), key="rep_user")
+                # 使用 .get() 確保即使選單沒對到，程式也不會崩潰
+                members = leader_member_mapping.get(selected_leader, [])
+                selected_user = st.selectbox("選擇同仁：", members, key="rep_user")
 
             st.write(f"當前選擇：**{selected_leader}** - **{selected_user}**")
-            
-            # 這裡接著您原本的提交按鈕與獎勵顯示邏輯
-            if st.button("🚀 繳交今日 6S 成果，領取點數！", key="submit_btn"):
-                st.success(f"已送出回報：{selected_user}")
+
+
+
+        
         
         # 介面渲染：選擇組長與成員
         st.markdown("### 🔍 第一步：確認您的身份")
