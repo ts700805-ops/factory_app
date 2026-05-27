@@ -442,12 +442,15 @@ else:
 
 
 # ==========================================
-    # 📝 頁面一：每日 6S 任務回報中心 (正確對齊版)
+    # 📝 頁面一：每日 6S 任務回報中心 (最終修正版)
     # ==========================================
     elif st.session_state.menu_selection == "📝每日6S任務回報":
         st.markdown('### 📋 每日 6S 任務回報中心')
 
-        # 1. 定義保底人員映射表
+        # 1. 強制初始化所有變數，絕對不會再發生 NameError
+        leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
+        
+        # 定義人員對應映射表
         leader_member_mapping = {
             "陳德文": ["徐梓翔", "牟育玄", "林建安", "魏瑄毅", "羅立昕", "江金福", "呂是儒", "邱信維", "張瑀榛", "陳宛廷", "戴鎰祥", "鍾明志", "黃瑞翎", "羅文發", "羅章淳", "蕭桓惟", "周棟榮", "李偉誠", "潘信成", "周政龍", "傑米", "達文", "吉爾"],
             "劉志偉": ["劉定澤", "胡瑄芸", "蕭詩瓊", "劉秀鳳", "龍才華", "龍斯愷", "姜治銘", "彭毓萱", "邱珍娜", "陳建勳", "黃建堃", "麥可", "費南"],
@@ -457,26 +460,20 @@ else:
             "李俊霖": ["陳育信", "陳凱彥", "111", "222"]
         }
 
-        # 2. 為了讓介面能管理，顯示設定區域
-        with st.expander("⚙️ 點此編輯組長與組員設定"):
-            with st.form("6s_setting_form"):
-                current_text = "\n".join([f"{k}:{','.join(v)}" for k, v in leader_member_mapping.items()])
-                edit_area = st.text_area("編輯人員清單 (格式: 組長:人員1,人員2)", current_text, height=150)
-                if st.form_submit_button("儲存"):
-                    st.success("設定已暫存 (請確認您的後台儲存邏輯)")
-
-        # 3. 下拉選單 (一定要有唯一的 key)
-        st.markdown("### 🔍 第一步：選擇回報對象")
-        col_l, col_m = st.columns(2)
+        # 2. 介面渲染：使用獨一無二的 key
+        st.markdown("### 🔍 第一步：確認您的身份")
+        col_leader, col_member = st.columns(2)
         
-        with col_l:
-            sel_leader = st.selectbox("👤 選擇組長", list(leader_member_mapping.keys()), key="6s_leader_v3")
+        with col_leader:
+            # 確保在此區塊內變數一定已被定義
+            selected_leader = st.selectbox("👤 選擇所屬組長：", leader_list, key="final_leader_select")
         
-        with col_m:
-            members = leader_member_mapping.get(sel_leader, [])
-            sel_user = st.selectbox("🎯 選擇同仁", members, key="6s_user_v3")
+        with col_member:
+            available_members = leader_member_mapping.get(selected_leader, [])
+            selected_user = st.selectbox("🎯 選擇回報同仁姓名：", available_members, key="final_member_select")
 
-        st.write(f"目前回報對象：**{sel_leader}** 組 - **{sel_user}**")
+        st.divider()
+        st.write(f"當前選擇：組長 **{selected_leader}** / 同仁 **{selected_user}**")
 
         # 介面渲染：選擇組長與成員
         st.markdown("### 🔍 第一步：確認您的身份")
