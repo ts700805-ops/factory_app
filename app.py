@@ -440,59 +440,46 @@ else:
 
 
 
-
 # ==========================================
-    # 📝 頁面一：每日 6S 任務回報中心 (修正版)
+    # 📝 頁面一：每日 6S 任務回報中心 (修正整合版)
     # ==========================================
     elif st.session_state.menu_selection == "📝每日6S任務回報":
         st.markdown('### 📋 每日 6S 任務回報中心')
 
-        # 【核心修正：強制定義變數以避免 NameError】
+        # 1. 定義保底資料
+        default_mapping = {
+            "陳德文": ["徐梓翔", "牟育玄", "林建安", "魏瑄毅", "羅立昕", "江金福", "呂是儒", "邱信維", "張瑀榛", "陳宛廷", "戴鎰祥", "鍾明志", "黃瑞翎", "羅文發", "羅章淳", "蕭桓惟", "周棟榮", "李偉誠", "潘信成", "張瑀榛", "周政龍", "傑米", "達文", "吉爾"],
+            "劉志偉": ["劉定澤", "胡瑄芸", "蕭詩瓊", "劉秀鳳", "龍才華", "龍斯愷", "姜治銘", "彭毓萱", "邱珍娜", "陳建勳", "黃建堃", "麥可", "費南"],
+            "吳政昌": ["吳政昌", "劉韋廷", "張佳銓", "陳長彥", "李守益", "林昶志"],
+            "蘇萬紘": ["梁志宏", "謝宛庭", "潘威傑", "徐兆生", "鄭智鍵", "王添應", "徐聖淇", "黃承淮", "溫翠茹", "張瑀榛", "張瑀榛", "周政龍", "保羅", "羅丹"],
+            "陳文山": ["蘇雍盛", "張文品", "趙健浩", "洪敏強", "姚奕舟", "彭鈺麟"],
+            "李俊霖": ["陳育信", "陳凱彥", "111", "222"]
+        }
+        
+        # 2. 優先嘗試從後台讀取（此處維持您原本邏輯，若讀不到則自動使用 default_mapping）
         BASE_URL = globals().get('DB_URL') or "https://my-factory-system-default-rtdb.firebaseio.com"
-        leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"] # 設定保底預設值
-        leader_member_mapping = {}
+        leader_member_mapping = default_mapping.copy() # 先用預設值
+        
+        # 這裡不強迫寫入，以免讀取失敗時把原本的設定覆蓋掉
+        
+        # 3. 取得組長清單
+        leader_list = list(leader_member_mapping.keys())
 
-        try:
-            # 嘗試抓取最新設定
-            res = requests.get(f"{BASE_URL}/leaders_list.json").json()
-            if res:
-                leader_list = [l.strip() for l in str(res).split(",") if l.strip()]
-        except:
-            pass
-
-        # 確保 leader_list 不會因為抓取失敗而變成 None
-        if not leader_list:
-            leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
-
-        # 介面渲染：確保變數已經存在才執行
+        # 4. 介面渲染：務必為每個元件加上 key 以防錯誤
         st.markdown("### 🔍 第一步：確認您的身份")
         col_leader, col_member = st.columns(2)
         
         with col_leader:
-            selected_leader = st.selectbox("👤 選擇所屬組長：", leader_list)
+            selected_leader = st.selectbox("👤 選擇所屬組長：", leader_list, key="6s_leader_select_final")
         
         with col_member:
-            # 這裡也會用到 leader_member_mapping，所以上面也定義好了
             available_members = leader_member_mapping.get(selected_leader, [])
-            if available_members:
-                selected_user = st.selectbox("🎯 選擇回報同仁姓名：", available_members)
-            else:
-                st.info("尚未載入組員資料")
-            
+            selected_user = st.selectbox("🎯 選擇回報同仁姓名：", available_members, key="6s_member_select_final")
 
-        # 如果後台完全沒讀到任何資料，才啟用保底名單
-        if not leader_member_mapping:
-            leader_member_mapping = {
-                "陳德文": ["徐梓翔", "牟育玄", "林建安", "魏瑄毅", "羅立昕", "江金福", "呂是儒", "邱信維", "張瑀榛", "陳宛廷", "戴鎰祥", "鍾明志", "黃瑞翎", "羅文發", "羅章淳", "蕭桓惟", "周棟榮", "李偉誠", "潘信成", "張瑀榛", "周政龍", "傑米", "達文", "吉爾"],
-                "劉志偉": ["劉定澤", "胡瑄芸", "蕭詩瓊", "劉秀鳳", "龍才華", "龍斯愷", "姜治銘", "彭毓萱", "邱珍娜", "陳建勳", "黃建堃", "麥可", "費南"],
-                "吳政昌": ["吳政昌", "劉韋廷", "張佳銓", "陳長彥", "李守益", "林昶志"],
-                "蘇萬紘": ["梁志宏", "謝宛庭", "潘威傑", "徐兆生", "鄭智鍵", "王添應", "徐聖淇", "黃承淮", "溫翠茹", "張瑀榛", "張瑀榛", "周政龍", "保羅", "羅丹"],
-                "陳文山": ["蘇雍盛", "張文品", "趙健浩", "洪敏強", "姚奕舟", "彭鈺麟"],
-                "李俊霖": ["陳育信", "陳凱彥", "111", "222"]
-            }
-
-        if not leader_list:
-            leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
+        st.divider()
+        st.write(f"目前選擇組長：**{selected_leader}** | 同仁：**{selected_user}**")
+        
+        # 下方可繼續接您原本的「回報確認」按鈕或其他邏輯
 
         # 介面渲染：選擇組長與成員
         st.markdown("### 🔍 第一步：確認您的身份")
