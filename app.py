@@ -595,6 +595,30 @@ else:
                     time.sleep(1.2)
                     st.session_state.menu_selection = "🎮6S戰境養成"
                     st.rerun()
+                    # ==========================================
+        # ⚙️ 新增人員管理區塊 (找回設定功能)
+        # ==========================================
+        st.divider()
+        st.markdown("### ⚙️ 人員與組別管理")
+        
+        with st.expander("點此展開人員編輯設定"):
+            with st.form("admin_edit_members"):
+                # 將目前的字典轉回字串格式，方便在文字框編輯
+                current_text = "\n".join([f"{k}:{','.join(v)}" for k, v in leader_member_mapping.items()])
+                edit_input = st.text_area("編輯組員清單 (格式：組長:組員1,組員2)", current_text, height=200)
+                
+                if st.form_submit_button("💾 儲存並更新名單到後台"):
+                    # 執行邏輯：將編輯框內容更新到 Firebase
+                    try:
+                        # 這裡將內容存入 leader_members.json
+                        requests.put(f"{BASE_URL}/leader_members.json", json=edit_input)
+                        st.success("設定已成功儲存至後台！請重新整理頁面。")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"儲存失敗: {e}")
+
+
+    
 
     # ==========================================
     # 🎮 6S 戰境養成功能區塊
