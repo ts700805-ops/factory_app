@@ -442,15 +442,14 @@ else:
 
 
 # ==========================================
-    # 📝 頁面一：每日 6S 任務回報中心 (強制修正版)
+    # 📝 頁面一：每日 6S 任務回報中心 (語法修正版)
     # ==========================================
     elif st.session_state.menu_selection == "📝每日6S任務回報":
         st.markdown('### 📋 每日 6S 任務回報中心')
 
-        # 1. 強制宣告變數 (確保 NameError 消失)
-        # 如果後台沒東西，這就是安全預設值
-        default_leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
-        default_mapping = {
+        # 1. 強制宣告變數，確保變數一定存在
+        leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
+        leader_member_mapping = {
             "陳德文": ["徐梓翔", "牟育玄", "林建安", "魏瑄毅", "羅立昕"],
             "劉志偉": ["劉定澤", "胡瑄芸", "蕭詩瓊", "劉秀鳳", "龍才華"],
             "吳政昌": ["吳政昌", "劉韋廷", "張佳銓", "陳長彥"],
@@ -459,35 +458,28 @@ else:
             "李俊霖": ["陳育信", "陳凱彥", "111", "222"]
         }
 
-        # 將變數賦值，確保無論如何都有東西
-        leader_list = default_leader_list
-        leader_member_mapping = default_mapping
-
-        # 2. 設定管理介面 (Tab 頁籤)
+        # 2. 建立頁籤
         tab_report, tab_setting = st.tabs(["📝 回報任務", "⚙️ 設定管理"])
 
         with tab_setting:
             st.subheader("編輯人員對應")
-            with st.form("config_form"):
-                current_text = "\n".join([f"{k}:{','.join(v)}" for k, v in leader_member_mapping.items()])
-                config_input = st.text_area("編輯區 (組長:人員1,人員2)", current_text, height=150, key="cfg_input")
-                st.form_submit_button("儲存設定")
+            # 簡單的文字區塊，用來讓您未來對接後台
+            st.text_area("編輯區 (組長:人員1,人員2)", "陳德文:成員1,成員2", height=150)
+            st.button("儲存設定")
 
-        # 3. 回報介面 (確保變數存在)
         with tab_report:
             st.markdown("### 👤 確認您的身份")
             col1, col2 = st.columns(2)
             
             with col1:
-                # 使用 key 避免 ID 重複錯誤
                 selected_leader = st.selectbox("選擇組長：", leader_list, key="rep_leader_select")
             
-            with col_member_key := col2:
+            with col2:
                 members = leader_member_mapping.get(selected_leader, [])
                 selected_user = st.selectbox("選擇同仁：", members, key="rep_member_select")
 
             st.write(f"當前選擇：{selected_leader} - {selected_user}")
-
+            
         
         # 介面渲染：選擇組長與成員
         st.markdown("### 🔍 第一步：確認您的身份")
