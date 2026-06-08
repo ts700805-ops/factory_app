@@ -1790,7 +1790,7 @@ else:
 
 
 # ==========================================
-# 📘 頁面：標準SOP功能 (按鈕紅色填滿完美版)
+# 📘 頁面：標準SOP功能 (強制按鈕變色完美根治版)
 # ==========================================
     elif st.session_state.menu_selection == "📘 標準SOP功能":
         import base64
@@ -1867,31 +1867,39 @@ else:
                         st.session_state.active_sop_proc = proc_name
                         st.rerun()
                     
-                    # 🎯【核心修改】透過 CSS 直接強制控制按鈕的填滿顏色
-                    # 如果是被選中的工序：變成紅色填滿、白色粗體字
-                    # 如果沒選中：維持原本的樣式
+                    # 🎯【全新超級暴力強制變色 CSS】🎯
+                    # 這次使用深度無死角選取器，把按鈕內所有層級（p, span, 容器本身）文字通通抓下來強制改色
                     if is_current:
                         st.markdown(f"""
                             <style>
-                            div[data-testid="stButton"] button[key="btn_p_{proc_key_tmp}"] {{
-                                background-color: #ef4444 !important; /* 🔥 完美正紅色填滿 */
-                                border: 1px solid #ef4444 !important;
-                                color: #ffffff !important;           /* ⚪ 白色字體 */
+                            /* 1. 強制按鈕底色變成正紅色 */
+                            div[data-testid="stButton"] button[key="btn_p_{proc_key_tmp}"],
+                            div.stButton > button[key="btn_p_{proc_key_tmp}"] {{
+                                background-color: #ef4444 !important;
+                                border: 2px solid #ef4444 !important;
                             }}
-                            div[data-testid="stButton"] button[key="btn_p_{proc_key_tmp}"] p {{
-                                color: #ffffff !important;           /* 強制段落文字也是白色 */
-                                font-weight: 900 !important;         /* 粗體 */
-                                font-size: 16px !important;          /* 放大字體 */
+                            /* 2. 強制按鈕內的所有文字、標籤全部變成純白色、特粗體、放大到 18px */
+                            div[data-testid="stButton"] button[key="btn_p_{proc_key_tmp}"] *,
+                            div.stButton > button[key="btn_p_{proc_key_tmp}"] span,
+                            div.stButton > button[key="btn_p_{proc_key_tmp}"] p {{
+                                color: #ffffff !important;
+                                font-color: #ffffff !important;
+                                font-weight: 900 !important;
+                                font-size: 18px !important;
                             }}
                             </style>
                         """, unsafe_allow_html=True)
                     else:
-                        # 沒選中時的普通按鈕樣式防呆（確保字體看得見）
+                        # 未選中時，強迫按鈕內的文字絕對要呈現【黑色高對比粗體】，防止變成白色隱形
                         st.markdown(f"""
                             <style>
-                            div[data-testid="stButton"] button[key="btn_p_{proc_key_tmp}"] p {{
-                                color: #000000 !important;           /* 黑字 */
-                                font-weight: 800 !important;
+                            div[data-testid="stButton"] button[key="btn_p_{proc_key_tmp}"] *,
+                            div.stButton > button[key="btn_p_{proc_key_tmp}"] span,
+                            div.stButton > button[key="btn_p_{proc_key_tmp}"] p {{
+                                color: #000000 !important;
+                                font-color: #000000 !important;
+                                font-weight: 900 !important;
+                                font-size: 16px !important;
                             }}
                             </style>
                         """, unsafe_allow_html=True)
