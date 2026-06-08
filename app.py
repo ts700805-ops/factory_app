@@ -180,7 +180,7 @@ if "user" not in st.session_state:
 else:
     # 側邊欄導航 (新增手工具相關選項)
     st.sidebar.markdown(f"### 👤 當前人員：**{st.session_state.user}**")
-    nav = st.sidebar.radio("功能導航", [
+   nav = st.sidebar.radio("功能導航", [
         "🧾組長待辦事項",
         "🛡️🛡️🛡️🛡️🛡️🛡️",
         "📝每日6S任務回報", 
@@ -189,7 +189,7 @@ else:
         "🔧 固資&手工具紀錄表",
         "⚙️ 資產編輯清單", 
         "🛡️🛡️🛡️🛡️🛡️🛡️",
-        "📘核心防護SOP", 
+        "📘核心防護SOP",  # 確定使用這個新名稱
         "⚙️ 設定管理",
     ])
     
@@ -1796,18 +1796,25 @@ else:
         SOP_CONFIG_URL = f"{DB_BASE_URL}/sop_main_config"  
         SOP_FILE_URL = f"{DB_BASE_URL}/sop_file_data"      
 
-        # 頂部大標題 (放大且改為橙色，名稱修正為 📘核心安全防護SOP)
-        st.markdown('<h1 style="text-align:center; color:#ea580c; font-weight:900; font-size:2.8rem;">📘核心安全防護SOP</h1>', unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center; color:#ea580c; font-weight:800; font-size:1.3rem;'>請至下方心智圖清單中點擊「👁️ 查看」，系統將採用安全機制彈出大視窗，供現場人員直接查閱</p>", unsafe_allow_html=True)
-        st.divider()
-
-        # 1. 讀取機型規格清單 (放大且改為橙色)
-        st.markdown('<h3 style="color:#ea580c; font-weight:900; font-size:1.6rem;">⚙️ 1. 請選取機型規格</h3>', unsafe_allow_html=True)
+        # 1. 先讀取機型規格清單 (為了讓最上面的大標題能連動，我們把讀取和下拉選單挪到最前面)
         main_config = requests.get(f"{SOP_CONFIG_URL}.json").json() or {}
         model_list = main_config.get("model_list", ["SOTER+EFEM", "標準機型"])
 
         # 2. 下拉式選單：選擇機型規格
         selected_model = st.selectbox("選擇機型規格 (請由此下拉選單切換)：", model_list, index=0, key="sop_selected_model")
+        
+        # 自動提取主要機型代號（例如把 "SOTER+EFEM , 標準機型" 切割成 "SOTER+EFEM"）
+        display_model_name = selected_model.split(',')[0].split('，')[0].strip()
+
+        st.divider()
+
+        # 🔔 【已修正】頂部大標題：現在會隨著您下拉選單選的機型自動連動更新了！
+        st.markdown(f'<h1 style="text-align:center; color:#ea580c; font-weight:900; font-size:2.8rem;">📘 {display_model_name} 核心安全防護SOP</h1>', unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center; color:#ea580c; font-weight:800; font-size:1.3rem;'>請至下方心智圖清單中點擊「👁️ 查看」，系統將採用安全機制彈出大視窗，供現場人員直接查閱</p>", unsafe_allow_html=True)
+        st.divider()
+
+        # 提示選取標題 (配合搬移後的順序微調提示)
+        st.markdown('<h3 style="color:#ea580c; font-weight:900; font-size:1.6rem;">⚙️ 1. 目前已選取之機型規格</h3>', unsafe_allow_html=True)
         
         # 安全編碼機型 Key
         model_safe_key = base64.b64encode(selected_model.encode('utf-8')).decode('utf-8').replace('=', '')
