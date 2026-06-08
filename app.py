@@ -1789,58 +1789,49 @@ else:
 
 
 # ==========================================
-# 📘 頁面：標準SOP功能 (後台工序完全連動維護版)
+# 📘 頁面：標準SOP功能 (多份SOP獨立個體安全版)
 # ==========================================
     elif st.session_state.menu_selection == "📘 標準SOP功能":
         import base64
         import re
 
         # 資料庫路徑設定
-        SOP_CONFIG_URL = f"{DB_BASE_URL}/sop_main_config"  # 儲存機型規格清單
-        SOP_FILE_URL = f"{DB_BASE_URL}/sop_file_data"      # 儲存 PDF 檔案與各機型獨立工序
+        SOP_CONFIG_URL = f"{DB_BASE_URL}/sop_main_config"  # 儲存機型與工序項目
+        SOP_FILE_URL = f"{DB_BASE_URL}/sop_file_data"      # 儲存 PDF 檔案 (多檔案獨立儲存)
 
         # 頂部大標題
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900; font-size:2.5rem;">📘 標準 SOP 線上查閱中心</h1>', unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center; color:#334155; font-weight:700;'>切換機型規格時，系統會自動動態加載該機型專屬的製造工序與作業書</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center; color:#334155; font-weight:700;'>支援單一工序配置多份獨立 SOP 文件，避免檔案過大，保障系統流暢度</p>", unsafe_allow_html=True)
         st.divider()
 
-        # ------------------------------------------
         # 1. 讀取機型規格清單
-        # ------------------------------------------
         main_config = requests.get(f"{SOP_CONFIG_URL}.json").json() or {}
         model_list = main_config.get("model_list", ["SOTER+EFEM", "標準機型"])
 
-        # ------------------------------------------
-        # 2. ⚙️ 下拉式選單：選擇機型規格
-        # ------------------------------------------
+        # 2. 下拉式選單：選擇機型規格
         st.markdown("### ⚙️ 1. 請選取機型規格")
         selected_model = st.selectbox("選擇機型規格：", model_list, index=0, key="sop_selected_model")
         
-        # 安全編碼機型 Key，用來當作資料庫的分類節點
+        # 安全編碼機型 Key
         model_safe_key = base64.b64encode(selected_model.encode('utf-8')).decode('utf-8').replace('=', '')
 
-        # ------------------------------------------
-        # 3. 🎯 動態載入「該機型專屬」的工序項目與所有檔案紀錄
-        # ------------------------------------------
-        all_file_data = requests.get(f"{SOP_FILE_URL}.json").json() or {}
-        
-        # 試著從資料庫抓取專屬此機型的工序
+        # 3. 動態載入該機型專屬工序項目
         model_spec_data = requests.get(f"{SOP_CONFIG_URL}/model_procs/{model_safe_key}.json").json()
         if model_spec_data and "sop_types" in model_spec_data:
             sop_types = model_spec_data["sop_types"]
         else:
-            # 這是你提供的預設工序流程，當新機型沒設定過時自動帶入
             sop_types = [
                 "骨架作業", "前置作業", "配電作業", "模組作業", "水平調整", 
                 "通電作業", "IPQC表單查檢", "收機清潔", "包機作業", "PACKING", 
                 "前置作業(門板組立)", "S.T作業"
             ]
 
-        # 初始化 session_state 用來紀錄目前點選了哪一個工序
+        # 4. 一次性載入整個檔案資料庫，供心智圖渲染
+        all_file_nodes = requests.get(f"{SOP_FILE_URL}.json").json() or {}
+
+        # 初始化選中工序
         if "active_sop_proc" not in st.session_state:
             st.session_state.active_sop_proc = sop_types[0] if sop_types else ""
-        
-        # 【重要校正】如果切換機型後，發現當前選取的工序不在新機型的流程內，自動跳回新機型第一個工序
         if st.session_state.active_sop_proc not in sop_types and sop_types:
             st.session_state.active_sop_proc = sop_types[0]
 
@@ -1848,19 +1839,18 @@ else:
 
 
         # ==========================================
-        # 🧠 【三層獨立心智圖看板】
+        # 🧠 【三層獨立心智圖看板 - 支援多文件展開】
         # ==========================================
-        st.markdown(f"### 🧠 【{selected_model}】專屬工序心智圖")
+        st.markdown(f"### 🧠 【{selected_model}】多文件心智圖總覽")
         
         with st.container(border=True):
             for idx, proc_name in enumerate(sop_types):
-                # 複合式安全 Key (機型碼_工序碼)
                 proc_safe_key = base64.b64encode(proc_name.encode('utf-8')).decode('utf-8').replace('=', '')
-                combined_file_key = f"{model_safe_key}_{proc_safe_key}"
+                combined_node_key = f"{model_safe_key}_{proc_safe_key}"
                 
-                # 檢查該機型此工序有無檔案
-                has_file = combined_file_key in all_file_data and "file_base64" in all_file_data[combined_file_key]
-                file_name_info = all_file_data[combined_file_key].get("file_name", "") if has_file else ""
+                # 取得該工序下的「多份」獨立檔案字典
+                proc_files_dict = all_file_nodes.get(combined_node_key, {})
+                file_count = len(proc_files_dict) if isinstance(proc_files_dict, dict) else 0
                 
                 is_current = (current_active == proc_name)
                 
@@ -1874,7 +1864,7 @@ else:
                     else:
                         st.markdown('<div style="text-align:center; color:#cbd5e1; font-weight:900; line-height:40px;">│</div>', unsafe_allow_html=True)
                 
-                # 第二欄：連接線
+                # 第二欄：連接線 ➔
                 with mm_cols[1]:
                     st.markdown('<div style="text-align:center; color:#a78bfa; font-weight:900; line-height:45px; font-size:1.2rem;">➔</div>', unsafe_allow_html=True)
                 
@@ -1885,45 +1875,44 @@ else:
                     text_style = "color:#fde047;" if is_current else "color:#ffffff;"
                     
                     st.markdown(f"""
-                        <div style="background-color: {card_bg}; border: {border_style}; border-radius: 6px; padding: 6px 12px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                            <span style="{text_style} font-weight: 800; font-size: 1rem;">🛠️ {proc_name}</span>
+                        <div style="background-color: {card_bg}; border: {border_style}; border-radius: 6px; padding: 4px 12px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                            <span style="{text_style} font-weight: 800; font-size: 0.95rem;">🛠️ {proc_name} ({file_count}份)</span>
                         </div>
                     """, unsafe_allow_html=True)
                     
-                    # 按鈕：點選時變紅色填滿 + 黑色字體粗體
-                    if st.button(f"👆 查看 {proc_name}", key=f"btn_p_{combined_file_key}", use_container_width=True):
+                    if st.button(f"👆 查看 {proc_name}", key=f"btn_p_{combined_node_key}", use_container_width=True):
                         st.session_state.active_sop_proc = proc_name
                         st.rerun()
                     
-                    # 覆蓋樣式：被選中 = 紅底黑字，沒選中 = 正常黑字
+                    # 點選時變：紅底黑字，沒點選：正常黑字
                     if is_current:
                         st.markdown(f"""
                             <style>
-                            div[data-testid="stButton"] button[key="btn_p_{combined_file_key}"],
-                            div.stButton > button[key="btn_p_{combined_file_key}"],
-                            div.stButton > button[key="btn_p_{combined_file_key}"]:hover,
-                            div.stButton > button[key="btn_p_{combined_file_key}"]:active,
-                            div.stButton > button[key="btn_p_{combined_file_key}"]:focus {{
+                            div[data-testid="stButton"] button[key="btn_p_{combined_node_key}"],
+                            div.stButton > button[key="btn_p_{combined_node_key}"],
+                            div.stButton > button[key="btn_p_{combined_node_key}"]:hover,
+                            div.stButton > button[key="btn_p_{combined_node_key}"]:active,
+                            div.stButton > button[key="btn_p_{combined_node_key}"]:focus {{
                                 background-color: #ef4444 !important;
                                 border: 2px solid #ef4444 !important;
                                 background: #ef4444 !important;
                             }}
-                            div[data-testid="stButton"] button[key="btn_p_{combined_file_key}"] *,
-                            div.stButton > button[key="btn_p_{combined_file_key}"] span,
-                            div.stButton > button[key="btn_p_{combined_file_key}"] p {{
+                            div[data-testid="stButton"] button[key="btn_p_{combined_node_key}"] *,
+                            div.stButton > button[key="btn_p_{combined_node_key}"] span,
+                            div.stButton > button[key="btn_p_{combined_node_key}"] p {{
                                 color: #000000 !important;
                                 -webkit-text-fill-color: #000000 !important;
                                 font-weight: 900 !important;
-                                font-size: 16px !important;
+                                font-size: 15px !important;
                             }}
                             </style>
                         """, unsafe_allow_html=True)
                     else:
                         st.markdown(f"""
                             <style>
-                            div[data-testid="stButton"] button[key="btn_p_{combined_file_key}"] *,
-                            div.stButton > button[key="btn_p_{combined_file_key}"] span,
-                            div.stButton > button[key="btn_p_{combined_file_key}"] p {{
+                            div[data-testid="stButton"] button[key="btn_p_{combined_node_key}"] *,
+                            div.stButton > button[key="btn_p_{combined_node_key}"] span,
+                            div.stButton > button[key="btn_p_{combined_node_key}"] p {{
                                 color: #000000 !important;
                                 -webkit-text-fill-color: #000000 !important;
                                 font-weight: 800 !important;
@@ -1931,18 +1920,21 @@ else:
                             </style>
                         """, unsafe_allow_html=True)
 
-                # 第四欄：連接線
+                # 第四欄：連接線 ➔
                 with mm_cols[3]:
                     st.markdown('<div style="text-align:center; color:#34d399; font-weight:900; line-height:45px; font-size:1.2rem;">➔</div>', unsafe_allow_html=True)
                 
-                # 第五欄：SOP文件擴展節點
+                # 第五欄：【多檔案獨立分支展開】
                 with mm_cols[4]:
-                    if has_file:
-                        st.markdown(f"""
-                            <div style="background-color: #065f46; border-left: 5px solid #34d399; border-radius: 4px; padding: 6px 12px; margin-top: 5px;">
-                                <span style="color: #ffffff; font-weight: 700; font-size: 0.9rem; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">📄 {file_name_info}</span>
-                            </div>
-                        """, unsafe_allow_html=True)
+                    if file_count > 0:
+                        # 迴圈抓出該工序底下的每一份獨立檔案
+                        for file_id, file_info in proc_files_dict.items():
+                            f_name = file_info.get("file_name", "未命名文件")
+                            st.markdown(f"""
+                                <div style="background-color: #065f46; border-left: 4px solid #34d399; border-radius: 4px; padding: 3px 8px; margin-bottom: 3px;">
+                                    <span style="color: #ffffff; font-weight: 700; font-size: 0.85rem; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">📄 {f_name}</span>
+                                </div>
+                            """, unsafe_allow_html=True)
                     else:
                         st.markdown('<div style="color: #94a3b8; font-style: italic; font-weight:700; line-height:45px; font-size:0.9rem;">❌ 尚未配置 SOP</div>', unsafe_allow_html=True)
 
@@ -1951,22 +1943,27 @@ else:
 
 
         # ==========================================
-        # 📄 【動態內容區】下方管理選中的專屬 SOP
+        # 📄 【動態內容區】獨立個體文件上傳與個別查閱管理
         # ==========================================
         if current_active:
             st.markdown(f"## 🔍 目前展開檢視：【{selected_model}】➔【{current_active}】")
             
-            target_file_key = f"{model_safe_key}_" + base64.b64encode(current_active.encode('utf-8')).decode('utf-8').replace('=', '')
-            existing_file_data = all_file_data.get(target_file_key)
+            target_node_key = f"{model_safe_key}_" + base64.b64encode(current_active.encode('utf-8')).decode('utf-8').replace('=', '')
+            
+            # 從大字典撈出該工序目前擁有的所有檔案
+            current_files = all_file_nodes.get(target_node_key, {})
 
-            # 檔案上傳
-            uploaded_pdf = st.file_uploader(f"📤 上傳或更新【{selected_model} - {current_active}】的 SOP (限制 PDF)", type=["pdf"], key=f"uploader_{target_file_key}")
+            # 區塊 1：上傳新檔案 (獨立個體儲存)
+            uploaded_pdf = st.file_uploader(f"📤 新增獨立 SOP 文件至【{current_active}】(可多次上傳不同的檔案)", type=["pdf"], key=f"uploader_{target_node_key}")
             
             if uploaded_pdf is not None:
-                if st.button("🚀 確定上傳並覆蓋舊檔案", use_container_width=True):
-                    with st.spinner("檔案上傳中..."):
+                if st.button("🚀 確定上傳此份獨立文件", use_container_width=True):
+                    with st.spinner("檔案打包傳輸中..."):
                         file_bytes = uploaded_pdf.read()
                         base64_pdf = base64.b64encode(file_bytes).decode('utf-8')
+                        
+                        # 使用時間戳記當作這份檔案的獨立 ID，絕不重疊覆蓋
+                        unique_file_id = f"file_{int(time.time() * 1000)}"
                         
                         payload = {
                             "file_name": uploaded_pdf.name,
@@ -1975,46 +1972,58 @@ else:
                             "file_base64": base64_pdf
                         }
                         
-                        requests.put(f"{SOP_FILE_URL}/{target_file_key}.json", data=json.dumps(payload))
-                        st.success(f"🎉 上傳成功！已綁定至 【{selected_model}】的【{current_active}】。")
+                        # 寫入專屬的獨立檔案節點路徑下！
+                        requests.put(f"{SOP_FILE_URL}/{target_node_key}/{unique_file_id}.json", data=json.dumps(payload))
+                        st.success(f"🎉 獨立個體【{uploaded_pdf.name}】上傳成功！已成功分流儲存。")
                         time.sleep(0.8)
                         st.rerun()
 
             st.write("")
 
-            # 顯示下載按鈕
-            if existing_file_data and "file_base64" in existing_file_data:
-                st.markdown(f"<div style='background-color:#f1f5f9; padding:10px; border-left:5px solid #4c1d95; border-radius:4px; margin-bottom:10px;'><b style='color:#0f172a; font-size:1.1rem;'>📄 目前說明書：{existing_file_data.get('file_name')}</b></div>", unsafe_allow_html=True)
-                try:
-                    pdf_b64 = existing_file_data["file_base64"]
-                    pdf_bytes = base64.b64decode(pdf_b64)
-                    file_name_download = existing_file_data.get('file_name', 'SOP.pdf')
+            # 區塊 2：獨立列表展現、個別下載、個別刪除
+            st.markdown("### 📋 已上傳之獨立 SOP 文件列表")
+            if current_files and isinstance(current_files, dict):
+                for f_id, f_data in current_files.items():
+                    f_name = f_data.get("file_name", "未知檔案")
+                    f_time = f_data.get("upload_time", "未知時間")
                     
-                    st.download_button(
-                        label=f"📥 點擊下載 / 開啟查閱 【{file_name_download}】",
-                        data=pdf_bytes,
-                        file_name=file_name_download,
-                        mime="application/pdf",
-                        use_container_width=True,
-                        type="primary" 
-                    )
-                except Exception as file_err:
-                    st.error(f"檔案解析失敗: {file_err}")
-
-                st.write("")
-                # 刪除功能
-                with st.expander("🗑️ 刪除此專屬說明書"):
-                    pwd_sop = st.text_input("請輸入管理密碼：", type="password", key=f"pwd_{target_file_key}")
-                    if st.button("❌ 確認徹底移除此 PDF 檔案", type="primary", use_container_width=True, key=f"del_{target_file_key}"):
-                        if pwd_sop == "0000":
-                            requests.delete(f"{SOP_FILE_URL}/{target_file_key}.json")
-                            st.success("檔案已成功刪除！")
-                            time.sleep(0.5)
-                            st.rerun()
-                        else:
-                            st.error("❌ 密碼錯誤！")
+                    # 用一個獨立的白底方框包住每份檔案
+                    with st.container(border=True):
+                        col_f1, col_f2 = st.columns([7, 3])
+                        with col_f1:
+                            st.markdown(f"**📄 文件名稱：** {f_name}")
+                            st.markdown(f"<small style='color:gray;'>上傳時間：{f_time}</small>", unsafe_allow_html=True)
+                        
+                        with col_f2:
+                            # 獨立下載按鈕
+                            try:
+                                p_b64 = f_data["file_base64"]
+                                p_bytes = base64.b64decode(p_b64)
+                                st.download_button(
+                                    label="📥 下載/查閱",
+                                    data=p_bytes,
+                                    file_name=f_name,
+                                    mime="application/pdf",
+                                    key=f"dl_{f_id}",
+                                    use_container_width=True
+                                )
+                            except:
+                                st.error("解碼失敗")
+                            
+                            # 獨立刪除按鈕 (放入小收納盒防誤觸)
+                            with st.expander("🗑️ 刪除"):
+                                pwd_del = st.text_input("密碼：", type="password", key=f"pwd_{f_id}")
+                                if st.button("❌ 確定刪除", type="primary", key=f"btn_del_{f_id}", use_container_width=True):
+                                    if pwd_del == "0000":
+                                        # 只刪除該筆時間戳記節點，其餘檔案完好無損！
+                                        requests.delete(f"{SOP_FILE_URL}/{target_node_key}/{f_id}.json")
+                                        st.success("該檔案已安全移除！")
+                                        time.sleep(0.5)
+                                        st.rerun()
+                                    else:
+                                        st.error("密碼錯誤")
             else:
-                st.warning(f"💡 目前【{selected_model}】底下的【{current_active}】尚未配置專屬 SOP。")
+                st.warning(f"💡 目前【{selected_model}】➔【{current_active}】尚未上傳任何 SOP 說明書。")
 
 
         # ==========================================
@@ -2041,18 +2050,16 @@ else:
 
         with col_set2:
             with st.container(border=True):
-                # 🎯【核心修正】：這裡動態顯示當前選定機型的名稱，並使用特定的 key，防止內容不連動
                 st.markdown(f"##### 🛠️ 2. 編輯【{selected_model}】的專屬工序")
                 sop_input_str = "，".join(sop_types)
                 
-                # 🎯【關鍵修改】：key 必須加上機型安全碼（key=f"txt_sop_list_{model_safe_key}"）
-                # 這樣 Streamlit 在切換下拉選單時，才會強制重刷這個文字方塊的內容！
                 sop_input = st.text_area(f"設定該機型專屬工序 (以逗號或分行隔開)", value=sop_input_str, height=120, key=f"txt_sop_list_{model_safe_key}")
                 
                 if st.button(f"💾 儲存【{selected_model}】專用流程", use_container_width=True, key=f"btn_save_sops_{model_safe_key}"):
                     new_sops = [t.strip() for t in re.split(r'[，,\n]', sop_input) if t.strip()]
-                    # 正確寫入當前所選機型對應的資料庫節點
                     requests.put(f"{SOP_CONFIG_URL}/model_procs/{model_safe_key}.json", data=json.dumps({"sop_types": new_sops}))
                     st.success(f"✅ 【{selected_model}】的專屬工序流程已完成獨立儲存！")
                     time.sleep(0.5)
                     st.rerun()
+
+
