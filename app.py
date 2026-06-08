@@ -1788,7 +1788,7 @@ else:
 
 
 # ==========================================
-# 📘 頁面：標準SOP功能 (新開視窗真正解法版)
+# 📘 頁面：標準SOP功能 (右側雙按鈕 + 內嵌全螢幕彈窗免下載版)
 # ==========================================
     elif st.session_state.menu_selection == "📘 標準SOP功能":
         import base64
@@ -1800,7 +1800,7 @@ else:
 
         # 頂部大標題
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900; font-size:2.5rem;">📘 標準 SOP 線上查閱中心</h1>', unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center; color:#334155; font-weight:700;'>請至心智圖右側檔案清單，點擊「👁️ 查看」系統將安全開啟新分頁呈現作業書</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center; color:#334155; font-weight:700;'>請至心智圖右側檔案清單，點擊「👁️ 查看」系統將直接彈出大視窗呈現作業書（免下載）</p>", unsafe_allow_html=True)
         st.divider()
 
         # 1. 讀取機型規格清單
@@ -1830,11 +1830,32 @@ else:
 
         # 初始化選中工序
         if "active_sop_proc" not in st.session_state:
-            st.session_state.active_sop_proc = sop_types[0] if sop_types else ""
+            st.session_state.active_sop_proc = map_types[0] if sop_types else ""
         if st.session_state.active_sop_proc not in sop_types and sop_types:
             st.session_state.active_sop_proc = sop_types[0]
 
         current_active = st.session_state.active_sop_proc
+
+
+        # 💡【核心創新技術】：定義點擊「👁️ 查看」時要彈出的全螢幕大燈箱視窗
+        @st.dialog("📄 標準 SOP 線上查閱視窗", width="large")
+        def show_pdf_dialog(file_name, base64_data):
+            st.markdown(f"#### 🛠️ 目前正在瀏覽：`{file_name}`")
+            try:
+                # 使用 object 標籤嵌入，並加上完全控制參數，讓瀏覽器內建的 PDF 閱讀器霸氣登場
+                pdf_html = f"""
+                    <object data="data:application/pdf;base64,{base64_data}" type="application/pdf" width="100%" height="750px">
+                        <div style="padding:20px; text-align:center; background:#fee2e2; border-radius:8px;">
+                            ⚠️ 您的瀏覽器不支援直接預覽，請更換瀏覽器或聯絡管理員。
+                        </div>
+                    </object>
+                """
+                st.markdown(pdf_html, unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"預覽渲染失敗: {e}")
+            
+            if st.button("❌ 關閉視窗", use_container_width=True):
+                st.rerun()
 
 
         # ==========================================
@@ -1903,7 +1924,7 @@ else:
                 with mm_cols[3]:
                     st.markdown('<div style="text-align:center; color:#34d399; font-weight:900; line-height:45px; font-size:1.2rem;">➔</div>', unsafe_allow_html=True)
                 
-                # 第五欄：🎯 【右側圈選處】配置 檔案標籤 + 安全新視窗查看 + 刪除彈出盒
+                # 第五欄：🎯 【右側圈選處】配置 檔案標籤 + 免下載彈出查看鈕 + 刪除彈出盒
                 with mm_cols[4]:
                     if file_count > 0:
                         for file_id, file_info in proc_files_dict.items():
@@ -1920,35 +1941,24 @@ else:
                                 """, unsafe_allow_html=True)
                                 
                             with f_sub_cols[1]:
-                                # 💡【核心修正解法】：將 Base64 轉換為瀏覽器認得的純 bytes 流，再搭配 js 強制新視窗打開
-                                try:
-                                    pdf_bytes = base64.b64decode(pdf_b64)
-                                    # 用原生按鈕渲染，點擊時直接傳輸二進位數據
-                                    st.download_button(
-                                        label="👁️ 查看",
-                                        data=pdf_bytes,
-                                        file_name=f_name,
-                                        mime="application/pdf",
-                                        key=f"view_sec_{combined_node_key}_{file_id}",
-                                        use_container_width=True
-                                    )
-                                    # 利用 CSS 把 download 按鈕偽裝成一般的帥氣功能查看鈕外觀
-                                    st.markdown(f"""
-                                        <style>
-                                        div.stDownloadButton button[key="view_sec_{combined_node_key}_{file_id}"] {{
-                                            background-color: #1e40af !important;
-                                            color: white !important;
-                                            font-weight: 800 !important;
-                                            font-size: 0.85rem !important;
-                                            height: 34px !important;
-                                            border: 1px solid #3b82f6 !important;
-                                            padding: 0px !important;
-                                            line-height: 34px !important;
-                                        }}
-                                        </style>
-                                    """, unsafe_allow_html=True)
-                                except Exception as e:
-                                    st.caption("檔案解析出錯")
+                                # 💡 改用 Streamlit 原生 Button 綁定 燈箱函式，點擊後「免下載」直接滿版跳出來！
+                                if st.button("👁️ 查看", key=f"view_dlg_{combined_node_key}_{file_id}", use_container_width=True):
+                                    show_pdf_dialog(f_name, pdf_b64)
+                                
+                                # 美化查看按鈕外觀
+                                st.markdown(f"""
+                                    <style>
+                                    div.stButton button[key="view_dlg_{combined_node_key}_{file_id}"] {{
+                                        background-color: #1e40af !important;
+                                        color: white !important;
+                                        font-weight: 800 !important;
+                                        font-size: 0.85rem !important;
+                                        height: 34px !important;
+                                        border: 1px solid #3b82f6 !important;
+                                        line-height: 18px !important;
+                                    }}
+                                    </style>
+                                """, unsafe_allow_html=True)
                                 
                             with f_sub_cols[2]:
                                 with st.popover("🗑️ 刪除", use_container_width=True):
@@ -2026,7 +2036,7 @@ else:
                 sop_input_str = "，".join(sop_types)
                 sop_input = st.text_area(f"設定該機型專屬工序 (以逗號或分行隔開)", value=sop_input_str, height=120, key=f"txt_sop_list_{model_safe_key}")
                 
-                if st.button(f"💾 儲存【{selected_model}】專用流程", use_container_width=True, key=f"btn_save_sops_{model_safe_key}"):
+                if st.button(f"💾 儲存【{selected_model}】專用流程", use_container_width=True, key="btn_save_sops_{model_safe_key}"):
                     new_sops = [t.strip() for t in re.split(r'[，,\n]', sop_input) if t.strip()]
                     requests.put(f"{SOP_CONFIG_URL}/model_procs/{model_safe_key}.json", data=json.dumps({"sop_types": new_sops}))
                     st.success(f"✅ 【{selected_model}】的專屬工序流程已完成獨立儲存！")
