@@ -1786,9 +1786,9 @@ else:
 
 
 # ==========================================
-# 📘 頁面：📘核心安全防護SOP ",(按鈕填滿藍色 + 文字全面加大並改為橙色清晰版)
+# 📘 頁面：📘核心安全防護SOP (按鈕填滿藍色 + 文字全面加大並改為橙色清晰版)
 # ==========================================
-    elif st.session_state.menu_selection == "📘核心防護SOP":
+    elif st.session_state.menu_selection == "📘核心安全防護SOP":
         import base64
         import re
 
@@ -1796,8 +1796,8 @@ else:
         SOP_CONFIG_URL = f"{DB_BASE_URL}/sop_main_config"  
         SOP_FILE_URL = f"{DB_BASE_URL}/sop_file_data"      
 
-        # 頂部大標題 (放大且改為橙色)
-        st.markdown('<h1 style="text-align:center; color:#ea580c; font-weight:900; font-size:2.8rem;">📘核心防護SOP</h1>', unsafe_allow_html=True)
+        # 頂部大標題 (放大且改為橙色，名稱修正為 📘核心安全防護SOP)
+        st.markdown('<h1 style="text-align:center; color:#ea580c; font-weight:900; font-size:2.8rem;">📘核心安全防護SOP</h1>', unsafe_allow_html=True)
         st.markdown("<p style='text-align:center; color:#ea580c; font-weight:800; font-size:1.3rem;'>請至下方心智圖清單中點擊「👁️ 查看」，系統將採用安全機制彈出大視窗，供現場人員直接查閱</p>", unsafe_allow_html=True)
         st.divider()
 
