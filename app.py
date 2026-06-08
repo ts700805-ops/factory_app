@@ -1789,7 +1789,7 @@ else:
 
 
 # ==========================================
-# 📘 頁面：標準SOP功能 (心智圖開展+紅底黑字版)
+# 📘 頁面：標準SOP功能 (心智圖樹狀展開版)
 # ==========================================
     elif st.session_state.menu_selection == "📘 標準SOP功能":
         import base64
@@ -1801,187 +1801,194 @@ else:
 
         # 頂部大標題調色：使用高對比深邃藍
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900; font-size:2.5rem;">📘 標準 SOP 線上查閱中心</h1>', unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center; color:#334155; font-weight:700;'>如心智圖般點擊工序節點，延伸查看或指派對應的標準作業書</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center; color:#334155; font-weight:700;'>以下方心智圖樹狀結構檢視各工序，點擊按鈕切換並在下方展開管理</p>", unsafe_allow_html=True)
         st.divider()
 
         # 1. 讀取與初始化 Firebase 後台工序選單資料
         sop_settings = requests.get(f"{SOP_LIST_URL}.json").json() or {"sop_types": []}
         sop_types = sop_settings.get("sop_types", ["骨架作業", "前置作業", "配電作業"]) # 預設保底選單
 
-        # 2. 預先讀取所有工序的檔案資料，用來計算每個工序是否有檔案
+        # 2. 預先讀取所有工序的檔案資料
         all_file_data = requests.get(f"{SOP_FILE_URL}.json").json() or {}
 
         # 3. 初始化 session_state 用來紀錄目前點選了哪一個工序
         if "active_sop_proc" not in st.session_state:
             st.session_state.active_sop_proc = sop_types[0] if sop_types else ""
 
-        selected_sop_proc = st.session_state.active_sop_proc
+        current_active = st.session_state.active_sop_proc
 
 
         # ==========================================
-        # 🌿 【心智圖樹狀延伸排版區】
+        # 🧠 【心智圖視覺看板區】
         # ==========================================
-        st.markdown("### 🌿 工序心智圖節點 (請點擊切換)")
+        st.markdown("### 🧠 SOP 工序心智圖總覽 (水平向右發散)")
         
-        # 使用直式兩欄（左邊是心智圖樹狀分支，右邊是開展出來的 SOP 內容）
-        mind_col_left, mind_col_right = st.columns([1.3, 1.7])
-        
-        with mind_col_left:
-            # 渲染心智圖的核心根節點
-            st.markdown("""
-                <div style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); border-radius: 12px; padding: 15px; text-align: center; border: 2px solid #60a5fa; box-shadow: 0 4px 6px rgba(0,0,0,0.15);">
-                    <span style="color: white; font-weight: 900; font-size: 1.3rem;">🎯 超慧製造部工序總綱</span>
-                </div>
-                <div style="text-align: center; color: #60a5fa; font-size: 1.5rem; font-weight: bold; margin: -5px 0;">│</div>
-            """, unsafe_allow_html=True)
-            
-            # 遍歷所有工序，繪製心智圖分支
+        with st.container(border=True):
+            # 用直式一條一條畫出向右衍生心智圖分支
             for idx, proc_name in enumerate(sop_types):
                 proc_key_tmp = base64.b64encode(proc_name.encode('utf-8')).decode('utf-8').replace('=', '')
+                
+                # 檢查是否有檔案
                 has_file = proc_key_tmp in all_file_data and "file_base64" in all_file_data[proc_key_tmp]
-                doc_count = 1 if has_file else 0
-                is_current = (selected_sop_proc == proc_name)
+                file_name_info = all_file_data[proc_key_tmp].get("file_name", "") if has_file else ""
                 
-                # 心智圖引線與樹狀盒子的外觀控制
-                card_bg = "#4c1d95" # 你最愛的科技深紫色
-                if is_current:
-                    status_color = "#fde047" # 亮黃
-                    border_style = "2px dashed #ef4444" # 點選的分支帶虛線
-                else:
-                    status_color = "#a78bfa" # 粉紫
-                    border_style = "1px solid #5b21b6"
+                is_current = (current_active == proc_name)
                 
-                # 繪製分支的 T 型視覺引線與卡片
-                st.markdown(f"""
-                    <div style="background-color: {card_bg}; border: {border_style}; border-radius: 8px; padding: 10px; margin-left: 25px; position: relative;">
-                        <div style="position: absolute; left: -20px; top: 50%; width: 20px; height: 2px; background-color: #60a5fa;"></div>
-                        <span style="color: white; font-weight: 800; font-size: 1rem; display: block;">🌿 分支：{proc_name}</span>
-                        <span style="color: {status_color}; font-weight: 900; font-size: 1rem;">📄 SOP 文件：{doc_count} 份</span>
-                    </div>
-                """, unsafe_allow_html=True)
+                # 建立心智圖階層 columns： [核心] ➔ [工序分支線] ➔ [工序節點(按鈕)] ➔ [延伸文件線] ➔ [SOP文件節點]
+                mm_cols = st.columns([1.2, 0.4, 2.5, 0.4, 4.0])
                 
-                # 擺放切換查看按鈕
-                if st.button(f"👆 點擊切換查看", key=f"btn_p_{proc_key_tmp}", use_container_width=True):
-                    st.session_state.active_sop_proc = proc_name
-                    st.rerun()
+                # 第一欄：核心根節點 (只在第一個項目顯示，讓畫面像樹根)
+                with mm_cols[0]:
+                    if idx == 0:
+                        st.markdown('<div style="background-color:#1e3a8a; color:white; padding:10px; border-radius:20px; text-align:center; font-weight:900; font-size:1.1rem; margin-top:5px;">📘 SOP 系統</div>', unsafe_allow_html=True)
+                    else:
+                        st.markdown('<div style="text-align:center; color:#cbd5e1; font-weight:900; line-height:40px;">│</div>', unsafe_allow_html=True)
                 
-                # 🎯【核心強制變色：紅底黑字！】🎯
-                # 這裡使用了終極選取器，不論是否選中都完美控制字體！
-                if is_current:
+                # 第二欄：連接線 ➔
+                with mm_cols[1]:
+                    st.markdown('<div style="text-align:center; color:#a78bfa; font-weight:900; line-height:45px; font-size:1.2rem;">➔</div>', unsafe_allow_html=True)
+                
+                # 第三欄：工序節點 (按鈕)
+                with mm_cols[2]:
+                    # 渲染高質感深紫方塊外觀
+                    card_bg = "#4c1d95"
+                    border_style = "2px solid #ef4444" if is_current else "1px solid #5b21b6"
+                    text_style = "color:#fde047;" if is_current else "color:#ffffff;"
+                    
                     st.markdown(f"""
-                        <style>
-                        /* 當前選中：完全紅色填滿 */
-                        div[data-testid="stButton"] button[key="btn_p_{proc_key_tmp}"],
-                        div.stButton > button[key="btn_p_{proc_key_tmp}"],
-                        div.stButton > button[key="btn_p_{proc_key_tmp}"]:hover,
-                        div.stButton > button[key="btn_p_{proc_key_tmp}"]:active,
-                        div.stButton > button[key="btn_p_{proc_key_tmp}"]:focus {{
-                            background-color: #ef4444 !important; /* 🔥 紅色填滿 */
-                            background: #ef4444 !important;
-                            border: 2px solid #ef4444 !important;
-                        }}
-                        /* 當前選中字體：強制黑色粗體 */
-                        div[data-testid="stButton"] button[key="btn_p_{proc_key_tmp}"] *,
-                        div.stButton > button[key="btn_p_{proc_key_tmp}"] span,
-                        div.stButton > button[key="btn_p_{proc_key_tmp}"] p,
-                        div.stButton > button[key="btn_p_{proc_key_tmp}"] div {{
-                            color: #000000 !important; /* 🔥 黑色字體 */
-                            -webkit-text-fill-color: #000000 !important;
-                            font-weight: 900 !important;
-                            font-size: 18px !important;
-                        }}
-                        </style>
+                        <div style="background-color: {card_bg}; border: {border_style}; border-radius: 6px; padding: 6px 12px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                            <span style="{text_style} font-weight: 800; font-size: 1rem;">🛠️ {proc_name}</span>
+                        </div>
                     """, unsafe_allow_html=True)
-                else:
-                    # 沒選中時：維持一般的清晰黑字
-                    st.markdown(f"""
-                        <style>
-                        div[data-testid="stButton"] button[key="btn_p_{proc_key_tmp}"] *,
-                        div.stButton > button[key="btn_p_{proc_key_tmp}"] span,
-                        div.stButton > button[key="btn_p_{proc_key_tmp}"] p {{
-                            color: #000000 !important;
-                            -webkit-text-fill-color: #000000 !important;
-                            font-weight: 900 !important;
-                            font-size: 16px !important;
-                        }}
-                        </style>
-                    """, unsafe_allow_html=True)
+                    
+                    # 🎯 【按鈕功能：點選時變身 紅色填滿 + 黑色粗體字】
+                    if st.button(f"👆 查看 {proc_name}", key=f"btn_p_{proc_key_tmp}", use_container_width=True):
+                        st.session_state.active_sop_proc = proc_name
+                        st.rerun()
+                    
+                    # 終極 CSS 覆蓋：確保選中時為 紅底黑字，沒選中時為 正常黑字
+                    if is_current:
+                        st.markdown(f"""
+                            <style>
+                            div[data-testid="stButton"] button[key="btn_p_{proc_key_tmp}"],
+                            div.stButton > button[key="btn_p_{proc_key_tmp}"],
+                            div.stButton > button[key="btn_p_{proc_key_tmp}"]:hover,
+                            div.stButton > button[key="btn_p_{proc_key_tmp}"]:active,
+                            div.stButton > button[key="btn_p_{proc_key_tmp}"]:focus {{
+                                background-color: #ef4444 !important; /* 🔥 紅色填滿 */
+                                border: 2px solid #ef4444 !important;
+                                background: #ef4444 !important;
+                            }}
+                            div[data-testid="stButton"] button[key="btn_p_{proc_key_tmp}"] *,
+                            div.stButton > button[key="btn_p_{proc_key_tmp}"] span,
+                            div.stButton > button[key="btn_p_{proc_key_tmp}"] p {{
+                                color: #000000 !important; /* 🎯 黑色字體 */
+                                -webkit-text-fill-color: #000000 !important;
+                                font-weight: 900 !important;
+                                font-size: 16px !important;
+                            }}
+                            </style>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"""
+                            <style>
+                            div[data-testid="stButton"] button[key="btn_p_{proc_key_tmp}"] *,
+                            div.stButton > button[key="btn_p_{proc_key_tmp}"] span,
+                            div.stButton > button[key="btn_p_{proc_key_tmp}"] p {{
+                                color: #000000 !important; /* 未選中時高對比黑字 */
+                                -webkit-text-fill-color: #000000 !important;
+                                font-weight: 800 !important;
+                            }}
+                            </style>
+                        """, unsafe_allow_html=True)
 
-                # 繪製心智圖縱向連接中繼線
-                if idx < len(sop_types) - 1:
-                    st.markdown('<div style="text-align: center; color: #60a5fa; font-size: 1.2rem; font-weight: bold; margin: -10px 0; margin-left: -240px;">│</div>', unsafe_allow_html=True)
+                # 第四欄：連接線 ➔ 延伸到 SOP
+                with mm_cols[3]:
+                    st.markdown('<div style="text-align:center; color:#34d399; font-weight:900; line-height:45px; font-size:1.2rem;">➔</div>', unsafe_allow_html=True)
+                
+                # 第五欄：SOP文件擴展節點 (心智圖右側末端)
+                with mm_cols[4]:
+                    if has_file:
+                        st.markdown(f"""
+                            <div style="background-color: #065f46; border-left: 5px solid #34d399; border-radius: 4px; padding: 6px 12px; margin-top: 5px;">
+                                <span style="color: #ffffff; font-weight: 700; font-size: 0.9rem; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">📄 {file_name_info}</span>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.markdown('<div style="color: #94a3b8; font-style: italic; font-weight:700; line-height:45px; font-size:0.9rem;">❌ 尚未配置 SOP</div>', unsafe_allow_html=True)
+
+        st.write("")
+        st.divider()
 
 
         # ==========================================
-        # 📄 【右側開展內容區】心智圖向右延伸的效果
+        # 📄 【動態內容區】下方展開點選的 SOP 詳情
         # ==========================================
-        with mind_col_right:
-            if not selected_sop_proc:
-                st.info("💡 請點選左側心智圖工序節點來開展資料。")
-            else:
-                st.markdown(f"## 🌿 心智圖向右開展：【{selected_sop_proc}】")
-                st.write("---")
-                
-                safe_proc_key = base64.b64encode(selected_sop_proc.encode('utf-8')).decode('utf-8').replace('=', '')
-                existing_file_data = all_file_data.get(safe_proc_key)
+        selected_sop_proc = st.session_state.active_sop_proc
 
-                # 提供上傳元件
-                uploaded_pdf = st.file_uploader(f"📤 上傳或更新【{selected_sop_proc}】的 SOP (限制 PDF 格式)", type=["pdf"], key=f"file_uploader_{safe_proc_key}")
+        if selected_sop_proc:
+            st.markdown(f"## 🔍 當前心智圖展開檢視：【{selected_sop_proc}】")
+            
+            safe_proc_key = base64.b64encode(selected_sop_proc.encode('utf-8')).decode('utf-8').replace('=', '')
+            existing_file_data = all_file_data.get(safe_proc_key)
+
+            # 提供上傳元件
+            uploaded_pdf = st.file_uploader(f"📤 上傳或更新【{selected_sop_proc}】的 SOP (限制 PDF 格式)", type=["pdf"], key=f"file_uploader_{safe_proc_key}")
+            
+            if uploaded_pdf is not None:
+                if st.button("🚀 確定上傳並覆蓋舊檔案", use_container_width=True):
+                    with st.spinner("檔案封裝傳輸中，請稍候..."):
+                        file_bytes = uploaded_pdf.read()
+                        base64_pdf = base64.b64encode(file_bytes).decode('utf-8')
+                        
+                        payload = {
+                            "file_name": uploaded_pdf.name,
+                            "upload_time": get_now_str(),
+                            "uploader": st.session_state.user if "user" in st.session_state else "系統管理員",
+                            "file_base64": base64_pdf
+                        }
+                        
+                        requests.put(f"{SOP_FILE_URL}/{safe_proc_key}.json", data=json.dumps(payload))
+                        st.success(f"🎉 【{uploaded_pdf.name}】已成功與【{selected_sop_proc}】關聯儲存！")
+                        time.sleep(0.8)
+                        st.rerun()
+
+            st.write("")
+
+            # 顯示下載按鈕或未上傳提示
+            if existing_file_data and "file_base64" in existing_file_data:
+                st.markdown(f"<div style='background-color:#f1f5f9; padding:10px; border-left:5px solid #4c1d95; border-radius:4px; margin-bottom:10px;'><b style='color:#0f172a; font-size:1.1rem;'>📄 目前專屬文件：{existing_file_data.get('file_name')}</b></div>", unsafe_allow_html=True)
                 
-                if uploaded_pdf is not None:
-                    if st.button("🚀 確定上傳並覆蓋舊檔案", use_container_width=True):
-                        with st.spinner("檔案封裝傳輸中，請稍候..."):
-                            file_bytes = uploaded_pdf.read()
-                            base64_pdf = base64.b64encode(file_bytes).decode('utf-8')
-                            
-                            payload = {
-                                "file_name": uploaded_pdf.name,
-                                "upload_time": get_now_str(),
-                                "uploader": st.session_state.user if "user" in st.session_state else "系統管理員",
-                                "file_base64": base64_pdf
-                            }
-                            
-                            requests.put(f"{SOP_FILE_URL}/{safe_proc_key}.json", data=json.dumps(payload))
-                            st.success(f"🎉 【{uploaded_pdf.name}】已成功與【{selected_sop_proc}】關聯儲存！")
-                            time.sleep(0.8)
-                            st.rerun()
+                try:
+                    pdf_b64 = existing_file_data["file_base64"]
+                    pdf_bytes = base64.b64decode(pdf_b64)
+                    file_name_download = existing_file_data.get('file_name', 'SOP_Document.pdf')
+                    
+                    st.download_button(
+                        label=f"📥 點擊下載 / 開啟查閱 【{file_name_download}】",
+                        data=pdf_bytes,
+                        file_name=file_name_download,
+                        mime="application/pdf",
+                        use_container_width=True,
+                        type="primary" 
+                    )
+                except Exception as file_err:
+                    st.error(f"檔案解析失敗: {file_err}")
 
                 st.write("")
-
-                # 顯示下載按鈕或未上傳提示
-                if existing_file_data and "file_base64" in existing_file_data:
-                    st.markdown(f"<div style='background-color:#f1f5f9; padding:10px; border-left:5px solid #4c1d95; border-radius:4px; margin-bottom:10px;'><b style='color:#0f172a; font-size:1.1rem;'>📄 目前節點文件：{existing_file_data.get('file_name')}</b></div>", unsafe_allow_html=True)
-                    
-                    try:
-                        pdf_b64 = existing_file_data["file_base64"]
-                        pdf_bytes = base64.b64decode(pdf_b64)
-                        file_name_download = existing_file_data.get('file_name', 'SOP_Document.pdf')
-                        
-                        st.download_button(
-                            label=f"📥 點擊下載 / 開啟查閱 【{file_name_download}】",
-                            data=pdf_bytes,
-                            file_name=file_name_download,
-                            mime="application/pdf",
-                            use_container_width=True,
-                            type="primary" 
-                        )
-                    except Exception as file_err:
-                        st.error(f"檔案解析失敗: {file_err}")
-
-                    st.write("")
-                    # 刪除檔案功能
-                    with st.expander("🗑️ 刪除此工序之 SOP 文件"):
-                        pwd_sop = st.text_input("請輸入管理權限密碼：", type="password", key=f"pwd_sop_{safe_proc_key}")
-                        if st.button("❌ 確認徹底移除此 PDF 檔案", type="primary", use_container_width=True, key=f"del_sop_btn_{safe_proc_key}"):
-                            if pwd_sop == "0000":
-                                requests.delete(f"{SOP_FILE_URL}/{safe_proc_key}.json")
-                                st.success("檔案已成功從雲端資料庫抹除！")
-                                time.sleep(0.5)
-                                st.rerun()
-                            else:
-                                st.error("❌ 密碼錯誤，拒絕刪除！")
-                else:
-                    st.warning(f"💡 目前節點【{selected_sop_proc}】尚未配置 SOP。請於上方選擇 PDF 檔案進行上傳。")
+                # 刪除檔案功能 (含安全密碼驗證)
+                with st.expander("🗑️ 刪除此工序之 SOP 文件"):
+                    pwd_sop = st.text_input("請輸入管理權限密碼：", type="password", key=f"pwd_sop_{safe_proc_key}")
+                    if st.button("❌ 確認徹底移除此 PDF 檔案", type="primary", use_container_width=True, key=f"del_sop_btn_{safe_proc_key}"):
+                        if pwd_sop == "0000":
+                            requests.delete(f"{SOP_FILE_URL}/{safe_proc_key}.json")
+                            st.success("檔案已成功從雲端資料庫抹除！")
+                            time.sleep(0.5)
+                            st.rerun()
+                        else:
+                            st.error("❌ 密碼錯誤，拒絕刪除！")
+            else:
+                st.warning(f"💡 目前【{selected_sop_proc}】尚未上傳任何標準 SOP 說明書。請於上方選擇 PDF 檔案進行上傳。")
 
 
         # ==========================================
