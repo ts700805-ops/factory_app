@@ -182,7 +182,7 @@ else:
     st.sidebar.markdown(f"### 👤 當前人員：**{st.session_state.user}**")
     nav = st.sidebar.radio("功能導航", [
    
-    "💡2o26上半年技能考核進度", 
+    
     "🧾組長待辦事項",
     "🛡️🛡️🛡️🛡️🛡️🛡️",
     "📝每日6S任務回報", 
