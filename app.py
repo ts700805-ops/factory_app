@@ -1786,9 +1786,8 @@ else:
 
 
 
-
 # ==========================================
-# 📘 頁面：標準SOP功能 (最終視覺優化：全文字深紫色清晰高對比版)
+# 📘 頁面：標準SOP功能 (按鈕全面填滿藍色 + 文字深紫色完美清晰版)
 # ==========================================
     elif st.session_state.menu_selection == "📘 標準SOP功能":
         import base64
@@ -1798,7 +1797,7 @@ else:
         SOP_CONFIG_URL = f"{DB_BASE_URL}/sop_main_config"  
         SOP_FILE_URL = f"{DB_BASE_URL}/sop_file_data"      
 
-        # 頂部大標題 (全改深紫色)
+        # 頂部大標題
         st.markdown('<h1 style="text-align:center; color:#4c1d95; font-weight:900; font-size:2.5rem;">📘 標準 SOP 線上查閱中心</h1>', unsafe_allow_html=True)
         st.markdown("<p style='text-align:center; color:#4c1d95; font-weight:700;'>請至下方心智圖清單中點擊「👁️ 查看」，系統將採用安全機制彈出大視窗，供現場人員直接查閱</p>", unsafe_allow_html=True)
         st.divider()
@@ -1808,7 +1807,7 @@ else:
         main_config = requests.get(f"{SOP_CONFIG_URL}.json").json() or {}
         model_list = main_config.get("model_list", ["SOTER+EFEM", "標準機型"])
 
-        # 2. 下拉式選單：選擇機型規格 (加上深紫色標籤說明)
+        # 2. 下拉式選單：選擇機型規格
         selected_model = st.selectbox("選擇機型規格 (請由此下拉選單切換)：", model_list, index=0, key="sop_selected_model")
         
         # 安全編碼機型 Key
@@ -1837,57 +1836,62 @@ else:
         current_active = st.session_state.active_sop_proc
 
 
-        # 💡【燈箱文字翻修】：內部公告與提示全部更換為「深紫色」高清晰字體
+        # 💡【燈箱安全查閱視窗】
         @st.dialog("📄 標準 SOP 線上安全查閱視窗", width="large")
         def show_pdf_dialog_safe(file_name, base64_data):
             st.markdown(f'<h3 style="color:#4c1d95; font-weight:800;">🛠️ 目前正在線上檢視：<span style="color:#4c1d95;">{file_name}</span></h3>', unsafe_allow_html=True)
             
             try:
-                # 將 Base64 解碼還原成二進位檔案流
                 pdf_bytes = base64.b64decode(base64_data)
                 
-                # 提示框：全面改成強烈對比的淺紫色背景與深紫色粗體字
+                # 提示框（淺紫底、深紫字）
                 st.markdown("""
                     <div style="background-color: #f3e8ff; padding: 18px; border-radius: 8px; border-left: 6px solid #7c3aed; margin-bottom: 15px;">
                         <b style="font-size: 1.3rem; color: #4c1d95; display: block; margin-bottom: 6px;">🛡️ 檢視安全對策公告：</b>
                         <p style="font-size: 1.1rem; font-weight: 800; color: #4c1d95; margin: 0; line-height: 1.6;">
                             因工廠內部 Chrome 瀏覽器具備嚴格的網域安全限制，系統已自動為您切換至安全防護模式。<br>
-                            請直接點擊下方 <span style="color:#4c1d95; text-decoration: underline;">【深紫色大按鈕】</span> 即可直接打開並查閱此作業書！
+                            請直接點擊下方 <span style="color:#1e40af; font-weight:900; text-decoration: underline;">【藍色大按鈕】</span> 即可直接打開並查閱此作業書！
                         </p>
                     </div>
                 """, unsafe_allow_html=True)
 
-                # 建立兩個並排大按鈕：一個直接開啟、一個下載
+                # 兩個大操作鈕
                 c1, c2 = st.columns(2)
                 with c1:
                     st.download_button(
-                        label="🟣 點擊直接開啟 / 下載此 SOP 文件",
+                        label="🔵 點擊直接開啟 / 下載此 SOP 文件",
                         data=pdf_bytes,
                         file_name=file_name,
                         mime="application/pdf",
                         use_container_width=True,
-                        type="primary"
+                        key="dlg_download_btn_safe"
                     )
                 with c2:
-                    if st.button("❌ 放棄檢視 (關閉視窗)", use_container_width=True):
+                    if st.button("❌ 放棄檢視 (關閉視窗)", use_container_width=True, key="dlg_close_btn_safe"):
                         st.rerun()
 
-                # 下方提示文字同步修正為高清晰深紫色字體
+                # 下方提示小卡
                 st.markdown("""
                     <div style="background-color: #f8fafc; padding: 12px; border-radius: 6px; margin-top: 15px; border: 1px solid #cbd5e1;">
                         <span style="color: #4c1d95; font-weight: 900; font-size: 1rem;">💡 操作小提示：</span><br>
                         <span style="color: #4c1d95; font-weight: 800; font-size: 0.95rem;">
-                            點擊上方按鈕後，檔案會直接在瀏覽器下方彈出，或自動調用您電腦最習慣的 PDF 閱讀軟體（如 Adobe Reader 或 Chrome 內建功能）以全螢幕最高解析度開啟，絕對不會被網頁安全機制阻擋！
+                            點擊上方按鈕後，檔案會直接在瀏覽器下方彈出，或自動調用您電腦最習慣的 PDF 閱讀軟體以全螢幕最高解析度開啟。
                         </span>
                     </div>
                 """, unsafe_allow_html=True)
                 
-                # 利用 CSS 強制將燈箱內部的按鈕字體也全部轉成深紫色
+                # 燈箱專用按鈕 CSS（強制渲染填滿藍色與白字）
                 st.markdown("""
                     <style>
+                    div[data-testid="stDialog"] button {
+                        background-color: #1e40af !important;
+                        border: 2px solid #2563eb !important;
+                        height: 45px !important;
+                    }
                     div[data-testid="stDialog"] button span {
-                        color: #4c1d95 !important;
+                        color: #ffffff !important;
                         font-weight: 900 !important;
+                        font-size: 1.05rem !important;
                     }
                     </style>
                 """, unsafe_allow_html=True)
@@ -1897,7 +1901,7 @@ else:
 
 
         # ==========================================
-        # 🧠 【三層獨立心智圖看板】(文字全數翻修為深紫色)
+        # 🧠 【三層獨立心智圖看板】(按鈕全面渲染填滿深藍色)
         # ==========================================
         st.markdown(f'<h3 style="color:#4c1d95; font-weight:800;">🧠 【{selected_model}】多文件心智圖總覽</h3>', unsafe_allow_html=True)
         
@@ -1906,57 +1910,52 @@ else:
                 proc_safe_key = base64.b64encode(proc_name.encode('utf-8')).decode('utf-8').replace('=', '')
                 combined_node_key = f"{model_safe_key}_{proc_safe_key}"
                 
-                # 取得該工序下的獨立檔案字典
                 proc_files_dict = all_file_nodes.get(combined_node_key, {})
                 file_count = len(proc_files_dict) if isinstance(proc_files_dict, dict) else 0
-                
                 is_current = (current_active == proc_name)
                 
-                # 欄位配置
                 mm_cols = st.columns([1.2, 0.3, 2.0, 0.3, 5.2])
                 
-                # 第一欄：機型核心根節點
+                # 第一欄：根節點
                 with mm_cols[0]:
                     if idx == 0:
-                        st.markdown(f'<div style="background-color:#4c1d95; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:900; font-size:1rem; margin-top:5px;">🏭 {selected_model}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div style="background-color:#1e40af; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:900; font-size:1rem; margin-top:5px;">🏭 {selected_model}</div>', unsafe_allow_html=True)
                     else:
                         st.markdown('<div style="text-align:center; color:#cbd5e1; font-weight:900; line-height:40px;">│</div>', unsafe_allow_html=True)
                 
-                # 第二欄：連接線
+                # 第二欄：箭頭
                 with mm_cols[1]:
                     st.markdown('<div style="text-align:center; color:#4c1d95; font-weight:900; line-height:45px; font-size:1.2rem;">➔</div>', unsafe_allow_html=True)
                 
-                # 第三欄：獨立工序按鈕
+                # 第三欄：🎯 工序選定大按鈕 (填滿深藍色、高對比白字、紅色邊框加強選中感)
                 with mm_cols[2]:
-                    card_bg = "#f3e8ff"
-                    border_style = "2px solid #4c1d95" if is_current else "1px solid #ddd6fe"
-                    text_style = "color:#4c1d95;"
-                    
-                    st.markdown(f"""
-                        <div style="background-color: {card_bg}; border: {border_style}; border-radius: 6px; padding: 4px 12px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-                            <span style="{text_style} font-weight: 800; font-size: 0.95rem;">🛠️ {proc_name} ({file_count}份)</span>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    
-                    if st.button(f"👆 選定 {proc_name}", key=f"btn_p_{combined_node_key}", use_container_width=True):
+                    if st.button(f"⚙️ {proc_name} ({file_count}份)", key=f"btn_p_{combined_node_key}", use_container_width=True):
                         st.session_state.active_sop_proc = proc_name
                         st.rerun()
                     
-                    # 覆蓋工序按鈕本身的字體顏色為深紫色
+                    # 覆蓋工序按鈕樣式：填滿藍底、粗白字
+                    border_color = "#ef4444" if is_current else "#3b82f6"
+                    border_width = "3px" if is_current else "1px"
                     st.markdown(f"""
                         <style>
+                        div.stButton > button[key="btn_p_{combined_node_key}"] {{
+                            background-color: #1e40af !important;
+                            border: {border_width} solid {border_color} !important;
+                            border-radius: 6px !important;
+                            height: 40px !important;
+                        }}
                         div.stButton > button[key="btn_p_{combined_node_key}"] span {{
-                            color: #4c1d95 !important;
+                            color: #ffffff !important;
                             font-weight: 900 !important;
                         }}
                         </style>
                     """, unsafe_allow_html=True)
 
-                # 第四欄：連接線
+                # 第四欄：箭頭
                 with mm_cols[3]:
                     st.markdown('<div style="text-align:center; color:#4c1d95; font-weight:900; line-height:45px; font-size:1.2rem;">➔</div>', unsafe_allow_html=True)
                 
-                # 第五欄：檔案與功能按鈕區
+                # 第五欄：🎯 右側檔案標籤與「查看」、「刪除」按鈕列 (全面修改為藍色按鈕)
                 with mm_cols[4]:
                     if file_count > 0:
                         for file_id, file_info in proc_files_dict.items():
@@ -1973,21 +1972,27 @@ else:
                                 """, unsafe_allow_html=True)
                                 
                             with f_sub_cols[1]:
+                                # 👁️ 查看按鈕 (填滿深藍色、高對比白字)
                                 if st.button("👁️ 查看", key=f"view_dlg_{combined_node_key}_{file_id}", use_container_width=True):
                                     show_pdf_dialog_safe(f_name, pdf_b64)
                                 
-                                # 查看按鈕字體強制深紫色
                                 st.markdown(f"""
                                     <style>
+                                    div.stButton button[key="view_dlg_{combined_node_key}_{file_id}"] {{
+                                        background-color: #1d4ed8 !important;
+                                        border: 1px solid #60a5fa !important;
+                                        height: 34px !important;
+                                    }}
                                     div.stButton button[key="view_dlg_{combined_node_key}_{file_id}"] span {{
-                                        color: #4c1d95 !important;
+                                        color: #ffffff !important;
                                         font-weight: 900 !important;
                                     }}
                                     </style>
                                 """, unsafe_allow_html=True)
                                 
                             with f_sub_cols[2]:
-                                with st.popover("🗑️ 刪除", use_container_width=True):
+                                # 🗑️ 刪除按鈕彈出盒 (外層按鈕同樣改成填滿深藍色)
+                                with st.popover("🗑️ 刪除", use_container_width=True, key=f"pop_{combined_node_key}_{file_id}"):
                                     st.markdown('<p style="color:#4c1d95; font-weight:700; margin:0;">請輸入管理密碼：</p>', unsafe_allow_html=True)
                                     pwd_del = st.text_input("密碼欄位：", type="password", key=f"pwd_{combined_node_key}_{file_id}", label_visibility="collapsed")
                                     if st.button("❌ 確定抹除", type="primary", key=f"del_{combined_node_key}_{file_id}", use_container_width=True):
@@ -1999,12 +2004,17 @@ else:
                                         else:
                                             st.error("密碼錯誤")
                                             
-                                # 彈出刪除按鈕字體更換為深紫色
+                                # 強制修改 Popover 啟動按鈕為填滿藍色
                                 st.markdown(f"""
                                     <style>
-                                    div.stPopover button span {{
-                                        color: #4c1d95 !important;
-                                        font-weight: 800 !important;
+                                    div[data-testid="stPopover"] button[id*="pop_{combined_node_key}_{file_id}"] {{
+                                        background-color: #1d4ed8 !important;
+                                        border: 1px solid #60a5fa !important;
+                                        height: 34px !important;
+                                    }}
+                                    div[data-testid="stPopover"] button[id*="pop_{combined_node_key}_{file_id}"] span {{
+                                        color: #ffffff !important;
+                                        font-weight: 900 !important;
                                     }}
                                     </style>
                                 """, unsafe_allow_html=True)
@@ -2016,19 +2026,18 @@ else:
 
 
         # ==========================================
-        # 📤 下方檔案上傳功能區 (文字轉為深紫色)
+        # 📤 下方檔案上傳功能區
         # ==========================================
         if current_active:
             st.markdown(f'<h3 style="color:#4c1d95; font-weight:800;">📤 上傳新文件至：【{selected_model}】➔ 【{current_active}】</h3>', unsafe_allow_html=True)
             
             target_node_key = f"{model_safe_key}_" + base64.b64encode(current_active.encode('utf-8')).decode('utf-8').replace('=', '')
             
-            # 使用深紫色標題指引上傳
             st.markdown(f'<p style="color:#4c1d95; font-weight:700; margin-bottom:0;">選擇要新增至【{current_active}】的 PDF 作業書：</p>', unsafe_allow_html=True)
             uploaded_pdf = st.file_uploader("PDF上傳器", type=["pdf"], key=f"uploader_{target_node_key}", label_visibility="collapsed")
             
             if uploaded_pdf is not None:
-                if st.button("🚀 確定上傳並加入右側心智圖列表", use_container_width=True):
+                if st.button("🚀 確定上傳並加入右側心智圖列表", use_container_width=True, key="btn_upload_submit_main"):
                     with st.spinner("檔案打包傳輸中..."):
                         file_bytes = uploaded_pdf.read()
                         base64_pdf = base64.b64encode(file_bytes).decode('utf-8')
@@ -2042,13 +2051,13 @@ else:
                         }
                         
                         requests.put(f"{SOP_FILE_URL}/{target_node_key}/{unique_file_id}.json", data=json.dumps(payload))
-                        st.success(f"🎉 檔案【{uploaded_pdf.name}】上傳成功！已同步至右側對應欄位。")
+                        st.success(f"🎉 檔案【{uploaded_pdf.name}】上傳成功！")
                         time.sleep(0.8)
                         st.rerun()
 
 
         # ==========================================
-        # ⚙️ 【獨立後台數據設定維護】 (文字轉為深紫色)
+        # ⚙️ 【獨立後台數據設定維護】(兩個大型儲存按鈕也轉為填滿深藍色)
         # ==========================================
         st.write("")
         st.divider()
@@ -2084,12 +2093,19 @@ else:
                     time.sleep(0.5)
                     st.rerun()
 
-        # 全局按鈕字體與輸入元件標題強制渲染成深紫色的通用樣式表
+        # 🚀 全局覆蓋樣式表：將所有剩餘的一般按鈕與輸入欄位標籤套上專屬外觀
         st.markdown("""
             <style>
-            case1: 全域按鈕文字
-            div[data-testid="stAppViewContainer"] button span,
-            case2: 所有系統內置的標籤文字與副標題
+            /* 1. 將所有頁面常駐型按鈕強制轉化為「填滿深藍色、粗白字」 */
+            div[data-testid="stAppViewContainer"] button {
+                background-color: #1e40af !important;
+                border: 1px solid #3b82f6 !important;
+            }
+            div[data-testid="stAppViewContainer"] button span {
+                color: #ffffff !important;
+                font-weight: 900 !important;
+            }
+            /* 2. 所有一般文字輸入標籤、元件說明標題，維持好看的深紫色 */
             div[data-testid="stAppViewContainer"] label p {
                 color: #4c1d95 !important;
                 font-weight: 900 !important;
