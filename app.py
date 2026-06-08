@@ -1789,7 +1789,7 @@ else:
 
 
 # ==========================================
-# 📘 頁面：標準SOP功能 (機型專屬工序獨立綁定版)
+# 📘 頁面：標準SOP功能 (後台工序完全連動維護版)
 # ==========================================
     elif st.session_state.menu_selection == "📘 標準SOP功能":
         import base64
@@ -1811,7 +1811,7 @@ else:
         model_list = main_config.get("model_list", ["SOTER+EFEM", "標準機型"])
 
         # ------------------------------------------
-        # 2. 👑 下拉式選單：選擇機型規格
+        # 2. ⚙️ 下拉式選單：選擇機型規格
         # ------------------------------------------
         st.markdown("### ⚙️ 1. 請選取機型規格")
         selected_model = st.selectbox("選擇機型規格：", model_list, index=0, key="sop_selected_model")
@@ -1822,10 +1822,9 @@ else:
         # ------------------------------------------
         # 3. 🎯 動態載入「該機型專屬」的工序項目與所有檔案紀錄
         # ------------------------------------------
-        # 從資料庫中讀取這個機型專屬的設定與檔案
         all_file_data = requests.get(f"{SOP_FILE_URL}.json").json() or {}
         
-        # 試著從資料庫抓取專屬此機型的工序，如果完全沒設定過，則給予你提供的預設流程保底
+        # 試著從資料庫抓取專屬此機型的工序
         model_spec_data = requests.get(f"{SOP_CONFIG_URL}/model_procs/{model_safe_key}.json").json()
         if model_spec_data and "sop_types" in model_spec_data:
             sop_types = model_spec_data["sop_types"]
@@ -1855,7 +1854,7 @@ else:
         
         with st.container(border=True):
             for idx, proc_name in enumerate(sop_types):
-                # 複合式安全 Key (機型碼_工序碼)，百分之百保證各機型工序檔案完全獨立隔離
+                # 複合式安全 Key (機型碼_工序碼)
                 proc_safe_key = base64.b64encode(proc_name.encode('utf-8')).decode('utf-8').replace('=', '')
                 combined_file_key = f"{model_safe_key}_{proc_safe_key}"
                 
@@ -1865,7 +1864,7 @@ else:
                 
                 is_current = (current_active == proc_name)
                 
-                # 心智圖發散五橫欄： [機型根] ➔ [連線] ➔ [獨立工序按鈕] ➔ [連線] ➔ [專屬檔案分支]
+                # 心智圖發散五橫欄
                 mm_cols = st.columns([1.5, 0.4, 2.5, 0.4, 4.0])
                 
                 # 第一欄：機型核心根節點
@@ -1875,7 +1874,7 @@ else:
                     else:
                         st.markdown('<div style="text-align:center; color:#cbd5e1; font-weight:900; line-height:40px;">│</div>', unsafe_allow_html=True)
                 
-                # 第二欄：連接線 ➔
+                # 第二欄：連接線
                 with mm_cols[1]:
                     st.markdown('<div style="text-align:center; color:#a78bfa; font-weight:900; line-height:45px; font-size:1.2rem;">➔</div>', unsafe_allow_html=True)
                 
@@ -1905,14 +1904,14 @@ else:
                             div.stButton > button[key="btn_p_{combined_file_key}"]:hover,
                             div.stButton > button[key="btn_p_{combined_file_key}"]:active,
                             div.stButton > button[key="btn_p_{combined_file_key}"]:focus {{
-                                background-color: #ef4444 !important; /* 紅色填滿 */
+                                background-color: #ef4444 !important;
                                 border: 2px solid #ef4444 !important;
                                 background: #ef4444 !important;
                             }}
                             div[data-testid="stButton"] button[key="btn_p_{combined_file_key}"] *,
                             div.stButton > button[key="btn_p_{combined_file_key}"] span,
                             div.stButton > button[key="btn_p_{combined_file_key}"] p {{
-                                color: #000000 !important; /* 黑色字體 */
+                                color: #000000 !important;
                                 -webkit-text-fill-color: #000000 !important;
                                 font-weight: 900 !important;
                                 font-size: 16px !important;
@@ -1932,7 +1931,7 @@ else:
                             </style>
                         """, unsafe_allow_html=True)
 
-                # 第四欄：連接線 ➔
+                # 第四欄：連接線
                 with mm_cols[3]:
                     st.markdown('<div style="text-align:center; color:#34d399; font-weight:900; line-height:45px; font-size:1.2rem;">➔</div>', unsafe_allow_html=True)
                 
@@ -2009,7 +2008,7 @@ else:
                     if st.button("❌ 確認徹底移除此 PDF 檔案", type="primary", use_container_width=True, key=f"del_{target_file_key}"):
                         if pwd_sop == "0000":
                             requests.delete(f"{SOP_FILE_URL}/{target_file_key}.json")
-                            st.success("檔案已從該機型工序中移除！")
+                            st.success("檔案已成功刪除！")
                             time.sleep(0.5)
                             st.rerun()
                         else:
@@ -2042,15 +2041,18 @@ else:
 
         with col_set2:
             with st.container(border=True):
+                # 🎯【核心修正】：這裡動態顯示當前選定機型的名稱，並使用特定的 key，防止內容不連動
                 st.markdown(f"##### 🛠️ 2. 編輯【{selected_model}】的專屬工序")
-                # 這裡會帶出當前選中機型在資料庫的獨立排程工序
                 sop_input_str = "，".join(sop_types)
-                sop_input = st.text_area(f"設定該機型專屬工序 (以逗號或分行隔開)", value=sop_input_str, height=120, key="txt_sop_list_spec")
                 
-                if st.button(f"💾 儲存【{selected_model}】專用流程", use_container_width=True, key="btn_save_sops_spec"):
+                # 🎯【關鍵修改】：key 必須加上機型安全碼（key=f"txt_sop_list_{model_safe_key}"）
+                # 這樣 Streamlit 在切換下拉選單時，才會強制重刷這個文字方塊的內容！
+                sop_input = st.text_area(f"設定該機型專屬工序 (以逗號或分行隔開)", value=sop_input_str, height=120, key=f"txt_sop_list_{model_safe_key}")
+                
+                if st.button(f"💾 儲存【{selected_model}】專用流程", use_container_width=True, key=f"btn_save_sops_{model_safe_key}"):
                     new_sops = [t.strip() for t in re.split(r'[，,\n]', sop_input) if t.strip()]
-                    # 將工序清單獨立存入對應機型專屬的路徑下
+                    # 正確寫入當前所選機型對應的資料庫節點
                     requests.put(f"{SOP_CONFIG_URL}/model_procs/{model_safe_key}.json", data=json.dumps({"sop_types": new_sops}))
-                    st.success(f"✅ 【{selected_model}】的專屬工序流程已完成綁定儲存！")
+                    st.success(f"✅ 【{selected_model}】的專屬工序流程已完成獨立儲存！")
                     time.sleep(0.5)
                     st.rerun()
