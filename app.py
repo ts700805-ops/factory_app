@@ -414,48 +414,72 @@ else:
                         st.error(f"❌ 錯誤：{e}")
 
 
-# --- 調整後的檢視邏輯 ---
-        st.markdown("---")
-        st.markdown("##### 📋 點選組長查看組員今日回報狀況")
-        
-        all_leaders_list = list(leader_member_mapping.keys())
-        selected_leader = st.selectbox("請選擇組長：", all_leaders_list, key="6s_leader_select")
-        target_members = leader_member_mapping.get(selected_leader, [])
-        
-        today_str = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
-        
-        try:
-            r_6s = requests.get(f"{DB_BASE_URL}/6s_logs.json").json()
-            r_6s = r_6s if isinstance(r_6s, dict) else {}
-            
-            # --- 除錯核心：列出所有找到的紀錄姓名，幫助您排查 ---
-            # st.write("資料庫內紀錄的姓名:", [v.get("姓名") for v in r_6s.values() if isinstance(v, dict)])
-            
-            report_data = {}
-            for v in r_6s.values():
-                if not isinstance(v, dict): continue
-                
-                # 檢查姓名與日期是否吻合
-                # 注意：這裡的 "姓名" 和 "日期" 必須與資料庫內完全一致
-                name = v.get("姓名")
-                date = v.get("日期")
-                
-                if name in target_members and date == today_str:
-                    report_data[name] = v.get("時間", "無時間紀錄")
-            
-            st.write(f"**{selected_leader} 組的今日已回報清單：**")
-            
-            if not report_data:
-                # 這裡可以協助排查：顯示組員名單供對照
-                st.warning("⚠️ 目前該組今日無人員完成回報。")
-                st.caption(f"目標組員名單: {', '.join(target_members)}")
-            else:
-                df_report = pd.DataFrame(list(report_data.items()), columns=["姓名", "回報時間"])
-                st.table(df_report)
-                st.success(f"共計 {len(report_data)} 位成員已完成回報。")
+import streamlit as st
+import pandas as pd
+import requests
+from datetime import datetime, timezone, timedelta
 
-        except Exception as e:
-            st.error(f"讀取資料發生錯誤: {e}")
+# --- 1. 基本設定 ---
+st.set_page_config(page_title="超慧科技管理系統", layout="wide")
+DB_BASE_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
+
+# --- 2. 模擬與資料讀取 (請確保你的 mapping 正確) ---
+# 注意：若 leader_member_mapping 未定義，請在此處補上
+if "leader_member_mapping" not in locals():
+    leader_member_mapping = {
+        "劉志偉": ["劉志偉", "劉定澤", "胡瑄芸", "蕭詩瓊"] # 請務必確保這裡的名稱與資料庫完全一致
+    }
+
+# --- 3. 顯示邏輯 ---
+st.markdown("---")
+st.markdown("##### 📋 點選組長查看組員今日回報狀況")
+
+all_leaders_list = list(leader_member_mapping.keys())
+selected_leader = st.selectbox("請選擇組長：", all_leaders_list, key="6s_leader_select")
+target_members = leader_member_mapping.get(selected_leader, [])
+
+# 使用修正後的時間取得方式
+today_str = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d")
+
+try:
+    r = requests.get(f"{DB_BASE_URL}/6s_logs.json")
+    r_6s = r.json() if r.status_code == 200 else {}
+    r_6s = r_6s if isinstance(r_6s, dict) else {}
+
+    report_data = {}
+    
+    # 偵錯用：顯示資料庫內抓到的前 5 筆紀錄，確認欄位名稱
+    # st.write("DEBUG: 資料庫前 5 筆紀錄:", list(r_6s.values())[:5])
+
+    for v in r_6s.values():
+        if not isinstance(v, dict): continue
+        
+        name = v.get("姓名", "").strip()
+        date = v.get("日期", "").strip()
+        
+        # 比對邏輯：將清單中的姓名也去除空白
+        clean_target_members = [m.strip() for m in target_members]
+        
+        if name in clean_target_members and date == today_str:
+            report_data[name] = v.get("時間", "無時間紀錄")
+
+    st.write(f"**{selected_leader} 組的今日已回報清單 (日期: {today_str})：**")
+
+    if not report_data:
+        st.warning("⚠️ 目前該組今日無人員完成回報。")
+        # 顯示目標組員清單，方便你核對名字是否有誤
+        st.caption(f"系統設定的組員名單: {', '.join(target_members)}")
+        # 顯示資料庫抓到的最後一位姓名，看是不是存成別的名字
+        if r_6s:
+            last_key = list(r_6s.keys())[-1]
+            st.caption(f"資料庫最新一筆姓名為: {r_6s[last_key].get('姓名')}")
+    else:
+        df_report = pd.DataFrame(list(report_data.items()), columns=["姓名", "回報時間"])
+        st.table(df_report)
+        st.success(f"共計 {len(report_data)} 位成員已完成回報。")
+
+except Exception as e:
+    st.error(f"讀取資料發生錯誤: {e}")
 
 
     
