@@ -1790,7 +1790,7 @@ else:
 
 
 # ==========================================
-# 📘 頁面：標準SOP功能 (高質感深紫科技款)
+# 📘 頁面：標準SOP功能 (高對比黑色粗體按鈕版)
 # ==========================================
     elif st.session_state.menu_selection == "📘 標準SOP功能":
         import base64
@@ -1837,21 +1837,21 @@ else:
                 # 判斷是否為當前選中
                 is_current = (st.session_state.active_sop_proc == proc_name)
                 
-                # 🎯 依照照片樣式設計的「深紫色」主色調：
-                card_bg = "#4c1d95"  # 照片上的高質感深紫色 (Purple 900)
+                # 🎯 依照照片樣式設計的「深紫色」主色調
+                card_bg = "#4c1d95"  
                 
                 if is_current:
                     title_color = "#ffffff"   # 當前選中：純白字
                     status_color = "#fde047"  # 當前選中：炫目亮黃字
-                    border_style = "3.5px solid #fde047" # 亮黃色粗外框，非常明顯
+                    border_style = "3.5px solid #fde047" # 亮黃色粗外框
                 elif doc_count > 0:
                     title_color = "#ffffff"   # 有檔案：純白字
                     status_color = "#a78bfa"  # 有檔案：柔和粉紫字
-                    border_style = "1px solid #a78bfa"  # 粉紫細邊框
+                    border_style = "1px solid #a78bfa"  
                 else:
                     title_color = "#cbd5e1"   # 沒檔案：淺灰字
                     status_color = "#94a3b8"  # 沒檔案：中灰字
-                    border_style = "1px solid #5b21b6"  # 暗紫細邊框
+                    border_style = "1px solid #5b21b6"  
                 
                 with cols[idx]:
                     # 1. 渲染照片風格的深紫科技款 HTML 顏色方塊
@@ -1862,10 +1862,23 @@ else:
                         </div>
                     """, unsafe_allow_html=True)
                     
-                    # 2. 在方塊正下方放一個小小的「選取查看」透明大按鈕，方便同仁點擊切換
-                    if st.button("👆 點擊切換查看", key=f"btn_p_{proc_key_tmp}", use_container_width=True):
+                    # 2. 💡【核心修改：黑色、粗體、大字體按鈕】
+                    # 使用 HTML 刻出一個漂亮的按鈕，強迫字體為黑色 (#000000)、粗體、18px 大字體，點擊保證清晰！
+                    if st.button(f"👆 點擊切換查看", key=f"btn_p_{proc_key_tmp}", use_container_width=True):
                         st.session_state.active_sop_proc = proc_name
                         st.rerun()
+                    
+                    # 透過 CSS 樣式強迫覆蓋這個按鈕的文字顏色與大小，防止它跟隨主題變白
+                    st.markdown(f"""
+                        <style>
+                        div[data-testid="stButton"] button[key="btn_p_{proc_key_tmp}"] p,
+                        div button[key="btn_p_{proc_key_tmp}"] {{
+                            color: #000000 !important;
+                            font-weight: 900 !important;
+                            font-size: 18px !important;
+                        }}
+                        </style>
+                    """, unsafe_allow_html=True)
 
         st.write("")
         st.divider()
@@ -1924,7 +1937,7 @@ else:
                         file_name=file_name_download,
                         mime="application/pdf",
                         use_container_width=True,
-                        type="primary" # 主色調按鈕，能避開白色底色阻擋
+                        type="primary" 
                     )
                 except Exception as file_err:
                     st.error(f"檔案解析失敗: {file_err}")
