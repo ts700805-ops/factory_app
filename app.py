@@ -413,36 +413,16 @@ else:
                     except Exception as e:
                         st.error(f"❌ 錯誤：{e}")
 
-
-import streamlit as st
-import pandas as pd
-import requests
-from datetime import datetime, timezone, timedelta
-
-# --- 1. 基本設定 ---
-st.set_page_config(page_title="超慧科技管理系統", layout="wide")
-DB_BASE_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
-
-# --- 2. 模擬與資料讀取 (請確保你的 mapping 正確) ---
-# 注意：若 leader_member_mapping 未定義，請在此處補上
-if "leader_member_mapping" not in locals():
-    leader_member_mapping = {
-        "劉志偉": ["劉志偉", "劉定澤", "胡瑄芸", "蕭詩瓊"] # 請務必確保這裡的名稱與資料庫完全一致
-    }
-
 # --- 整合後的回報清單顯示邏輯 ---
         st.markdown("---")
         st.markdown(f"##### 📋 {selected_leader} 組的今日已回報清單 (日期: {today_tw_str})")
         
         try:
-            # 讀取該日期下的所有回報 (使用您原系統寫入的 URL 路徑)
             res = requests.get(f"{REPORT_LOG_URL}/{today_tw_str}.json").json()
             
             if res and isinstance(res, dict):
-                # 過濾出該組成員，並建立表格
                 group_reports = []
                 for name, info in res.items():
-                    # 檢查姓名是否屬於當前選定組長的成員列表
                     if name in leader_member_mapping.get(selected_leader, []):
                         group_reports.append({"姓名": name, "回報時間": info.get("reported_at", "")})
                 
