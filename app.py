@@ -71,7 +71,7 @@ if "user" not in st.session_state:
                 st.rerun()
 else:
     # 側邊欄導航 (確保縮排層級一致)
-    st.sidebar.markdown(f"### 👤 當前人員：**{st.session_state.user}**")
+st.sidebar.markdown(f"### 👤 當前人員：**{st.session_state.user}**")
     
 nav = st.sidebar.radio("功能導航", [
         "💡 2026上半年技能考核進度", 
