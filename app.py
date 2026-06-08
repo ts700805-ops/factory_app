@@ -430,57 +430,50 @@ if "leader_member_mapping" not in locals():
         "劉志偉": ["劉志偉", "劉定澤", "胡瑄芸", "蕭詩瓊"] # 請務必確保這裡的名稱與資料庫完全一致
     }
 
-# --- 3. 顯示邏輯 ---
+# --- 簡化後的偵錯顯示邏輯 ---
 st.markdown("---")
-st.markdown("##### 📋 點選組長查看組員今日回報狀況")
+st.markdown("##### 📋 全員回報清單 (偵錯模式)")
 
-all_leaders_list = list(leader_member_mapping.keys())
-selected_leader = st.selectbox("請選擇組長：", all_leaders_list, key="6s_leader_select")
-target_members = leader_member_mapping.get(selected_leader, [])
-
-# 使用修正後的時間取得方式
+# 取得今日日期 (與資料庫比對用)
 today_str = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d")
 
 try:
     r = requests.get(f"{DB_BASE_URL}/6s_logs.json")
     r_6s = r.json() if r.status_code == 200 else {}
-    r_6s = r_6s if isinstance(r_6s, dict) else {}
-
-    report_data = {}
     
-    # 偵錯用：顯示資料庫內抓到的前 5 筆紀錄，確認欄位名稱
-    # st.write("DEBUG: 資料庫前 5 筆紀錄:", list(r_6s.values())[:5])
-
-    for v in r_6s.values():
-        if not isinstance(v, dict): continue
+    if isinstance(r_6s, dict):
+        # 建立一個列表，直接顯示所有紀錄的姓名與日期
+        all_logs = []
+        for key, val in r_6s.items():
+            if isinstance(val, dict):
+                all_logs.append({
+                    "姓名": val.get("姓名", "無姓名"),
+                    "日期": val.get("日期", "無日期"),
+                    "時間": val.get("時間", "無時間")
+                })
         
-        name = v.get("姓名", "").strip()
-        date = v.get("日期", "").strip()
+        df_all = pd.DataFrame(all_logs)
         
-        # 比對邏輯：將清單中的姓名也去除空白
-        clean_target_members = [m.strip() for m in target_members]
+        # 1. 顯示完整原始資料，確認日期格式
+        st.write("資料庫最新 10 筆原始回報資料：")
+        st.table(df_all.tail(10))
         
-        if name in clean_target_members and date == today_str:
-            report_data[name] = v.get("時間", "無時間紀錄")
-
-    st.write(f"**{selected_leader} 組的今日已回報清單 (日期: {today_str})：**")
-
-    if not report_data:
-        st.warning("⚠️ 目前該組今日無人員完成回報。")
-        # 顯示目標組員清單，方便你核對名字是否有誤
-        st.caption(f"系統設定的組員名單: {', '.join(target_members)}")
-        # 顯示資料庫抓到的最後一位姓名，看是不是存成別的名字
-        if r_6s:
-            last_key = list(r_6s.keys())[-1]
-            st.caption(f"資料庫最新一筆姓名為: {r_6s[last_key].get('姓名')}")
+        # 2. 強制篩選出符合今天日期的所有人員
+        today_logs = df_all[df_all["日期"] == today_str]
+        
+        st.write(f"系統認定的今日日期為: **{today_str}**")
+        
+        if not today_logs.empty:
+            st.success(f"找到 {len(today_logs)} 筆符合今日日期的回報：")
+            st.table(today_logs[["姓名", "時間"]])
+        else:
+            st.warning("⚠️ 找不到符合今日日期格式的資料！請檢查上表中的『日期』欄位格式。")
+            
     else:
-        df_report = pd.DataFrame(list(report_data.items()), columns=["姓名", "回報時間"])
-        st.table(df_report)
-        st.success(f"共計 {len(report_data)} 位成員已完成回報。")
+        st.error("資料庫格式異常。")
 
 except Exception as e:
-    st.error(f"讀取資料發生錯誤: {e}")
-
+    st.error(f"讀取失敗: {e}")
 
     
   # ==========================================
