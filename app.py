@@ -1790,7 +1790,7 @@ else:
 
 
 # ==========================================
-# 📘 頁面：標準SOP功能 (正紅外框一致性完美版)
+# 📘 頁面：標準SOP功能 (按鈕紅色填滿完美版)
 # ==========================================
     elif st.session_state.menu_selection == "📘 標準SOP功能":
         import base64
@@ -1837,24 +1837,24 @@ else:
                 # 判斷是否為當前選中
                 is_current = (st.session_state.active_sop_proc == proc_name)
                 
-                # 🎯 統一使用你最愛的「深紫色」主色調
+                # 維持你最愛的深紫色科技感方塊
                 card_bg = "#4c1d95"  
                 
                 if is_current:
-                    title_color = "#ffffff"   # 當前選中：純白字
-                    status_color = "#fde047"  # 當前選中：炫目亮黃字
-                    border_style = "4px solid #ef4444" # 🎯【核心修改】改成跟你圈選一模一樣的正紅色粗外框！
+                    title_color = "#ffffff"   
+                    status_color = "#fde047"  
+                    border_style = "2px solid #a78bfa" 
                 elif doc_count > 0:
-                    title_color = "#ffffff"   # 有檔案：純白字
-                    status_color = "#a78bfa"  # 有檔案：柔和粉紫字
+                    title_color = "#ffffff"   
+                    status_color = "#a78bfa"  
                     border_style = "1px solid #a78bfa"  
                 else:
-                    title_color = "#cbd5e1"   # 沒檔案：淺灰字
-                    status_color = "#94a3b8"  # 沒檔案：中灰字
+                    title_color = "#cbd5e1"   
+                    status_color = "#94a3b8"  
                     border_style = "1px solid #5b21b6"  
                 
                 with cols[idx]:
-                    # 1. 渲染深紫科技款 HTML 顏色方塊
+                    # 1. 渲染深紫方塊卡片
                     st.markdown(f"""
                         <div style="background-color: {card_bg}; border: {border_style}; border-radius: 8px; padding: 12px; text-align: center; margin-bottom: 5px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
                             <span style="color: {title_color}; font-weight: 800; font-size: 1.05rem; display: block; margin-bottom: 5px;">🛠️ {proc_name}</span>
@@ -1862,22 +1862,39 @@ else:
                         </div>
                     """, unsafe_allow_html=True)
                     
-                    # 2. 黑色、粗體、大字體按鈕
+                    # 2. 生成切換按鈕
                     if st.button(f"👆 點擊切換查看", key=f"btn_p_{proc_key_tmp}", use_container_width=True):
                         st.session_state.active_sop_proc = proc_name
                         st.rerun()
                     
-                    # 透過 CSS 樣式強迫覆蓋這個按鈕的文字顏色與大小，防止它隨主題變白
-                    st.markdown(f"""
-                        <style>
-                        div[data-testid="stButton"] button[key="btn_p_{proc_key_tmp}"] p,
-                        div button[key="btn_p_{proc_key_tmp}"] {{
-                            color: #000000 !important;
-                            font-weight: 900 !important;
-                            font-size: 18px !important;
-                        }}
-                        </style>
-                    """, unsafe_allow_html=True)
+                    # 🎯【核心修改】透過 CSS 直接強制控制按鈕的填滿顏色
+                    # 如果是被選中的工序：變成紅色填滿、白色粗體字
+                    # 如果沒選中：維持原本的樣式
+                    if is_current:
+                        st.markdown(f"""
+                            <style>
+                            div[data-testid="stButton"] button[key="btn_p_{proc_key_tmp}"] {{
+                                background-color: #ef4444 !important; /* 🔥 完美正紅色填滿 */
+                                border: 1px solid #ef4444 !important;
+                                color: #ffffff !important;           /* ⚪ 白色字體 */
+                            }}
+                            div[data-testid="stButton"] button[key="btn_p_{proc_key_tmp}"] p {{
+                                color: #ffffff !important;           /* 強制段落文字也是白色 */
+                                font-weight: 900 !important;         /* 粗體 */
+                                font-size: 16px !important;          /* 放大字體 */
+                            }}
+                            </style>
+                        """, unsafe_allow_html=True)
+                    else:
+                        # 沒選中時的普通按鈕樣式防呆（確保字體看得見）
+                        st.markdown(f"""
+                            <style>
+                            div[data-testid="stButton"] button[key="btn_p_{proc_key_tmp}"] p {{
+                                color: #000000 !important;           /* 黑字 */
+                                font-weight: 800 !important;
+                            }}
+                            </style>
+                        """, unsafe_allow_html=True)
 
         st.write("")
         st.divider()
@@ -1922,7 +1939,6 @@ else:
 
             # 顯示下載按鈕或未上傳提示
             if existing_file_data and "file_base64" in existing_file_data:
-                # 使用乾淨且高對比的淺灰藍底色來包覆文件名稱，保證看得到
                 st.markdown(f"<div style='background-color:#f1f5f9; padding:10px; border-left:5px solid #4c1d95; border-radius:4px; margin-bottom:10px;'><b style='color:#0f172a; font-size:1.1rem;'>📄 目前專屬文件：{existing_file_data.get('file_name')}</b></div>", unsafe_allow_html=True)
                 
                 try:
