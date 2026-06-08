@@ -1785,10 +1785,16 @@ else:
                 st.success("設定已存入資料庫"); time.sleep(0.8); st.rerun()
 
 
-
+# ==========================================
+# 📘 頁面：標準SOP功能 (免授權 全包修復版)
+# ==========================================
     elif st.session_state.menu_selection == "📘 標準SOP功能":
         import base64
         import re
+
+        # 直接在功能內部定義好路徑，百分之百不會再噴 NameError 錯誤！
+        SOP_LIST_URL = f"{DB_BASE_URL}/sop_settings"      # 儲存 SOP 下拉選單工序項目
+        SOP_FILE_URL = f"{DB_BASE_URL}/sop_file_data"     # 儲存各工序對應的 PDF 檔案內容
 
         st.markdown('<h1 style="text-align:center; color:#38bdf8; font-weight:900; font-size:2.5rem;">📘 標準 SOP 線上查閱中心</h1>', unsafe_allow_html=True)
         st.markdown("<p style='text-align:center; color:#cbd5e1;'>依據工序查詢對應標準作業書，支援線上直接查閱與動態管理</p>", unsafe_allow_html=True)
@@ -1796,7 +1802,7 @@ else:
 
         # 1. 讀取與初始化 Firebase 後台工序選單資料
         sop_settings = requests.get(f"{SOP_LIST_URL}.json").json() or {"sop_types": []}
-        sop_types = sop_settings.get("sop_types", ["骨架組裝工序", "內部配電工序", "外觀檢驗工序"]) # 預設保底選單
+        sop_types = sop_settings.get("sop_types", ["骨架作業", "前置作業", "配電作業"]) # 預設保底選單
 
         col_left, col_right = st.columns([1.2, 2.0])
 
@@ -1842,7 +1848,7 @@ else:
                         payload = {
                             "file_name": uploaded_pdf.name,
                             "upload_time": get_now_str(),
-                            "uploader": st.session_state.user,
+                            "uploader": st.session_state.user if "user" in st.session_state else "系統管理員",
                             "file_base64": base64_pdf
                         }
                         
