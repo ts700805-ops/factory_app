@@ -1790,7 +1790,7 @@ else:
 
 
 # ==========================================
-# 📘 頁面：標準SOP功能 (點擊看板直接連動版)
+# 📘 頁面：標準SOP功能 (高清晰度深色字體版)
 # ==========================================
     elif st.session_state.menu_selection == "📘 標準SOP功能":
         import base64
@@ -1800,8 +1800,9 @@ else:
         SOP_LIST_URL = f"{DB_BASE_URL}/sop_settings"      # 儲存 SOP 下拉選單工序項目
         SOP_FILE_URL = f"{DB_BASE_URL}/sop_file_data"     # 儲存各工序對應的 PDF 檔案內容
 
-        st.markdown('<h1 style="text-align:center; color:#38bdf8; font-weight:900; font-size:2.5rem;">📘 標準 SOP 線上查閱中心</h1>', unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center; color:#cbd5e1;'>點擊下方工序按鈕，直接查閱或管理對應的標準作業書</p>", unsafe_allow_html=True)
+        # 標題與副標題全部改成深色（深藍與深灰），確保看得一清二楚
+        st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900; font-size:2.5rem;">📘 標準 SOP 線上查閱中心</h1>', unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center; color:#334155; font-weight:700;'>點擊下方工序按鈕，直接查閱或管理對應的標準作業書</p>", unsafe_allow_html=True)
         st.divider()
 
         # 1. 讀取與初始化 Firebase 後台工序選單資料
@@ -1817,7 +1818,7 @@ else:
 
 
         # ==========================================
-        # 📊 【全新互動看板】點擊按鈕直接切換工序
+        # 📊 【互動看板】點擊按鈕直接切換工序
         # ==========================================
         st.markdown("### 📊 請點選欲查閱的製造工序")
         
@@ -1833,7 +1834,6 @@ else:
                 has_file = proc_key_tmp in all_file_data and "file_base64" in all_file_data[proc_key_tmp]
                 doc_count = 1 if has_file else 0
                 
-                # 依據是否為當前選中，以及有無檔案，決定按鈕文字標記
                 btn_label = f"🛠️ {proc_name} ({doc_count}份)"
                 
                 # 讓按鈕本身具有切換功能
@@ -1854,7 +1854,7 @@ else:
         selected_sop_proc = st.session_state.active_sop_proc
 
         if not selected_sop_proc:
-            st.warning("💡 請先於上方建立或選擇一個工序。")
+            st.warning("💡 請先於下方建立或選擇一個工序。")
         else:
             st.markdown(f"## 🔍 當前檢視：【{selected_sop_proc}】")
             
@@ -1887,7 +1887,8 @@ else:
 
             # 顯示下載按鈕或未上傳提示
             if existing_file_data and "file_base64" in existing_file_data:
-                st.info(f"📄 目前文件：**{existing_file_data.get('file_name')}**")
+                # 使用黑字體粗體顯示檔案名稱
+                st.markdown(f"<p style='color:#0f172a; font-size:1.1rem; font-weight:800;'>📄 目前文件：{existing_file_data.get('file_name')}</p>", unsafe_allow_html=True)
                 
                 try:
                     pdf_b64 = existing_file_data["file_base64"]
