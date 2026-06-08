@@ -430,21 +430,21 @@ if "leader_member_mapping" not in locals():
         "劉志偉": ["劉志偉", "劉定澤", "胡瑄芸", "蕭詩瓊"] # 請務必確保這裡的名稱與資料庫完全一致
     }
 
-# --- 簡化後的偵錯顯示邏輯 ---
+# --- 修正後的資料撈取邏輯 ---
 st.markdown("---")
 st.markdown("##### 📋 全員回報清單 (偵錯模式)")
 
-# 取得今日日期 (與資料庫比對用)
+# 取得今日日期
 today_str = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d")
 
 try:
-    r = requests.get(f"{DB_BASE_URL}/6s_logs.json")
-    r_6s = r.json() if r.status_code == 200 else {}
+    # 修改路徑為 'work_logs'，因為截圖中沒有 6s_logs
+    r = requests.get(f"{DB_BASE_URL}/work_logs.json") 
+    r_data = r.json() if r.status_code == 200 else {}
     
-    if isinstance(r_6s, dict):
-        # 建立一個列表，直接顯示所有紀錄的姓名與日期
+    if isinstance(r_data, dict):
         all_logs = []
-        for key, val in r_6s.items():
+        for key, val in r_data.items():
             if isinstance(val, dict):
                 all_logs.append({
                     "姓名": val.get("姓名", "無姓名"),
@@ -454,27 +454,23 @@ try:
         
         df_all = pd.DataFrame(all_logs)
         
-        # 1. 顯示完整原始資料，確認日期格式
-        st.write("資料庫最新 10 筆原始回報資料：")
+        # 顯示資料，讓您確認裡面是否有資料
+        st.write("資料庫 'work_logs' 中的最新 10 筆資料：")
         st.table(df_all.tail(10))
         
-        # 2. 強制篩選出符合今天日期的所有人員
+        # 篩選今日資料
         today_logs = df_all[df_all["日期"] == today_str]
         
-        st.write(f"系統認定的今日日期為: **{today_str}**")
-        
         if not today_logs.empty:
-            st.success(f"找到 {len(today_logs)} 筆符合今日日期的回報：")
-            st.table(today_logs[["姓名", "時間"]])
+            st.success(f"在 'work_logs' 中找到 {len(today_logs)} 筆符合今日日期的回報！")
+            st.table(today_logs)
         else:
-            st.warning("⚠️ 找不到符合今日日期格式的資料！請檢查上表中的『日期』欄位格式。")
-            
+            st.warning("⚠️ 在 'work_logs' 中找不到今日日期資料，請檢查上表日期格式。")
     else:
-        st.error("資料庫格式異常。")
+        st.error("資料庫中無資料或格式錯誤。")
 
 except Exception as e:
     st.error(f"讀取失敗: {e}")
-
     
   # ==========================================
     # 🎮 6S 戰境養成功能區塊
