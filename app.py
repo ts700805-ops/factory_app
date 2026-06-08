@@ -10,8 +10,9 @@ DB_BASE_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
 DB_URL = f"{DB_BASE_URL}/work_logs"
 FINISH_URL = f"{DB_BASE_URL}/completed_logs"
 SETTING_URL = f"{DB_BASE_URL}/settings"
-TOOL_LIST_URL = f"{DB_BASE_URL}/tool_settings"
-USER_TOOLS_URL = f"{DB_BASE_URL}/user_tool_logs"
+# 新增手工具相關路徑
+TOOL_LIST_URL = f"{DB_BASE_URL}/tool_settings"     # 儲存手工具下拉選單內容
+USER_TOOLS_URL = f"{DB_BASE_URL}/user_tool_logs"  # 儲存人員手工具紀錄表
 
 def get_now_str():
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
@@ -39,22 +40,129 @@ def get_settings():
     except:
         return default_settings
 
-# --- 2. 介面樣式設定 ---
+# --- 2. 介面樣式設定 (全面升級為照片中的高質感深綠色漸層主題) ---
 st.set_page_config(page_title="超慧科技管理系統", layout="wide")
 
 st.markdown("""
     <style>
-    .stApp { background: linear-gradient(135deg, #04241a 0%, #01140f 100%) !important; color: #e2e8f0 !important; }
-    .stSidebar, [data-testid="stSidebarUserContent"] { background-color: #021a14 !important; color: #f0fdf4 !important; }
-    .order-card { background: linear-gradient(145deg, #083b2e 0%, #031c16 100%); border-radius: 14px; border: 1px solid #10b981; margin-bottom: 25px; overflow: hidden; box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5); }
-    .order-header { background: linear-gradient(90deg, #059669 0%, #047857 100%); color: white; padding: 14px 18px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; font-size: 1.25rem; border-bottom: 1px solid #10b981; }
-    h1, h2, h3, p, label, .stWidgetLabel { color: #ffffff !important; }
+    /* 全網頁背景改成深綠至黑綠色漸層 */
+    .stApp { 
+        background: linear-gradient(135deg, #04241a 0%, #01140f 100%) !important; 
+        color: #e2e8f0 !important;
+    }
+    
+    /* 側邊欄與相關表單文字顏色微調 */
+    .stSidebar, [data-testid="stSidebarUserContent"] {
+        background-color: #021a14 !important;
+        color: #f0fdf4 !important;
+    }
+    
+    /* 製令卡片改為深綠色帶金屬感的漸層外框 */
+    .order-card { 
+        background: linear-gradient(145deg, #083b2e 0%, #031c16 100%); 
+        border-radius: 14px; 
+        border: 1px solid #10b981; 
+        margin-bottom: 25px; 
+        overflow: hidden; 
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5); 
+    }
+    
+    /* 卡片標頭：亮綠色漸層，配上清楚白字 */
+    .order-header { 
+        background: linear-gradient(90deg, #059669 0%, #047857 100%); 
+        color: white; 
+        padding: 14px 18px; 
+        font-weight: 800; 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        font-size: 1.25rem; 
+        border-bottom: 1px solid #10b981;
+    }
+    
+    /* 通電日期標籤改為顯眼明亮的冰藍或黃金配色 */
+    .power-date-tag { 
+        background: #06b6d4; 
+        color: #ffffff; 
+        padding: 4px 12px; 
+        border-radius: 8px; 
+        font-size: 0.9rem; 
+        font-weight: 800; 
+        display: flex; 
+        align-items: center; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    /* 工序橫條：改為半透明深色底，帶有翠綠邊線 */
+    .proc-row-container { 
+        padding: 15px 18px; 
+        border-bottom: 1px solid #064e3b; 
+        background-color: rgba(2, 44, 34, 0.6); 
+    }
+    
+    /* 工序名稱字體：亮白色，左邊改為亮綠色條 */
+    .proc-name { 
+        font-weight: 900; 
+        color: #ffffff; 
+        font-size: 1.1rem; 
+        border-left: 5px solid #34d399; 
+        padding-left: 12px; 
+    }
+    
+    /* 人員標籤：優化背景與文字對比度，改為明亮清晰字體 */
+    .badge-staff { 
+        background: #059669; 
+        color: #ffffff; 
+        padding: 4px 10px; 
+        border-radius: 6px; 
+        font-size: 0.95rem; 
+        font-weight: 700; 
+        border: 1px solid #34d399; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    /* 狀態框：已完工 (明亮綠) */
+    .status-done-box { 
+        background: #065f46; 
+        color: #34d399; 
+        font-weight: 800; 
+        font-size: 0.9rem; 
+        padding: 6px 12px; 
+        border-radius: 6px; 
+        border: 1px solid #34d399; 
+        display: inline-block; 
+        text-align: center;
+    }
+    
+    /* 狀態框：請指派 (鮮艷橘黃) */
+    .status-assign-box { 
+        background: #78350f; 
+        color: #fcd34d; 
+        font-weight: 700; 
+        padding: 6px 12px; 
+        border-radius: 6px; 
+        border: 1px solid #f59e0b; 
+        font-size: 0.9rem; 
+        text-align: center;
+    }
+    
+    /* 修正下拉選單與一般標題文字在黑底下的顏色 */
+    h1, h2, h3, p, label, .stWidgetLabel {
+        color: #ffffff !important;
+    }
+    
+    .status-empty { color: #cbd5e1; font-style: italic; font-weight: 700; font-size: 0.95rem; }
     </style>
 """, unsafe_allow_html=True)
 
 # --- 3. 讀取設定 ---
 settings = get_settings()
 all_leaders = settings.get("all_leaders", [])
+all_staff = settings.get("all_staff", [])
+process_list = settings.get("processes", [])
+order_list = settings.get("order_list", [])
+process_map = settings.get("process_map", {})
+staff_map = settings.get("staff_map", {}) 
 
 if "menu_selection" not in st.session_state:
     st.session_state.menu_selection = "📊 製造部派工專區"
@@ -70,266 +178,57 @@ if "user" not in st.session_state:
                 st.session_state.user = u
                 st.rerun()
 else:
-    # 側邊欄導航 (確保縮排層級一致)
-st.sidebar.markdown(f"### 👤 當前人員：**{st.session_state.user}**")
+    # 側邊欄導航 (新增手工具相關選項)
+    st.sidebar.markdown(f"### 👤 當前人員：**{st.session_state.user}**")
+    nav = st.sidebar.radio("功能導航", [
+   
+    "💡2o26上半年技能考核進度", 
+    "🧾組長待辦事項",
+    "📝每日6S任務回報", 
+    "🎮6S戰境養成", 
+    "📊 製造部派工專區", 
+    "📜 完工紀錄查詢", 
+    "🔧 固資&手工具紀錄表",
+    "⚙️ 資產編輯清單", 
+    "⚙️ 設定管理"
+
+    ])
     
-nav = st.sidebar.radio("功能導航", [
-        "💡 2026上半年技能考核進度", 
-        "🧾 組長待辦事項",
-        "🛡️ 🛡️ 🛡️ 🛡️ 🛡️ 🛡️",
-        "📝 每日6S任務回報", 
-        "🎮 6S戰境養成", 
-        "🟢 6S個人能力查詢",
-        "🛡️ 🛡️ 🛡️ 🛡️ 🛡️ 🛡️",
-        "📊 製造部派工專區", 
-        "📜 完工紀錄查詢", 
-        "🔧 固資&手工具紀錄表",
-        "⚙️ 資產編輯清單", 
-        "⚙️ 設定管理"
-])
-    
-    # 登出按鈕
-    st.sidebar.markdown("""
+    # --- 登出系統按鈕（放到側邊欄 radio 下方，確保 100% 執行與顯示）---
+    st.sidebar.markdown(
+        """
         <div style="padding: 10px 0; text-align: center;">
             <a href="/?logout=true" target="_self" style="
-                display: block; padding: 12px; color: #ffffff !important; 
-                background-color: #dc2626 !important; border-radius: 8px; 
-                text-decoration: none !important; font-size: 1.2rem; 
-                font-weight: 900; box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
+                display: block; 
+                padding: 12px; 
+                color: #ffffff !important; 
+                background-color: #dc2626 !important; 
+                border-radius: 8px; 
+                text-decoration: none !important; 
+                font-size: 1.2rem; 
+                font-weight: 900; 
+                box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
             ">🚪 點此登出系統</a>
         </div>
-    """, unsafe_allow_html=True)
+        """, 
+        unsafe_allow_html=True
+    )
 
-    # 處理邏輯
+    # 檢查是否點擊了登出連結
     if "logout" in st.query_params:
         st.query_params.clear()
         st.session_state.clear()
         st.rerun()
 
+    # 導航頁面重整判斷（移至登出按鈕下方，不阻斷程式執行）
     if nav != st.session_state.menu_selection:
         st.session_state.menu_selection = nav
         st.rerun()
 
-    # 此處後續接您的業務邏輯頁面內容
-    st.write(f"目前頁面: {st.session_state.menu_selection}")
 
-
-    # --- 📈💡2o26上半年技能考核進度 ---
-    elif st.session_state.menu_selection == "💡2o26上半年技能考核進度":
-        st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">💡2o26上半年技能考核進度</h1>', unsafe_allow_html=True)
-        
-        # 1. 取得當前登入的組長名字
-        logged_in_user = st.session_state.user 
-        
-        # 2. 先從資料庫抓取全體組長清單，做為切換選單的選項
-        leader_options = []
-        try:
-            map_res = requests.get(f"{DB_BASE_URL}/settings/staff_map.json")
-            if map_res.status_code == 200:
-                staff_data = map_res.json() or {}
-                # 抓出所有的組長鍵值 (Key)
-                leader_options = sorted([str(k).strip() for k in staff_data.keys() if k])
-        except Exception as e:
-            st.error(f"無法讀取組長清單: {e}")
-            
-        # 防呆：如果資料庫撈不到，至少包含當前登入者
-        if not leader_options:
-            leader_options = [str(logged_in_user).strip()]
-        elif str(logged_in_user).strip() not in leader_options:
-            leader_options.insert(0, str(logged_in_user).strip())
-
-        # --- 👑 【新增功能：切換組長選單】 ---
-        try:
-            default_leader_idx = leader_options.index(str(logged_in_user).strip())
-        except:
-            default_leader_idx = 0
-
-        selected_leader = st.selectbox(
-            "👑 請選擇要檢視/評核的組長：",
-            options=leader_options,
-            index=default_leader_idx,
-            key="global_leader_selector"
-        )
-
-        # 3. 根據選定的組長，嚴格清洗並抓取該組長的組員名單
-        display_list = []
-        try:
-            if map_res.status_code == 200:
-                raw_team_data = staff_data.get(selected_leader, [])
-                
-                if isinstance(raw_team_data, list):
-                    for item in raw_team_data:
-                        item_str = str(item).strip()
-                        if "," in item_str:
-                            display_list.extend([x.strip() for x in item_str.split(",") if x.strip()])
-                        else:
-                            if item_str: display_list.append(item_str)
-                elif isinstance(raw_team_data, str):
-                    display_list = [x.strip() for x in raw_team_data.split(",") if x.strip()]
-                
-            if not display_list:
-                display_list = [str(selected_leader).strip()]
-        except:
-            display_list = [str(selected_leader).strip()]
-
-        # 去除重複的人員名稱
-        display_list = sorted(list(set(display_list)))
-
-        # --- 🌐 核心讀取：從 Firebase 讀取目前全體員工的最新考核分數 (讓資料永久存在) ---
-        db_saved_scores = {}
-        try:
-            latest_eval_res = requests.get(f"{DB_BASE_URL}/skills_current_status.json")
-            if latest_eval_res.status_code == 200:
-                db_saved_scores = latest_eval_res.json() or {}
-        except:
-            pass
-
-        st.markdown(f'<p style="font-size:1.2rem; font-weight:bold; color:#1e3a8a;">👥 正在檢視：【{selected_leader} 組長】的組員技能考核狀態 (每格刻度 20%)：</p>', unsafe_allow_html=True)
-        st.divider()
-
-        # 固定 0% 到 100% 的選單選項
-        options_10 = [f"{x}%" for x in range(0, 101, 20)]
-
-        # 4. 一個畫面左右與上下並列顯示（2列 × 4欄 = 8個人）
-        if display_list:
-            # 每 4 個人切換成一橫列
-            for i in range(0, len(display_list), 4):
-                chunk = display_list[i:i+4]
-                cols = st.columns(4)  # 建立左右 4 個欄位
-                
-                for idx, member in enumerate(chunk):
-                    m_name = str(member).strip()
-                    if not m_name: continue
-                    
-                    # 優先從資料庫歷史紀錄讀取百分比，如果資料庫沒紀錄，預設才顯示 50%
-                    member_score_in_db = db_saved_scores.get(m_name, {}).get("技能考核完成度", 0)
-                    default_str = f"{member_score_in_db}%"
-                    
-                    # 確保數值在選單內，防呆機制
-                    if default_str not in options_10:
-                        default_str = "50%"
-                    current_index = options_10.index(default_str)
-                    
-                    with cols[idx]:
-                        # 精美黑框卡片外觀
-                        st.markdown(f'<div style="background:#1e3a8a; color:white; padding:8px 10px; border-radius:10px 10px 0 0; font-weight:bold; font-size:1.1rem; text-align:center;">👤 {m_name}</div>', unsafe_allow_html=True)
-                        
-                        with st.container(border=True):
-                            # 下拉式選單
-                            selected_str = st.selectbox(
-                                "技能考核進度",
-                                options=options_10,
-                                index=current_index,
-                                key="pct_select_" + m_name,
-                                label_visibility="collapsed"
-                            )
-                            
-                            # 轉回純數字供圖表使用
-                            pct_val = int(selected_str.replace("%", ""))
-                            
-                            # 【核心聯動】如果使用者調整了選單數值，立刻自動同步寫入 Firebase 更新，達到永久保存
-                            if pct_val != member_score_in_db:
-                                sync_url = f"{DB_BASE_URL}/skills_current_status/{m_name}.json"
-                                sync_data = {
-                                    "技能考核完成度": pct_val,
-                                    "更新時間": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                                }
-                                requests.put(sync_url, data=json.dumps(sync_data))
-                                st.rerun()
-                            
-                            # 根據百分比動態決定彩色圓形的顏色 (低於40紅, 40-70橘, 80以上綠)
-                            if pct_val <= 30:
-                                circle_color = "#ef4444"  # 紅色
-                            elif pct_val <= 70:
-                                circle_color = "#f97316"  # 橘色
-                            else:
-                                circle_color = "#22c55e"  # 綠色
-                                
-                            # 用 HTML/CSS 畫出彩色的圓形百分比圖表
-                            st.components.v1.html(f"""
-                                <div style="display: flex; justify-content: center; align-items: center; height: 110px; font-family: sans-serif;">
-                                    <div style="position: relative; width: 90px; height: 90px; border-radius: 50%; background: conic-gradient({circle_color} {pct_val * 3.6}deg, #e2e8f0 0deg); display: flex; justify-content: center; align-items: center;">
-                                        <div style="position: absolute; width: 72px; height: 72px; border-radius: 50%; background: white; display: flex; justify-content: center; align-items: center; flex-direction: column;">
-                                            <span style="font-size: 1.4rem; font-weight: 900; color: #1e3a8a;">{pct_val}%</span>
-                                            <span style="font-size: 0.65rem; color: #64748b; font-weight: bold; margin-top: 2px;">技能考核</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            """, height=110)
-                            
-                            # 獨立的儲存核准歷史按鈕 (按下即發送一筆正式報表到歷史資料庫)
-                            if st.button("💾 儲存歷史", key="save_btn_" + m_name, use_container_width=True, type="primary"):
-                                eval_db_url = f"{DB_BASE_URL}/skills_evaluations"
-                                new_eval = {
-                                    "人員": m_name,
-                                    "技能考核完成度": pct_val,
-                                    "評核月份": datetime.datetime.now().strftime("%Y-%m"),
-                                    "評核時間": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                                }
-                                try:
-                                    res = requests.post(f"{eval_db_url}.json", data=json.dumps(new_eval))
-                                    if res.status_code == 200:
-                                        st.success(f"{m_name} 已存檔!")
-                                    else:
-                                        st.error("錯誤")
-                                except Exception as save_err:
-                                    st.error(f"出錯: {save_err}")
-                
-                st.markdown('<div style="margin-bottom:15px;"></div>', unsafe_allow_html=True)
-        else:
-            st.info("💡 目前此組別無成員資料。")
-
-# --- 📜 完工紀錄查詢 (原功能完全保留，一律不修改) ---
-    elif st.session_state.menu_selection == "📜 完工紀錄查詢":
-        st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📜 歷史完工紀錄</h1>', unsafe_allow_html=True)
-        
-        all_logs = requests.get(f"{FINISH_URL}.json").json()
-        if all_logs:
-            df = pd.DataFrame([dict(v, db_id=k) for k, v in all_logs.items()])
-            search_q = st.text_input("🔍 搜尋紀錄")
-            if search_q: 
-                df = df[df.astype(str).apply(lambda x: x.str.contains(search_q, case=False)).any(axis=1)]
-            
-            if not df.empty:
-                for o_id, group in df.groupby("製令"):
-                    display_df = group.copy()
-                    
-                    # 1. 計算每筆工時(分)與總工時(分鐘數相加)
-                    total_all_minutes = 0.0
-                    if '秒數' in display_df.columns:
-                        display_df['工時(分)'] = (display_df['秒數'] / 60).round(2)
-                        total_all_minutes = round(display_df['工時(分)'].sum(), 2) 
-                        
-                        # 2. 逆推開始時間
-                        try:
-                            temp_finish = pd.to_datetime(display_df['完工時間'])
-                            display_df['開始時間'] = (temp_finish - pd.to_timedelta(display_df['秒數'], unit='s')).dt.strftime('%Y-%m-%d %H:%M:%S')
-                        except:
-                            display_df['開始時間'] = "計算失敗"
-
-                    # 3. 在標題顯示
-                    with st.expander(f"📦 製令：{o_id} ({len(group)} 項 | 總工時：{total_all_minutes} 分鐘)"):
-                        
-                        # 設定表格順序
-                        cols = ["工序", "開始時間", "完工時間", "工時(分)"]
-                        existing_cols = [c for c in cols if c in display_df.columns]
-                        
-                        st.table(display_df[existing_cols])
-                        
-                        if st.button(f"🗑️ 刪除紀錄", key=f"del_{o_id}"):
-                            for d_id in group['db_id']: requests.delete(f"{FINISH_URL}/{d_id}.json")
-                            st.rerun()
-            else: st.warning("查無紀錄。")
-        else: st.info("💡 目前尚無紀錄。")
-
-
-
-
-
-
-    # ==========================================
-    # 📝 頁面一：每日 6S 任務回報中心 (後台優先同步版)
-    # ==========================================
+# ==========================================
+# 📝 頁面一：每日 6S 任務回報中心 (後台優先同步版)
+# ==========================================
     elif st.session_state.menu_selection == "📝每日6S任務回報":
         import requests
         import json
@@ -405,6 +304,7 @@ nav = st.sidebar.radio("功能導航", [
                 "李俊霖": ["陳育信", "陳凱彥", "111", "222"]
             }
 
+        # 如果主清單在後台是空的，自動採用預設完整組長清單
         if not leader_list:
             leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
 
@@ -480,38 +380,85 @@ nav = st.sidebar.radio("功能導航", [
                     time.sleep(1.2)
                     st.session_state.menu_selection = "🎮6S戰境養成"
                     st.rerun()
-                    # ==========================================
-        # ⚙️ 新增人員管理區塊 (找回設定功能)
+
+
+
         # ==========================================
-        st.divider()
-        st.markdown("### ⚙️ 人員與組別管理")
-        
-        with st.expander("點此展開人員編輯設定"):
-            with st.form("admin_edit_members"):
-                # 將目前的字典轉回字串格式，方便在文字框編輯
-                current_text = "\n".join([f"{k}:{','.join(v)}" for k, v in leader_member_mapping.items()])
-                edit_input = st.text_area("編輯組員清單 (格式：組長:組員1,組員2)", current_text, height=200)
-                
-                if st.form_submit_button("💾 儲存並更新名單到後台"):
-                    # 執行邏輯：將編輯框內容更新到 Firebase
+        # ⚙️ 後台管理專區：維護組員名單 (紅框處功能)
+        # ==========================================
+        st.write("")
+        with st.expander("⚙️ 管理員專區：維護組員名單"):
+            st.markdown("##### 📝 編輯對照表")
+            st.caption("格式範例：組長名:成員1,成員2,成員3 (每行一位組長)")
+            
+            # 將目前的對照表轉換為文字顯示在輸入框中
+            current_mapping_text = ""
+            for l, m in leader_member_mapping.items():
+                current_mapping_text += f"{l}:{','.join(m)}\n"
+            
+            new_mapping_raw = st.text_area("人員配置資料：", value=current_mapping_text, height=250, key="6s_staff_edit_area")
+            
+            if st.button("💾 儲存並同步名單至雲端", use_container_width=True, key="6s_save_staff_btn"):
+                if new_mapping_raw:
                     try:
-                        # 這裡將內容存入 leader_members.json
-                        requests.put(f"{BASE_URL}/leader_members.json", json=edit_input)
-                        st.success("設定已成功儲存至後台！請重新整理頁面。")
-                        st.rerun()
+                        save_res = requests.put(f"{BASE_URL}/leader_members.json", data=json.dumps(new_mapping_raw.strip()))
+                        if save_res.status_code == 200:
+                            st.success("✅ 名單儲存成功！下拉選單已同步更新。")
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error("❌ 儲存失敗，請檢查網路。")
                     except Exception as e:
-                        st.error(f"儲存失敗: {e}")
+                        st.error(f"❌ 錯誤：{e}")
 
 
-    
 
-    # ==========================================
+ # ==========================================
+        # ==========================================
+            # --- 點選組長查看該組員未回報清單 ---
+            st.markdown("---")
+            st.markdown("##### 🔍 點選組長查看組員回報狀況")
+            
+            # 1. 取得所有組長清單
+            all_leaders_list = list(leader_member_mapping.keys())
+            selected_leader = st.selectbox("請選擇組長：", all_leaders_list, key="6s_leader_select")
+            
+            # 2. 獲取該組長名下的組員
+            target_members = leader_member_mapping.get(selected_leader, [])
+            
+            # 3. 取得今日日期
+            import datetime
+            now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
+            today_str = now.strftime("%Y-%m-%d")
+            
+            try:
+                # 4. 抓取 6S 紀錄
+                r_6s = requests.get(f"{DB_BASE_URL}/6s_logs.json").json()
+                r_6s = r_6s if isinstance(r_6s, dict) else {}
+                
+                # 找出今天已回報的人
+                reported_staff = [v.get("姓名") for v in r_6s.values() if isinstance(v, dict) and v.get("日期") == today_str]
+                
+                # 5. 計算該組長名下未回報的人
+                not_reported = [name for name in target_members if name not in reported_staff]
+                
+                # 顯示結果
+                st.write(f"**{selected_leader} 組的狀況：**")
+                if not not_reported:
+                    st.success(f"✅ {selected_leader} 組的所有組員 ({len(target_members)} 人) 皆已完成回報！")
+                else:
+                    st.warning(f"以下 {len(not_reported)} 位成員尚未回報：")
+                    st.write(", ".join(not_reported))
+            except:
+                st.info("ℹ️ 目前暫無 6S 回報資料。")
+# ==========================================
     # 🎮 6S 戰境養成功能區塊
     # ==========================================
+  # 更改為獨立 if 判定，徹底解決 elif 造成的 SyntaxError 語法錯誤
     if st.session_state.get("menu_selection") and "6S戰境養成" in str(st.session_state.menu_selection):
         import random
         import time
-        import json 
+        import json # 確保有載入 json 模組
 
         st.markdown(
             '''
@@ -602,6 +549,7 @@ nav = st.sidebar.radio("功能導航", [
             )
 
         st.divider()
+
        # ==========================================
         # ⚔️ 尋找現場同仁發起決鬥系統
         # ==========================================
@@ -749,6 +697,7 @@ nav = st.sidebar.radio("功能導航", [
                 time.sleep(1)
                 st.rerun()
       
+
 
 
 
@@ -939,6 +888,213 @@ nav = st.sidebar.radio("功能導航", [
 
     
             
+# --- 📈💡2o26上半年技能考核進度 ---
+    elif st.session_state.menu_selection == "💡2o26上半年技能考核進度":
+        st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">💡2o26上半年技能考核進度</h1>', unsafe_allow_html=True)
+        
+        # 1. 取得當前登入的組長名字
+        logged_in_user = st.session_state.user 
+        
+        # 2. 先從資料庫抓取全體組長清單，做為切換選單的選項
+        leader_options = []
+        try:
+            map_res = requests.get(f"{DB_BASE_URL}/settings/staff_map.json")
+            if map_res.status_code == 200:
+                staff_data = map_res.json() or {}
+                # 抓出所有的組長鍵值 (Key)
+                leader_options = sorted([str(k).strip() for k in staff_data.keys() if k])
+        except Exception as e:
+            st.error(f"無法讀取組長清單: {e}")
+            
+        # 防呆：如果資料庫撈不到，至少包含當前登入者
+        if not leader_options:
+            leader_options = [str(logged_in_user).strip()]
+        elif str(logged_in_user).strip() not in leader_options:
+            leader_options.insert(0, str(logged_in_user).strip())
+
+        # --- 👑 【新增功能：切換組長選單】 ---
+        try:
+            default_leader_idx = leader_options.index(str(logged_in_user).strip())
+        except:
+            default_leader_idx = 0
+
+        selected_leader = st.selectbox(
+            "👑 請選擇要檢視/評核的組長：",
+            options=leader_options,
+            index=default_leader_idx,
+            key="global_leader_selector"
+        )
+
+        # 3. 根據選定的組長，嚴格清洗並抓取該組長的組員名單
+        display_list = []
+        try:
+            if map_res.status_code == 200:
+                raw_team_data = staff_data.get(selected_leader, [])
+                
+                if isinstance(raw_team_data, list):
+                    for item in raw_team_data:
+                        item_str = str(item).strip()
+                        if "," in item_str:
+                            display_list.extend([x.strip() for x in item_str.split(",") if x.strip()])
+                        else:
+                            if item_str: display_list.append(item_str)
+                elif isinstance(raw_team_data, str):
+                    display_list = [x.strip() for x in raw_team_data.split(",") if x.strip()]
+                
+            if not display_list:
+                display_list = [str(selected_leader).strip()]
+        except:
+            display_list = [str(selected_leader).strip()]
+
+        # 去除重複的人員名稱
+        display_list = sorted(list(set(display_list)))
+
+        # --- 🌐 核心讀取：從 Firebase 讀取目前全體員工的最新考核分數 (讓資料永久存在) ---
+        db_saved_scores = {}
+        try:
+            latest_eval_res = requests.get(f"{DB_BASE_URL}/skills_current_status.json")
+            if latest_eval_res.status_code == 200:
+                db_saved_scores = latest_eval_res.json() or {}
+        except:
+            pass
+
+        st.markdown(f'<p style="font-size:1.2rem; font-weight:bold; color:#1e3a8a;">👥 正在檢視：【{selected_leader} 組長】的組員技能考核狀態 (每格刻度 10%)：</p>', unsafe_allow_html=True)
+        st.divider()
+
+        # 固定 0% 到 100% 的選單選項
+        options_10 = [f"{x}%" for x in range(0, 101, 10)]
+
+        # 4. 一個畫面左右與上下並列顯示（2列 × 4欄 = 8個人）
+        if display_list:
+            # 每 4 個人切換成一橫列
+            for i in range(0, len(display_list), 4):
+                chunk = display_list[i:i+4]
+                cols = st.columns(4)  # 建立左右 4 個欄位
+                
+                for idx, member in enumerate(chunk):
+                    m_name = str(member).strip()
+                    if not m_name: continue
+                    
+                    # 優先從資料庫歷史紀錄讀取百分比，如果資料庫沒紀錄，預設才顯示 50%
+                    member_score_in_db = db_saved_scores.get(m_name, {}).get("技能考核完成度", 0)
+                    default_str = f"{member_score_in_db}%"
+                    
+                    # 確保數值在選單內，防呆機制
+                    if default_str not in options_10:
+                        default_str = "50%"
+                    current_index = options_10.index(default_str)
+                    
+                    with cols[idx]:
+                        # 精美黑框卡片外觀
+                        st.markdown(f'<div style="background:#1e3a8a; color:white; padding:8px 10px; border-radius:10px 10px 0 0; font-weight:bold; font-size:1.1rem; text-align:center;">👤 {m_name}</div>', unsafe_allow_html=True)
+                        
+                        with st.container(border=True):
+                            # 下拉式選單
+                            selected_str = st.selectbox(
+                                "技能考核進度",
+                                options=options_10,
+                                index=current_index,
+                                key="pct_select_" + m_name,
+                                label_visibility="collapsed"
+                            )
+                            
+                            # 轉回純數字供圖表使用
+                            pct_val = int(selected_str.replace("%", ""))
+                            
+                            # 【核心聯動】如果使用者調整了選單數值，立刻自動同步寫入 Firebase 更新，達到永久保存
+                            if pct_val != member_score_in_db:
+                                sync_url = f"{DB_BASE_URL}/skills_current_status/{m_name}.json"
+                                sync_data = {
+                                    "技能考核完成度": pct_val,
+                                    "更新時間": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                }
+                                requests.put(sync_url, data=json.dumps(sync_data))
+                                st.rerun()
+                            
+                            # 根據百分比動態決定彩色圓形的顏色 (低於40紅, 40-70橘, 80以上綠)
+                            if pct_val <= 30:
+                                circle_color = "#ef4444"  # 紅色
+                            elif pct_val <= 70:
+                                circle_color = "#f97316"  # 橘色
+                            else:
+                                circle_color = "#22c55e"  # 綠色
+                                
+                            # 用 HTML/CSS 畫出彩色的圓形百分比圖表
+                            st.components.v1.html(f"""
+                                <div style="display: flex; justify-content: center; align-items: center; height: 110px; font-family: sans-serif;">
+                                    <div style="position: relative; width: 90px; height: 90px; border-radius: 50%; background: conic-gradient({circle_color} {pct_val * 3.6}deg, #e2e8f0 0deg); display: flex; justify-content: center; align-items: center;">
+                                        <div style="position: absolute; width: 72px; height: 72px; border-radius: 50%; background: white; display: flex; justify-content: center; align-items: center; flex-direction: column;">
+                                            <span style="font-size: 1.4rem; font-weight: 900; color: #1e3a8a;">{pct_val}%</span>
+                                            <span style="font-size: 0.65rem; color: #64748b; font-weight: bold; margin-top: 2px;">技能考核</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            """, height=110)
+                            
+                            # 獨立的儲存核准歷史按鈕 (按下即發送一筆正式報表到歷史資料庫)
+                            if st.button("💾 儲存歷史", key="save_btn_" + m_name, use_container_width=True, type="primary"):
+                                eval_db_url = f"{DB_BASE_URL}/skills_evaluations"
+                                new_eval = {
+                                    "人員": m_name,
+                                    "技能考核完成度": pct_val,
+                                    "評核月份": datetime.datetime.now().strftime("%Y-%m"),
+                                    "評核時間": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                }
+                                try:
+                                    res = requests.post(f"{eval_db_url}.json", data=json.dumps(new_eval))
+                                    if res.status_code == 200:
+                                        st.success(f"{m_name} 已存檔!")
+                                    else:
+                                        st.error("錯誤")
+                                except Exception as save_err:
+                                    st.error(f"出錯: {save_err}")
+                
+                st.markdown('<div style="margin-bottom:15px;"></div>', unsafe_allow_html=True)
+        else:
+            st.info("💡 目前此組別無成員資料。")
+
+# --- 📜 完工紀錄查詢 (原功能完全保留，一律不修改) ---
+    elif st.session_state.menu_selection == "📜 完工紀錄查詢":
+        st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900;">📜 歷史完工紀錄</h1>', unsafe_allow_html=True)
+        
+        all_logs = requests.get(f"{FINISH_URL}.json").json()
+        if all_logs:
+            df = pd.DataFrame([dict(v, db_id=k) for k, v in all_logs.items()])
+            search_q = st.text_input("🔍 搜尋紀錄")
+            if search_q: 
+                df = df[df.astype(str).apply(lambda x: x.str.contains(search_q, case=False)).any(axis=1)]
+            
+            if not df.empty:
+                for o_id, group in df.groupby("製令"):
+                    display_df = group.copy()
+                    
+                    # 1. 計算每筆工時(分)與總工時(分鐘數相加)
+                    total_all_minutes = 0.0
+                    if '秒數' in display_df.columns:
+                        display_df['工時(分)'] = (display_df['秒數'] / 60).round(2)
+                        total_all_minutes = round(display_df['工時(分)'].sum(), 2) 
+                        
+                        # 2. 逆推開始時間
+                        try:
+                            temp_finish = pd.to_datetime(display_df['完工時間'])
+                            display_df['開始時間'] = (temp_finish - pd.to_timedelta(display_df['秒數'], unit='s')).dt.strftime('%Y-%m-%d %H:%M:%S')
+                        except:
+                            display_df['開始時間'] = "計算失敗"
+
+                    # 3. 在標題顯示
+                    with st.expander(f"📦 製令：{o_id} ({len(group)} 項 | 總工時：{total_all_minutes} 分鐘)"):
+                        
+                        # 設定表格順序
+                        cols = ["工序", "開始時間", "完工時間", "工時(分)"]
+                        existing_cols = [c for c in cols if c in display_df.columns]
+                        
+                        st.table(display_df[existing_cols])
+                        
+                        if st.button(f"🗑️ 刪除紀錄", key=f"del_{o_id}"):
+                            for d_id in group['db_id']: requests.delete(f"{FINISH_URL}/{d_id}.json")
+                            st.rerun()
+            else: st.warning("查無紀錄。")
+        else: st.info("💡 目前尚無紀錄。")
 
 
             
