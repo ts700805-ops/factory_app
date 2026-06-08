@@ -1790,7 +1790,7 @@ else:
 
 
 # ==========================================
-# 📘 頁面：標準SOP功能 (直式單欄完美排列版)
+# 📘 頁面：標準SOP功能 (修正PDF封鎖、單欄直式排列版)
 # ==========================================
     elif st.session_state.menu_selection == "📘 標準SOP功能":
         import base64
@@ -1801,7 +1801,7 @@ else:
         SOP_FILE_URL = f"{DB_BASE_URL}/sop_file_data"     # 儲存各工序對應的 PDF 檔案內容
 
         st.markdown('<h1 style="text-align:center; color:#38bdf8; font-weight:900; font-size:2.5rem;">📘 標準 SOP 線上查閱中心</h1>', unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center; color:#cbd5e1;'>依據工序查詢對應標準作業書，支援線上直接查閱與動態管理</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center; color:#cbd5e1;'>依據工序查詢對應標準作業書，支援線上直接下載與動態管理</p>", unsafe_allow_html=True)
         st.divider()
 
         # 1. 讀取與初始化 Firebase 後台工序選單資料
@@ -1810,7 +1810,7 @@ else:
 
 
         # ==========================================
-        # 🔝 【位置 1】第一步：選擇查閱工序 (移到最上方)
+        # 🔝 【位置 1】第一步：選擇查閱工序 (最上方)
         # ==========================================
         st.markdown("### 🎯 第一步：選擇查閱工序")
         selected_sop_proc = st.selectbox("請選擇當前要查閱或指派的製造工序：", options=sop_types, key="main_sop_selectbox")
@@ -1818,7 +1818,7 @@ else:
 
 
         # ==========================================
-        # 📄 【位置 2】SOP 文件管理與現場即時看板 (放在中間)
+        # 📄 【位置 2】SOP 文件管理與下載按鈕 (放在中間)
         # ==========================================
         # 安全防呆：若選單暫時抓不到值，直接不往下執行或給予保底值，避免噴出 AttributeError
         if not selected_sop_proc:
@@ -1861,6 +1861,24 @@ else:
             if existing_file_data and "file_base64" in existing_file_data:
                 st.info(f"📄 目前文件：**{existing_file_data.get('file_name')}** 💾 登記人：{existing_file_data.get('uploader','系統')} ({existing_file_data.get('upload_time')})")
                 
+                # 💡 【核心修復關鍵】不再使用 iframe 顯示，改成提供安全的點擊下載/查閱按鈕
+                try:
+                    pdf_b64 = existing_file_data["file_base64"]
+                    pdf_bytes = base64.b64decode(pdf_b64)
+                    file_name_download = existing_file_data.get('file_name', 'SOP_Document.pdf')
+                    
+                    st.download_button(
+                        label=f"📥 點擊下載 / 查閱 【{file_name_download}】",
+                        data=pdf_bytes,
+                        file_name=file_name_download,
+                        mime="application/pdf",
+                        use_container_width=True,
+                        type="secondary"
+                    )
+                except Exception as file_err:
+                    st.error(f"檔案解析失敗: {file_err}")
+
+                st.write("")
                 # 刪除檔案功能 (含安全密碼驗證)
                 with st.expander("🗑️ 刪除此工序之 SOP 文件"):
                     pwd_sop = st.text_input("請輸入管理權限密碼：", type="password", key=f"pwd_sop_{safe_proc_key}")
@@ -1872,15 +1890,6 @@ else:
                             st.rerun()
                         else:
                             st.error("❌ 密碼錯誤，拒絕刪除！")
-
-                # 在網頁上建立一個高質感的 PDF 內嵌式閱讀器
-                try:
-                    pdf_b64 = existing_file_data["file_base64"]
-                    # 建立 HTML iframe 來內嵌顯示 PDF
-                    pdf_display = f'<iframe src="data:application/pdf;base64,{pdf_b64}" width="100%" height="800px" style="border: 2px solid #38bdf8; border-radius:10px;"></iframe>'
-                    st.markdown(pdf_display, unsafe_allow_html=True)
-                except Exception as view_err:
-                    st.error(f"無法載入預覽畫面: {view_err}。但您可以嘗試重新上傳檔案。")
             else:
                 st.warning(f"💡 目前【{selected_sop_proc}】尚未上傳任何標準 SOP 說明書。請於上方選擇 PDF 檔案進行指派。")
 
