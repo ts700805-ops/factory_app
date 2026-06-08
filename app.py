@@ -1790,7 +1790,7 @@ else:
 
 
 # ==========================================
-# 📘 頁面：標準SOP功能 (高對比黑色粗體按鈕版)
+# 📘 頁面：標準SOP功能 (正紅外框一致性完美版)
 # ==========================================
     elif st.session_state.menu_selection == "📘 標準SOP功能":
         import base64
@@ -1837,13 +1837,13 @@ else:
                 # 判斷是否為當前選中
                 is_current = (st.session_state.active_sop_proc == proc_name)
                 
-                # 🎯 依照照片樣式設計的「深紫色」主色調
+                # 🎯 統一使用你最愛的「深紫色」主色調
                 card_bg = "#4c1d95"  
                 
                 if is_current:
                     title_color = "#ffffff"   # 當前選中：純白字
                     status_color = "#fde047"  # 當前選中：炫目亮黃字
-                    border_style = "3.5px solid #fde047" # 亮黃色粗外框
+                    border_style = "4px solid #ef4444" # 🎯【核心修改】改成跟你圈選一模一樣的正紅色粗外框！
                 elif doc_count > 0:
                     title_color = "#ffffff"   # 有檔案：純白字
                     status_color = "#a78bfa"  # 有檔案：柔和粉紫字
@@ -1854,7 +1854,7 @@ else:
                     border_style = "1px solid #5b21b6"  
                 
                 with cols[idx]:
-                    # 1. 渲染照片風格的深紫科技款 HTML 顏色方塊
+                    # 1. 渲染深紫科技款 HTML 顏色方塊
                     st.markdown(f"""
                         <div style="background-color: {card_bg}; border: {border_style}; border-radius: 8px; padding: 12px; text-align: center; margin-bottom: 5px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
                             <span style="color: {title_color}; font-weight: 800; font-size: 1.05rem; display: block; margin-bottom: 5px;">🛠️ {proc_name}</span>
@@ -1862,13 +1862,12 @@ else:
                         </div>
                     """, unsafe_allow_html=True)
                     
-                    # 2. 💡【核心修改：黑色、粗體、大字體按鈕】
-                    # 使用 HTML 刻出一個漂亮的按鈕，強迫字體為黑色 (#000000)、粗體、18px 大字體，點擊保證清晰！
+                    # 2. 黑色、粗體、大字體按鈕
                     if st.button(f"👆 點擊切換查看", key=f"btn_p_{proc_key_tmp}", use_container_width=True):
                         st.session_state.active_sop_proc = proc_name
                         st.rerun()
                     
-                    # 透過 CSS 樣式強迫覆蓋這個按鈕的文字顏色與大小，防止它跟隨主題變白
+                    # 透過 CSS 樣式強迫覆蓋這個按鈕的文字顏色與大小，防止它隨主題變白
                     st.markdown(f"""
                         <style>
                         div[data-testid="stButton"] button[key="btn_p_{proc_key_tmp}"] p,
