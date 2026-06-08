@@ -1809,7 +1809,7 @@ else:
         st.divider()
 
         # 🔔 【已修正】頂部大標題：現在會隨著您下拉選單選的機型自動連動更新了！
-        st.markdown(f'<h1 style="text-align:center; color:#ea580c; font-weight:900; font-size:2.8rem;">📘 {display_model_name} 核心安全防護SOP</h1>', unsafe_allow_html=True)
+        st.markdown(f'<h1 style="text-align:center; color:#ea580c; font-weight:900; font-size:2.8rem;">📘核心安全防護SOP</h1>', unsafe_allow_html=True)
         st.markdown("<p style='text-align:center; color:#ea580c; font-weight:800; font-size:1.3rem;'>請至下方心智圖清單中點擊「👁️ 查看」，系統將採用安全機制彈出大視窗，供現場人員直接查閱</p>", unsafe_allow_html=True)
         st.divider()
 
