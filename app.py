@@ -1789,7 +1789,7 @@ else:
 
 
 # ==========================================
-# 📘 頁面：標準SOP功能 (多份SOP獨立個體安全版)
+# 📘 頁面：標準SOP功能 (網頁自動內嵌開啟版)
 # ==========================================
     elif st.session_state.menu_selection == "📘 標準SOP功能":
         import base64
@@ -1801,7 +1801,7 @@ else:
 
         # 頂部大標題
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900; font-size:2.5rem;">📘 標準 SOP 線上查閱中心</h1>', unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center; color:#334155; font-weight:700;'>支援單一工序配置多份獨立 SOP 文件，避免檔案過大，保障系統流暢度</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center; color:#334155; font-weight:700;'>點選工序按鈕後，下方將直接自動開啟並呈現 PDF 文件內容，無須手動下載</p>", unsafe_allow_html=True)
         st.divider()
 
         # 1. 讀取機型規格清單
@@ -1826,7 +1826,7 @@ else:
                 "前置作業(門板組立)", "S.T作業"
             ]
 
-        # 4. 一次性載入整個檔案資料庫，供心智圖渲染
+        # 4. 一次性載入整個檔案資料庫，供心智圖與閱讀器渲染
         all_file_nodes = requests.get(f"{SOP_FILE_URL}.json").json() or {}
 
         # 初始化選中工序
@@ -1927,7 +1927,6 @@ else:
                 # 第五欄：【多檔案獨立分支展開】
                 with mm_cols[4]:
                     if file_count > 0:
-                        # 迴圈抓出該工序底下的每一份獨立檔案
                         for file_id, file_info in proc_files_dict.items():
                             f_name = file_info.get("file_name", "未命名文件")
                             st.markdown(f"""
@@ -1943,17 +1942,50 @@ else:
 
 
         # ==========================================
-        # 📄 【動態內容區】獨立個體文件上傳與個別查閱管理
+        # 📄 【動態內容區】🎯 點選後直接自動開啟 PDF 閱讀器
         # ==========================================
         if current_active:
-            st.markdown(f"## 🔍 目前展開檢視：【{selected_model}】➔【{current_active}】")
+            st.markdown(f"## 🔍 當前開啟查閱：【{selected_model}】➔【{current_active}】")
             
             target_node_key = f"{model_safe_key}_" + base64.b64encode(current_active.encode('utf-8')).decode('utf-8').replace('=', '')
-            
-            # 從大字典撈出該工序目前擁有的所有檔案
             current_files = all_file_nodes.get(target_node_key, {})
 
-            # 區塊 1：上傳新檔案 (獨立個體儲存)
+            # 📣 這裡就是自動開啟的核心區塊
+            if current_files and isinstance(current_files, dict):
+                file_items = list(current_files.items())
+                
+                # 如果該工序有「多份」PDF，用分頁（Tabs）呈現，點到哪份就自動開哪份！
+                if len(file_items) > 1:
+                    tab_titles = [item[1].get("file_name", "未命名文件") for item in file_items]
+                    tabs = st.tabs(tab_titles)
+                    
+                    for t_idx, (f_id, f_data) in enumerate(file_items):
+                        with tabs[t_idx]:
+                            try:
+                                pdf_b64 = f_data["file_base64"]
+                                # 💡 核心魔術：利用 base64 資料串直接嵌入瀏覽器，達成「免下載直接開啟」
+                                pdf_display = f'<iframe src="data:application/pdf;base64,{pdf_b64}" width="100%" height="800" type="application/pdf"></iframe>'
+                                st.markdown(pdf_display, unsafe_allow_html=True)
+                            except Exception as e:
+                                st.error(f"PDF 檔案載入失敗: {e}")
+                else:
+                    # 如果只有一份檔案，直接霸氣地滿版打開
+                    f_id, f_data = file_items[0]
+                    st.markdown(f"##### 📄 文件名稱：{f_data.get('file_name')}")
+                    try:
+                        pdf_b64 = f_data["file_base64"]
+                        pdf_display = f'<iframe src="data:application/pdf;base64,{pdf_b64}" width="100%" height="800" type="application/pdf"></iframe>'
+                        st.markdown(pdf_display, unsafe_allow_html=True)
+                    except Exception as e:
+                        st.error(f"PDF 檔案載入失敗: {e}")
+            else:
+                st.warning(f"💡 目前【{selected_model}】➔【{current_active}】尚未配置任何 SOP 說明書。請在下方進行上傳。")
+
+            st.write("")
+            st.divider()
+
+            # 區塊：上傳與管理維護 (移到最下方，避免干擾人員看文件)
+            st.markdown("### 🛠️ 此工序文件管理後台")
             uploaded_pdf = st.file_uploader(f"📤 新增獨立 SOP 文件至【{current_active}】(可多次上傳不同的檔案)", type=["pdf"], key=f"uploader_{target_node_key}")
             
             if uploaded_pdf is not None:
@@ -1961,8 +1993,6 @@ else:
                     with st.spinner("檔案打包傳輸中..."):
                         file_bytes = uploaded_pdf.read()
                         base64_pdf = base64.b64encode(file_bytes).decode('utf-8')
-                        
-                        # 使用時間戳記當作這份檔案的獨立 ID，絕不重疊覆蓋
                         unique_file_id = f"file_{int(time.time() * 1000)}"
                         
                         payload = {
@@ -1972,58 +2002,28 @@ else:
                             "file_base64": base64_pdf
                         }
                         
-                        # 寫入專屬的獨立檔案節點路徑下！
                         requests.put(f"{SOP_FILE_URL}/{target_node_key}/{unique_file_id}.json", data=json.dumps(payload))
-                        st.success(f"🎉 獨立個體【{uploaded_pdf.name}】上傳成功！已成功分流儲存。")
+                        st.success(f"🎉 獨立個體【{uploaded_pdf.name}】上傳成功！")
                         time.sleep(0.8)
                         st.rerun()
 
-            st.write("")
-
-            # 區塊 2：獨立列表展現、個別下載、個別刪除
-            st.markdown("### 📋 已上傳之獨立 SOP 文件列表")
+            # 提供刪除功能
             if current_files and isinstance(current_files, dict):
-                for f_id, f_data in current_files.items():
-                    f_name = f_data.get("file_name", "未知檔案")
-                    f_time = f_data.get("upload_time", "未知時間")
-                    
-                    # 用一個獨立的白底方框包住每份檔案
-                    with st.container(border=True):
-                        col_f1, col_f2 = st.columns([7, 3])
-                        with col_f1:
-                            st.markdown(f"**📄 文件名稱：** {f_name}")
-                            st.markdown(f"<small style='color:gray;'>上傳時間：{f_time}</small>", unsafe_allow_html=True)
-                        
-                        with col_f2:
-                            # 獨立下載按鈕
-                            try:
-                                p_b64 = f_data["file_base64"]
-                                p_bytes = base64.b64decode(p_b64)
-                                st.download_button(
-                                    label="📥 下載/查閱",
-                                    data=p_bytes,
-                                    file_name=f_name,
-                                    mime="application/pdf",
-                                    key=f"dl_{f_id}",
-                                    use_container_width=True
-                                )
-                            except:
-                                st.error("解碼失敗")
-                            
-                            # 獨立刪除按鈕 (放入小收納盒防誤觸)
-                            with st.expander("🗑️ 刪除"):
-                                pwd_del = st.text_input("密碼：", type="password", key=f"pwd_{f_id}")
-                                if st.button("❌ 確定刪除", type="primary", key=f"btn_del_{f_id}", use_container_width=True):
-                                    if pwd_del == "0000":
-                                        # 只刪除該筆時間戳記節點，其餘檔案完好無損！
-                                        requests.delete(f"{SOP_FILE_URL}/{target_node_key}/{f_id}.json")
-                                        st.success("該檔案已安全移除！")
-                                        time.sleep(0.5)
-                                        st.rerun()
-                                    else:
-                                        st.error("密碼錯誤")
-            else:
-                st.warning(f"💡 目前【{selected_model}】➔【{current_active}】尚未上傳任何 SOP 說明書。")
+                with st.expander("🗑️ 移除此工序內的文件"):
+                    for f_id, f_data in current_files.items():
+                        col_del1, col_del2 = st.columns([7, 3])
+                        with col_del1:
+                            st.write(f"📄 {f_data.get('file_name')} ({f_data.get('upload_time')})")
+                        with col_del2:
+                            pwd_del = st.text_input("密碼：", type="password", key=f"pwd_{f_id}")
+                            if st.button("❌ 刪除", type="primary", key=f"btn_del_{f_id}", use_container_width=True):
+                                if pwd_del == "0000":
+                                    requests.delete(f"{SOP_FILE_URL}/{target_node_key}/{f_id}.json")
+                                    st.success("檔案已成功抹除！")
+                                    time.sleep(0.5)
+                                    st.rerun()
+                                else:
+                                    st.error("密碼錯誤")
 
 
         # ==========================================
@@ -2052,7 +2052,6 @@ else:
             with st.container(border=True):
                 st.markdown(f"##### 🛠️ 2. 編輯【{selected_model}】的專屬工序")
                 sop_input_str = "，".join(sop_types)
-                
                 sop_input = st.text_area(f"設定該機型專屬工序 (以逗號或分行隔開)", value=sop_input_str, height=120, key=f"txt_sop_list_{model_safe_key}")
                 
                 if st.button(f"💾 儲存【{selected_model}】專用流程", use_container_width=True, key=f"btn_save_sops_{model_safe_key}"):
