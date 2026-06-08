@@ -1789,7 +1789,7 @@ else:
 
 
 # ==========================================
-# 📘 頁面：標準SOP功能 (右側雙按鈕 + 新開視窗安全版)
+# 📘 頁面：標準SOP功能 (右側雙按鈕 + 修正 Key 重複免下載版)
 # ==========================================
     elif st.session_state.menu_selection == "📘 標準SOP功能":
         import base64
@@ -1829,7 +1829,7 @@ else:
         # 4. 一次性載入整個檔案資料庫
         all_file_nodes = requests.get(f"{SOP_FILE_URL}.json").json() or {}
 
-        # 初始化選中工序 (保留高亮邏輯)
+        # 初始化選中工序
         if "active_sop_proc" not in st.session_state:
             st.session_state.active_sop_proc = sop_types[0] if sop_types else ""
         if st.session_state.active_sop_proc not in sop_types and sop_types:
@@ -1839,7 +1839,7 @@ else:
 
 
         # ==========================================
-        # 🧠 【三層獨立心智圖看板 - 右側圈選處按鈕升級】
+        # 🧠 【三層獨立心智圖看板】(右側圈選處精準定位按鈕)
         # ==========================================
         st.markdown(f"### 🧠 【{selected_model}】多文件心智圖總覽")
         
@@ -1854,7 +1854,7 @@ else:
                 
                 is_current = (current_active == proc_name)
                 
-                # 調整欄位配置比例，留更寬的空間（最後一欄）給檔案、查看鈕、刪除鈕
+                # 調整欄位配置比例，確保按鈕能完美並排不卡字
                 mm_cols = st.columns([1.2, 0.3, 2.0, 0.3, 5.2])
                 
                 # 第一欄：機型核心根節點
@@ -1905,18 +1905,17 @@ else:
                 with mm_cols[3]:
                     st.markdown('<div style="text-align:center; color:#34d399; font-weight:900; line-height:45px; font-size:1.2rem;">➔</div>', unsafe_allow_html=True)
                 
-                # 第五欄：🎯 【精準定位：右側圈選處】直接生成檔案名稱與 查看/刪除 控制鈕
+                # 第五欄：🎯 【右側圈選處】精準配置 檔案 + 👁️ 查看 + 🗑️ 刪除 按鈕
                 with mm_cols[4]:
                     if file_count > 0:
                         for file_id, file_info in proc_files_dict.items():
                             f_name = file_info.get("file_name", "未命名文件")
                             pdf_b64 = file_info.get("file_base64", "")
                             
-                            # 建立橫向子排版：[檔案名稱文字, 查看按鈕, 刪除微型盒]
+                            # 建立橫向子排版：[檔案名稱文字, 查看按鈕, 刪除彈出盒]
                             f_sub_cols = st.columns([5, 2.5, 2.5])
                             
                             with f_sub_cols[0]:
-                                # 檔案名標籤
                                 st.markdown(f"""
                                     <div style="background-color: #065f46; border-left: 4px solid #34d399; border-radius: 4px; padding: 4px 8px; margin-top:2px; height:34px;">
                                         <span style="color: #ffffff; font-weight: 700; font-size: 0.82rem; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height:26px;">📄 {f_name}</span>
@@ -1924,7 +1923,7 @@ else:
                                 """, unsafe_allow_html=True)
                                 
                             with f_sub_cols[1]:
-                                # 💡 核心改良：建立點擊後在「全新分頁」直接打開的萬能 HTML 密技，絕不被封鎖網頁
+                                # 💡 新開分頁技術：直接觸發瀏覽器開全新 New Tab，100% 不會被 Chrome 封鎖攔截
                                 html_link = f"""
                                     <a href="data:application/pdf;base64,{pdf_b64}" target="_blank" style="text-decoration: none;">
                                         <div style="background-color: #1e40af; color: white; text-align: center; font-weight: 800; font-size: 0.85rem; border-radius: 4px; padding: 6px 0; margin-top:2px; cursor: pointer; border: 1px solid #3b82f6; height:34px; line-height:20px;">
@@ -1935,7 +1934,6 @@ else:
                                 st.markdown(html_link, unsafe_allow_html=True)
                                 
                             with f_sub_cols[2]:
-                                # 刪除防誤觸小收納
                                 with st.popover("🗑️ 刪除", use_container_width=True):
                                     pwd_del = st.text_input("輸入管理密碼：", type="password", key=f"pwd_{combined_node_key}_{file_id}")
                                     if st.button("❌ 確定抹除", type="primary", key=f"del_{combined_node_key}_{file_id}", use_container_width=True):
@@ -1954,14 +1952,14 @@ else:
 
 
         # ==========================================
-        # 📤 下方僅保留：新增檔案上傳區 (不干擾上方視覺)
+        # 📤 下方檔案上傳功能區
         # ==========================================
         if current_active:
             st.markdown(f"### 📤 上傳新文件至：【{selected_model}】➔ 【{current_active}】")
             
             target_node_key = f"{model_safe_key}_" + base64.b64encode(current_active.encode('utf-8')).decode('utf-8').replace('=', '')
             
-            uploaded_pdf = st.file_uploader(f"選擇要新增至【{current_active}】的 PDF 作業書 (可多次上傳非同檔案)", type=["pdf"], key=f"uploader_{target_node_key}")
+            uploaded_pdf = st.file_uploader(f"選擇要新增至【{current_active}】的 PDF 作業書", type=["pdf"], key=f"uploader_{target_node_key}")
             
             if uploaded_pdf is not None:
                 if st.button("🚀 確定上傳並加入右側心智圖列表", use_container_width=True):
@@ -1978,45 +1976,17 @@ else:
                         }
                         
                         requests.put(f"{SOP_FILE_URL}/{target_node_key}/{unique_file_id}.json", data=json.dumps(payload))
-                        st.success(f"🎉 檔案【{uploaded_pdf.name}】上傳成功！請至上方右側查看。")
+                        st.success(f"🎉 檔案【{uploaded_pdf.name}】上傳成功！已同步至右側對應欄位。")
                         time.sleep(0.8)
                         st.rerun()
 
 
         # ==========================================
-        # ⚙️ 【獨立後台數據設定維護】
+        # ⚙️ 👑 【獨立後台數據設定維護】(移出迴圈外，永久根除 Key 重複 Bug)
         # ==========================================
         st.write("")
         st.divider()
         st.markdown("### ⚙️ SOP 後台數據清單維護")
-        
-        col_set1, col_set2 = st.columns(2)
-        
-        with col_set1:
-            with st.container(border=True):
-                st.markdown("##### 🏭 1. 編輯【機型規格】大主選單")
-                model_input_str = "，".join(model_list)
-                model_input = st.text_area("機型項目 (以逗號或分行隔開)", value=model_input_str, height=120, key="txt_model_list")
-                
-                if st.button("💾 儲存機型大清單", use_container_width=True, key="btn_save_models"):
-                    new_models = [m.strip() for m in re.split(r'[，,\n]', model_input) if m.strip()]
-                    requests.put(f"{SOP_CONFIG_URL}/model_list.json", data=json.dumps(new_models))
-                    st.success("✅ 機型大選單項目已成功更新！")
-                    time.sleep(0.5)
-                    st.rerun()
-
-        with col_set2:
-            with st.container(border=True):
-                st.markdown(f"##### 🛠️ 2. 編輯【{selected_model}】的專屬工序")
-                sop_input_str = "，".join(sop_types)
-                sop_input = st.text_area(f"設定該機型專屬工序 (以逗號或分行隔開)", value=sop_input_str, height=120, key=f"txt_sop_list_{model_safe_key}")
-                
-                if st.button(f"💾 儲存【{selected_model}】專用流程", use_container_width=True, key=f"btn_save_sops_{model_safe_key}"):
-                    new_sops = [t.strip() for t in re.split(r'[，,\n]', sop_input) if m.strip()]
-                    requests.put(f"{SOP_CONFIG_URL}/model_procs/{model_safe_key}.json", data=json.dumps({"sop_types": new_sops}))
-                    st.success(f"✅ 【{selected_model}】的專屬工序流程已完成獨立儲存！")
-                    time.sleep(0.5)
-                    st.rerun()
         
         col_set1, col_set2 = st.columns(2)
         
@@ -2045,5 +2015,3 @@ else:
                     st.success(f"✅ 【{selected_model}】的專屬工序流程已完成獨立儲存！")
                     time.sleep(0.5)
                     st.rerun()
-
-
