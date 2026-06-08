@@ -1789,7 +1789,7 @@ else:
 
 
 # ==========================================
-# 📘 頁面：標準SOP功能 (紅色填滿+藍色字體終極版)
+# 📘 頁面：標準SOP功能 (心智圖樹狀展開版)
 # ==========================================
     elif st.session_state.menu_selection == "📘 標準SOP功能":
         import base64
@@ -1799,131 +1799,136 @@ else:
         SOP_LIST_URL = f"{DB_BASE_URL}/sop_settings"      # 儲存 SOP 下拉選單工序項目
         SOP_FILE_URL = f"{DB_BASE_URL}/sop_file_data"     # 儲存各工序對應的 PDF 檔案內容
 
-        # 頂部大標題調色：使用高對比深邃藍與夜空藍
+        # 頂部大標題調色：使用高對比深邃藍
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900; font-size:2.5rem;">📘 標準 SOP 線上查閱中心</h1>', unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center; color:#334155; font-weight:700;'>點擊下方工序方塊，直接查閱或管理對應的標準作業書</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center; color:#334155; font-weight:700;'>以下方心智圖樹狀結構檢視各工序，點擊按鈕切換並在下方展開管理</p>", unsafe_allow_html=True)
         st.divider()
 
         # 1. 讀取與初始化 Firebase 後台工序選單資料
         sop_settings = requests.get(f"{SOP_LIST_URL}.json").json() or {"sop_types": []}
         sop_types = sop_settings.get("sop_types", ["骨架作業", "前置作業", "配電作業"]) # 預設保底選單
 
-        # 2. 預先讀取所有工序的檔案資料，用來計算每個工序是否有檔案
+        # 2. 預先讀取所有工序的檔案資料
         all_file_data = requests.get(f"{SOP_FILE_URL}.json").json() or {}
 
         # 3. 初始化 session_state 用來紀錄目前點選了哪一個工序
         if "active_sop_proc" not in st.session_state:
             st.session_state.active_sop_proc = sop_types[0] if sop_types else ""
 
+        current_active = st.session_state.active_sop_proc
+
 
         # ==========================================
-        # 📊 【精美深紫卡片區】點擊切換功能
+        # 🧠 【心智圖視覺看板區】
         # ==========================================
-        st.markdown("### 📊 請點選欲查閱的製造工序")
+        st.markdown("### 🧠 SOP 工序心智圖總覽 (水平向右發散)")
         
-        # 建立動態排版，每 4 個工序排成一列
-        for i in range(0, len(sop_types), 4):
-            chunk = sop_types[i:i+4]
-            cols = st.columns(4)
-            for idx, proc_name in enumerate(chunk):
-                # 計算該工序安全 key
+        with st.container(border=True):
+            # 用直式一條一條畫出向右衍生心智圖分支
+            for idx, proc_name in enumerate(sop_types):
                 proc_key_tmp = base64.b64encode(proc_name.encode('utf-8')).decode('utf-8').replace('=', '')
                 
-                # 檢查這個工序有沒有對應的檔案資料
+                # 檢查是否有檔案
                 has_file = proc_key_tmp in all_file_data and "file_base64" in all_file_data[proc_key_tmp]
-                doc_count = 1 if has_file else 0
+                file_name_info = all_file_data[proc_key_tmp].get("file_name", "") if has_file else ""
                 
-                # 判斷是否為當前選中
-                is_current = (st.session_state.active_sop_proc == proc_name)
+                is_current = (current_active == proc_name)
                 
-                # 維持你最愛的深紫色科技感方塊
-                card_bg = "#4c1d95"  
+                # 建立心智圖階層 columns： [核心] ➔ [工序分支線] ➔ [工序節點(按鈕)] ➔ [延伸文件線] ➔ [SOP文件節點]
+                mm_cols = st.columns([1.2, 0.4, 2.5, 0.4, 4.0])
                 
-                if is_current:
-                    title_color = "#ffffff"   
-                    status_color = "#fde047"  
-                    border_style = "2px solid #a78bfa" 
-                elif doc_count > 0:
-                    title_color = "#ffffff"   
-                    status_color = "#a78bfa"  
-                    border_style = "1px solid #a78bfa"  
-                else:
-                    title_color = "#cbd5e1"   
-                    status_color = "#94a3b8"  
-                    border_style = "1px solid #5b21b6"  
+                # 第一欄：核心根節點 (只在第一個項目顯示，讓畫面像樹根)
+                with mm_cols[0]:
+                    if idx == 0:
+                        st.markdown('<div style="background-color:#1e3a8a; color:white; padding:10px; border-radius:20px; text-align:center; font-weight:900; font-size:1.1rem; margin-top:5px;">📘 SOP 系統</div>', unsafe_allow_html=True)
+                    else:
+                        st.markdown('<div style="text-align:center; color:#cbd5e1; font-weight:900; line-height:40px;">│</div>', unsafe_allow_html=True)
                 
-                with cols[idx]:
-                    # 1. 渲染深紫方塊卡片
+                # 第二欄：連接線 ➔
+                with mm_cols[1]:
+                    st.markdown('<div style="text-align:center; color:#a78bfa; font-weight:900; line-height:45px; font-size:1.2rem;">➔</div>', unsafe_allow_html=True)
+                
+                # 第三欄：工序節點 (按鈕)
+                with mm_cols[2]:
+                    # 渲染高質感深紫方塊外觀
+                    card_bg = "#4c1d95"
+                    border_style = "2px solid #ef4444" if is_current else "1px solid #5b21b6"
+                    text_style = "color:#fde047;" if is_current else "color:#ffffff;"
+                    
                     st.markdown(f"""
-                        <div style="background-color: {card_bg}; border: {border_style}; border-radius: 8px; padding: 12px; text-align: center; margin-bottom: 5px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
-                            <span style="color: {title_color}; font-weight: 800; font-size: 1.05rem; display: block; margin-bottom: 5px;">🛠️ {proc_name}</span>
-                            <span style="color: {status_color}; font-weight: 900; font-size: 1.15rem;">📄 已配置：{doc_count} 份</span>
+                        <div style="background-color: {card_bg}; border: {border_style}; border-radius: 6px; padding: 6px 12px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                            <span style="{text_style} font-weight: 800; font-size: 1rem;">🛠️ {proc_name}</span>
                         </div>
                     """, unsafe_allow_html=True)
                     
-                    # 2. 生成切換按鈕
-                    if st.button(f"👆 點擊切換查看", key=f"btn_p_{proc_key_tmp}", use_container_width=True):
+                    # 🎯 【按鈕功能：點選時變身 紅色填滿 + 黑色粗體字】
+                    if st.button(f"👆 查看 {proc_name}", key=f"btn_p_{proc_key_tmp}", use_container_width=True):
                         st.session_state.active_sop_proc = proc_name
                         st.rerun()
                     
-                    # 🎯【終極地毯式 CSS 覆蓋技術】🎯
-                    # 這次連同 hover (滑鼠懸停) 和 active (點擊中) 的所有狀態跟子標籤通通鎖定改色！
+                    # 終極 CSS 覆蓋：確保選中時為 紅底黑字，沒選中時為 正常黑字
                     if is_current:
                         st.markdown(f"""
                             <style>
-                            /* 強制按鈕主體改為：紅色填滿 */
                             div[data-testid="stButton"] button[key="btn_p_{proc_key_tmp}"],
                             div.stButton > button[key="btn_p_{proc_key_tmp}"],
                             div.stButton > button[key="btn_p_{proc_key_tmp}"]:hover,
                             div.stButton > button[key="btn_p_{proc_key_tmp}"]:active,
                             div.stButton > button[key="btn_p_{proc_key_tmp}"]:focus {{
-                                background-color: #ef4444 !important; /* 紅色填滿 */
+                                background-color: #ef4444 !important; /* 🔥 紅色填滿 */
                                 border: 2px solid #ef4444 !important;
                                 background: #ef4444 !important;
                             }}
-                            
-                            /* 強制內部所有文字改為：深藍色、粗體、18px */
-                            div[data-testid="stButton"] button[key="btn_p_{proc_key_tmp}"] *,
-                            div.stButton > button[key="btn_p_{proc_key_tmp}"] span,
-                            div.stButton > button[key="btn_p_{proc_key_tmp}"] p,
-                            div.stButton > button[key="btn_p_{proc_key_tmp}"] div {{
-                                color: #1e3a8a !important; /* 藍色字體 */
-                                -webkit-text-fill-color: #1e3a8a !important; /* 雙重保障防止瀏覽器覆蓋 */
-                                font-weight: 900 !important; /* 粗體 */
-                                font-size: 18px !important;  /* 放大字體 */
-                            }}
-                            </style>
-                        """, unsafe_allow_html=True)
-                    else:
-                        # 沒選中時的普通按鈕樣式防呆（確保為黑字、防止翻白隱形）
-                        st.markdown(f"""
-                            <style>
                             div[data-testid="stButton"] button[key="btn_p_{proc_key_tmp}"] *,
                             div.stButton > button[key="btn_p_{proc_key_tmp}"] span,
                             div.stButton > button[key="btn_p_{proc_key_tmp}"] p {{
-                                color: #000000 !important; /* 沒選中時為黑色字體 */
+                                color: #000000 !important; /* 🎯 黑色字體 */
                                 -webkit-text-fill-color: #000000 !important;
                                 font-weight: 900 !important;
                                 font-size: 16px !important;
                             }}
                             </style>
                         """, unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"""
+                            <style>
+                            div[data-testid="stButton"] button[key="btn_p_{proc_key_tmp}"] *,
+                            div.stButton > button[key="btn_p_{proc_key_tmp}"] span,
+                            div.stButton > button[key="btn_p_{proc_key_tmp}"] p {{
+                                color: #000000 !important; /* 未選中時高對比黑字 */
+                                -webkit-text-fill-color: #000000 !important;
+                                font-weight: 800 !important;
+                            }}
+                            </style>
+                        """, unsafe_allow_html=True)
+
+                # 第四欄：連接線 ➔ 延伸到 SOP
+                with mm_cols[3]:
+                    st.markdown('<div style="text-align:center; color:#34d399; font-weight:900; line-height:45px; font-size:1.2rem;">➔</div>', unsafe_allow_html=True)
+                
+                # 第五欄：SOP文件擴展節點 (心智圖右側末端)
+                with mm_cols[4]:
+                    if has_file:
+                        st.markdown(f"""
+                            <div style="background-color: #065f46; border-left: 5px solid #34d399; border-radius: 4px; padding: 6px 12px; margin-top: 5px;">
+                                <span style="color: #ffffff; font-weight: 700; font-size: 0.9rem; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">📄 {file_name_info}</span>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.markdown('<div style="color: #94a3b8; font-style: italic; font-weight:700; line-height:45px; font-size:0.9rem;">❌ 尚未配置 SOP</div>', unsafe_allow_html=True)
 
         st.write("")
         st.divider()
 
 
         # ==========================================
-        # 📄 【動態內容區】呈現內容
+        # 📄 【動態內容區】下方展開點選的 SOP 詳情
         # ==========================================
         selected_sop_proc = st.session_state.active_sop_proc
 
-        if not selected_sop_proc:
-            st.warning("💡 請先於上方建立或點選一個工序。")
-        else:
-            st.markdown(f"## 🔍 當前檢視工序：【{selected_sop_proc}】")
+        if selected_sop_proc:
+            st.markdown(f"## 🔍 當前心智圖展開檢視：【{selected_sop_proc}】")
             
-            # 安全編碼路徑
             safe_proc_key = base64.b64encode(selected_sop_proc.encode('utf-8')).decode('utf-8').replace('=', '')
             existing_file_data = all_file_data.get(safe_proc_key)
 
