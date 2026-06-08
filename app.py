@@ -1790,7 +1790,7 @@ else:
 
 
 # ==========================================
-# 📘 頁面：標準SOP功能 (精美高對比卡片點擊版)
+# 📘 頁面：標準SOP功能 (高質感深紫科技款)
 # ==========================================
     elif st.session_state.menu_selection == "📘 標準SOP功能":
         import base64
@@ -1800,7 +1800,7 @@ else:
         SOP_LIST_URL = f"{DB_BASE_URL}/sop_settings"      # 儲存 SOP 下拉選單工序項目
         SOP_FILE_URL = f"{DB_BASE_URL}/sop_file_data"     # 儲存各工序對應的 PDF 檔案內容
 
-        # 大標題使用高質感的深藍色與深灰色，在白色背景下非常顯眼
+        # 頂部大標題調色：使用高對比深邃藍與夜空藍
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900; font-size:2.5rem;">📘 標準 SOP 線上查閱中心</h1>', unsafe_allow_html=True)
         st.markdown("<p style='text-align:center; color:#334155; font-weight:700;'>點擊下方工序方塊，直接查閱或管理對應的標準作業書</p>", unsafe_allow_html=True)
         st.divider()
@@ -1818,7 +1818,7 @@ else:
 
 
         # ==========================================
-        # 📊 【精美卡片看板區】字體與背景高對比設計
+        # 📊 【精美深紫卡片區】點擊切換功能
         # ==========================================
         st.markdown("### 📊 請點選欲查閱的製造工序")
         
@@ -1837,36 +1837,32 @@ else:
                 # 判斷是否為當前選中
                 is_current = (st.session_state.active_sop_proc == proc_name)
                 
-                # 🎯 顏色美化重組（確保字體絕對看得見）：
-                # 選中的工序：亮藍色背景 + 亮黃色字
-                # 未選中但有檔案：深綠色背景 + 亮綠色字
-                # 未選中且沒檔案：深灰色背景 + 淡灰色字
+                # 🎯 依照照片樣式設計的「深紫色」主色調：
+                card_bg = "#4c1d95"  # 照片上的高質感深紫色 (Purple 900)
+                
                 if is_current:
-                    card_bg = "#1e40af"       # 皇家深藍
-                    title_color = "#fdf2e9"   # 近白色
-                    status_color = "#fde047"  # 耀眼亮黃 (凸顯當前選中)
-                    border_style = "3px solid #fde047"
+                    title_color = "#ffffff"   # 當前選中：純白字
+                    status_color = "#fde047"  # 當前選中：炫目亮黃字
+                    border_style = "3.5px solid #fde047" # 亮黃色粗外框，非常明顯
                 elif doc_count > 0:
-                    card_bg = "#065f46"       # 現場森林綠
-                    title_color = "#ffffff"   # 純白字
-                    status_color = "#34d399"  # 亮綠色字
-                    border_style = "1px solid #34d399"
+                    title_color = "#ffffff"   # 有檔案：純白字
+                    status_color = "#a78bfa"  # 有檔案：柔和粉紫字
+                    border_style = "1px solid #a78bfa"  # 粉紫細邊框
                 else:
-                    card_bg = "#1e293b"       # 深鐵灰
-                    title_color = "#cbd5e1"   # 淺灰字
-                    status_color = "#94a3b8"  # 中灰字
-                    border_style = "1px solid #475569"
+                    title_color = "#cbd5e1"   # 沒檔案：淺灰字
+                    status_color = "#94a3b8"  # 沒檔案：中灰字
+                    border_style = "1px solid #5b21b6"  # 暗紫細邊框
                 
                 with cols[idx]:
-                    # 1. 渲染漂亮的 HTML 顏色方塊卡片
+                    # 1. 渲染照片風格的深紫科技款 HTML 顏色方塊
                     st.markdown(f"""
-                        <div style="background-color: {card_bg}; border: {border_style}; border-radius: 8px; padding: 12px; text-align: center; margin-bottom: 5px;">
+                        <div style="background-color: {card_bg}; border: {border_style}; border-radius: 8px; padding: 12px; text-align: center; margin-bottom: 5px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
                             <span style="color: {title_color}; font-weight: 800; font-size: 1.05rem; display: block; margin-bottom: 5px;">🛠️ {proc_name}</span>
                             <span style="color: {status_color}; font-weight: 900; font-size: 1.15rem;">📄 已配置：{doc_count} 份</span>
                         </div>
                     """, unsafe_allow_html=True)
                     
-                    # 2. 在卡片正下方放一個小小的「選取查看」透明大按鈕，方便同仁點擊切換
+                    # 2. 在方塊正下方放一個小小的「選取查看」透明大按鈕，方便同仁點擊切換
                     if st.button("👆 點擊切換查看", key=f"btn_p_{proc_key_tmp}", use_container_width=True):
                         st.session_state.active_sop_proc = proc_name
                         st.rerun()
@@ -1876,7 +1872,7 @@ else:
 
 
         # ==========================================
-        # 📄 【動態內容區】依據點選的方塊呈現內容
+        # 📄 【動態內容區】呈現內容
         # ==========================================
         selected_sop_proc = st.session_state.active_sop_proc
 
@@ -1914,8 +1910,8 @@ else:
 
             # 顯示下載按鈕或未上傳提示
             if existing_file_data and "file_base64" in existing_file_data:
-                # 使用明顯的深色字顯示目前文件名稱，絕對看得見
-                st.markdown(f"<div style='background-color:#f1f5f9; padding:10px; border-left:5px solid #2563eb; border-radius:4px; margin-bottom:10px;'><b style='color:#0f172a; font-size:1.1rem;'>📄 目前專屬文件：{existing_file_data.get('file_name')}</b></div>", unsafe_allow_html=True)
+                # 使用乾淨且高對比的淺灰藍底色來包覆文件名稱，保證看得到
+                st.markdown(f"<div style='background-color:#f1f5f9; padding:10px; border-left:5px solid #4c1d95; border-radius:4px; margin-bottom:10px;'><b style='color:#0f172a; font-size:1.1rem;'>📄 目前專屬文件：{existing_file_data.get('file_name')}</b></div>", unsafe_allow_html=True)
                 
                 try:
                     pdf_b64 = existing_file_data["file_base64"]
@@ -1928,7 +1924,7 @@ else:
                         file_name=file_name_download,
                         mime="application/pdf",
                         use_container_width=True,
-                        type="primary" # 改為明顯的主色調按鈕，防白化
+                        type="primary" # 主色調按鈕，能避開白色底色阻擋
                     )
                 except Exception as file_err:
                     st.error(f"檔案解析失敗: {file_err}")
