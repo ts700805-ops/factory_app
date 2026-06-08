@@ -180,17 +180,17 @@ if "user" not in st.session_state:
 else:
     # 側邊欄導航 (新增手工具相關選項)
     # 側邊欄導航 (新增手工具相關選項)
+   # 側邊欄導航 (確保縮排完全一致)
     st.sidebar.markdown(f"### 👤 當前人員：**{st.session_state.user}**")
     
-    # 修正後的縮排結構
     nav = st.sidebar.radio("功能導航", [
         "💡 2026上半年技能考核進度", 
         "🧾 組長待辦事項",
-        "🛡️ --------------------",
+        "🛡️ 🛡️ 🛡️ 🛡️ 🛡️ 🛡️",
         "📝 每日6S任務回報", 
         "🎮 6S戰境養成", 
         "🟢 6S個人能力查詢",
-        "🛡️ --------------------",
+        "🛡️ 🛡️ 🛡️ 🛡️ 🛡️ 🛡️",
         "📊 製造部派工專區", 
         "📜 完工紀錄查詢", 
         "🔧 固資&手工具紀錄表",
@@ -198,67 +198,24 @@ else:
         "⚙️ 設定管理"
     ])
     
-    # --- 登出系統按鈕 ---
-    st.sidebar.markdown(
-        """
+    # 登出系統按鈕
+    st.sidebar.markdown("""
         <div style="padding: 10px 0; text-align: center;">
             <a href="/?logout=true" target="_self" style="
-                display: block; 
-                padding: 12px; 
-                color: #ffffff !important; 
-                background-color: #dc2626 !important; 
-                border-radius: 8px; 
-                text-decoration: none !important; 
-                font-size: 1.2rem; 
-                font-weight: 900; 
-                box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
+                display: block; padding: 12px; color: #ffffff !important; 
+                background-color: #dc2626 !important; border-radius: 8px; 
+                text-decoration: none !important; font-size: 1.2rem; 
+                font-weight: 900; box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
             ">🚪 點此登出系統</a>
         </div>
-        """, 
-        unsafe_allow_html=True
-    )
+    """, unsafe_allow_html=True)
 
-    # 檢查是否點擊了登出連結
+    # 狀態檢查與頁面重整
     if "logout" in st.query_params:
         st.query_params.clear()
         st.session_state.clear()
         st.rerun()
 
-    # 導航頁面重整判斷
-    if nav != st.session_state.menu_selection:
-        st.session_state.menu_selection = nav
-        st.rerun()
-    
-    # --- 登出系統按鈕（放到側邊欄 radio 下方，確保 100% 執行與顯示）---
-    st.sidebar.markdown(
-        """
-        <div style="padding: 10px 0; text-align: center;">
-            <a href="/?logout=true" target="_self" style="
-                display: block; 
-                padding: 12px; 
-                color: #ffffff !important; 
-                background-color: #dc2626 !important; 
-                border-radius: 8px; 
-                text-decoration: none !important; 
-                font-size: 1.2rem; 
-                font-weight: 900; 
-                box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
-            ">🚪 點此登出系統</a>
-        </div>
-        """, 
-        unsafe_allow_html=True
-    )
-
-    # 檢查是否點擊了登出連結
-    if "logout" in st.query_params:
-        st.query_params.clear()
-        st.session_state.clear()
-        st.rerun()
-
-    # 導航頁面重整判斷（移至登出按鈕下方，不阻斷程式執行）
-    if nav != st.session_state.menu_selection:
-        st.session_state.menu_selection = nav
-        st.rerun()
 
 
     # --- 📈💡2o26上半年技能考核進度 ---
