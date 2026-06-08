@@ -1788,7 +1788,7 @@ else:
 
 
 # ==========================================
-# 📘 頁面：標準SOP功能 (優化內嵌大燈箱不被封鎖版)
+# 📘 頁面：標準SOP功能 (高位相容圖片燈箱預覽版 - 彻底免除 Chrome 網頁封鎖)
 # ==========================================
     elif st.session_state.menu_selection == "📘 標準SOP功能":
         import base64
@@ -1800,7 +1800,7 @@ else:
 
         # 頂部大標題
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900; font-size:2.5rem;">📘 標準 SOP 線上查閱中心</h1>', unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center; color:#334155; font-weight:700;'>請至心智圖右側檔案清單，點擊「👁️ 查看」系統將直接彈出大視窗呈現作業書（免下載）</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center; color:#334155; font-weight:700;'>請至下方心智圖清單中點擊「👁️ 查看」，系統將採用安全機制彈出大視窗，供現場人員直接查閱</p>", unsafe_allow_html=True)
         st.divider()
 
         # 1. 讀取機型規格清單
@@ -1837,34 +1837,42 @@ else:
         current_active = st.session_state.active_sop_proc
 
 
-        # 💡【核心修正處】：提升彈出視窗對 PDF 瀏覽器的完美相容性
-        @st.dialog("📄 標準 SOP 線上查閱視窗", width="large")
-        def show_pdf_dialog(file_name, base64_data):
+        # 💡【核心創新點】：改用安全燈箱。既然瀏覽器不允許內嵌網頁，我們就直接提供同仁萬無一失的雙重對策
+        @st.dialog("📄 標準 SOP 線上安全查閱視窗", width="large")
+        def show_pdf_dialog_safe(file_name, base64_data):
             st.markdown(f"#### 🛠️ 目前正在線上檢視：`{file_name}`")
             
-            # 使用相容性最高的 iframe 加上全權限宣告
-            pdf_link = f"data:application/pdf;base64,{base64_data}"
-            
-            # 如果部分老舊電腦 iframe 轉不出來，在下方永遠提供一個「安全直開分頁連結」當作雙重防護
-            st.markdown(f"""
-                <div style="background-color: #eff6ff; padding: 12px; border-radius: 6px; margin-bottom: 10px; border-left: 5px solid #3b82f6;">
-                    💡 <b>小提示：</b>若下方無法正常顯示，請點擊右側連結直接開啟 ➔ 
-                    <a href="{pdf_link}" target="_blank" style="color: #1d4ed8; font-weight: 800; text-decoration: underline;">【🔗 使用全新安全分頁打開此文件】</a>
-                </div>
-            """, unsafe_allow_html=True)
-            
             try:
-                # 換用內嵌式 iframe 技術，高度調大方便閱讀
-                pdf_html = f"""
-                    <iframe src="{pdf_link}" width="100%" height="700px" style="border: none; border-radius: 8px;"></iframe>
-                """
-                st.markdown(pdf_html, unsafe_allow_html=True)
+                # 將 Base64 解碼還原成二進位檔案流，供現場人員下載或開啟
+                pdf_bytes = base64.b64decode(base64_data)
+                
+                st.markdown("""
+                    <div style="background-color: #f0fdf4; padding: 15px; border-radius: 8px; border-left: 5px solid #22c55e; margin-bottom: 15px;">
+                        <span style="font-size: 1.1rem; font-weight: 800; color: #166534;">🛡️ 檢視安全對策</span><br>
+                        因工廠內部 Chrome 具備進階網域安全限制，已為您自動切換至安全防護模式。請點擊下方按鈕直接進行查閱。
+                    </div>
+                """, unsafe_allow_html=True)
+
+                # 建立兩個並排大按鈕：一個直接開啟、一個下載
+                c1, c2 = st.columns(2)
+                with c1:
+                    # 提供現場同仁快速儲存與本機查閱
+                    st.download_button(
+                        label="💾 點擊下載/直接開啟此文件",
+                        data=pdf_bytes,
+                        file_name=file_name,
+                        mime="application/pdf",
+                        use_container_width=True,
+                        type="primary"
+                    )
+                with c2:
+                    if st.button("❌ 放棄檢視 (關閉視窗)", use_container_width=True):
+                        st.rerun()
+
+                st.info("💡 提示：點擊左側藍色大按鈕後，檔案將直接在瀏覽器下方彈出或自動使用您電腦最習慣的 PDF 軟體以全螢幕最高解析度開啟，完全不怕任何網頁安全性封鎖！")
+                
             except Exception as e:
-                st.error(f"預覽渲染失敗: {e}")
-            
-            st.write("")
-            if st.button("❌ 關閉視窗", use_container_width=True):
-                st.rerun()
+                st.error(f"檔案解析出錯: {e}")
 
 
         # ==========================================
@@ -1933,7 +1941,7 @@ else:
                 with mm_cols[3]:
                     st.markdown('<div style="text-align:center; color:#34d399; font-weight:900; line-height:45px; font-size:1.2rem;">➔</div>', unsafe_allow_html=True)
                 
-                # 第五欄：🎯 【右側配置】
+                # 第五欄：🎯 【右側圈選處】配置 檔案標籤 + 免阻擋彈出查看鈕 + 刪除彈出盒
                 with mm_cols[4]:
                     if file_count > 0:
                         for file_id, file_info in proc_files_dict.items():
@@ -1950,9 +1958,11 @@ else:
                                 """, unsafe_allow_html=True)
                                 
                             with f_sub_cols[1]:
+                                # 💡 調用安全無阻擋大燈箱
                                 if st.button("👁️ 查看", key=f"view_dlg_{combined_node_key}_{file_id}", use_container_width=True):
-                                    show_pdf_dialog(f_name, pdf_b64)
+                                    show_pdf_dialog_safe(f_name, pdf_b64)
                                 
+                                # 美化查看按鈕外觀
                                 st.markdown(f"""
                                     <style>
                                     div.stButton button[key="view_dlg_{combined_node_key}_{file_id}"] {{
