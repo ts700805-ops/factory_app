@@ -1,39 +1,33 @@
 import streamlit as st
 import pandas as pd
-import datetime
 
-# --- 介面設定 ---
+# 1. 頁面基本設定
 st.set_page_config(page_title="超慧科技管理系統", layout="wide")
 
-# 初始化 Session State
+# 2. 初始化 Session State
 if "menu_selection" not in st.session_state:
     st.session_state.menu_selection = "📊 製造部派工專區"
 if "user" not in st.session_state:
     st.session_state.user = None
 
-# --- 側邊欄導航 (修正縮排版) ---
-def sidebar_nav():
+# 3. 側邊欄導航 (確保縮排層級嚴格對齊)
+def render_sidebar():
     st.sidebar.markdown(f"### 👤 當前人員：**{st.session_state.user}**")
     
-    # 這裡確保每一行都對齊，沒有混合使用 Tab 與空白
-    options = [
-        "💡 2026上半年技能考核進度", 
+    # 導航選項列表
+    nav_options = [
+        "📊 製造部派工專區",
         "🧾 組長待辦事項",
-        "🛡️ 🛡️ 🛡️ 🛡️ 🛡️ 🛡️",
-        "📝 每日6S任務回報", 
-        "🎮 6S戰境養成", 
-        "🟢 6S個人能力查詢",
-        "🛡️ 🛡️ 🛡️ 🛡️ 🛡️ 🛡️",
-        "📊 製造部派工專區", 
-        "📜 完工紀錄查詢", 
-        "🔧 固資&手工具紀錄表",
-        "⚙️ 資產編輯清單", 
-        "⚙️ 設定管理"
+        "💡 2026上半年技能考核進度",
+        "📝 每日6S任務回報",
+        "⚙️ 管理後台"
     ]
     
-    # 使用 index 參數來保持選擇狀態
-    current_idx = options.index(st.session_state.menu_selection) if st.session_state.menu_selection in options else 0
-    nav = st.sidebar.radio("功能導航", options, index=current_idx)
+    # 計算 index 以便維持選取狀態
+    current_index = nav_options.index(st.session_state.menu_selection) if st.session_state.menu_selection in nav_options else 0
+    
+    # 這裡確保導航列的縮排是乾淨的
+    nav = st.sidebar.radio("功能導航", nav_options, index=current_index)
     
     # 登出按鈕
     if st.sidebar.button("🚪 點此登出系統", use_container_width=True):
@@ -42,39 +36,36 @@ def sidebar_nav():
         
     return nav
 
-# --- 主程式流程 ---
+# 4. 主程式執行邏輯
 if st.session_state.user is None:
-    st.title("⚓ 登入系統")
-    user = st.selectbox("請選擇組長", ["陳德文", "劉志偉", "吳政昌", "蘇萬紘"])
+    # 簡易登入頁面
+    st.title("⚓ 超慧科技管理系統")
+    user_name = st.selectbox("請選擇組長姓名登入", ["陳德文", "劉志偉", "吳政昌", "蘇萬紘"])
     if st.button("確認登入"):
-        st.session_state.user = user
+        st.session_state.user = user_name
         st.rerun()
 else:
-    # 執行導航
-    nav = sidebar_nav()
+    # 渲染導航並取得結果
+    nav = render_sidebar()
+    
+    # 如果導航改變則重整頁面
     if nav != st.session_state.menu_selection:
         st.session_state.menu_selection = nav
         st.rerun()
 
-    # --- 頁面內容切換 ---
-    st.title(f"目前檢視：{st.session_state.menu_selection}")
-
+    # 5. 頁面內容路由
+    st.title(f"當前功能：{st.session_state.menu_selection}")
+    
     if st.session_state.menu_selection == "🧾 組長待辦事項":
-        st.subheader("待處理項目清單")
+        st.write("這是您的待辦事項頁面。")
+        # 這裡放入您想測試的表格或清單
+        tasks = pd.DataFrame({
+            "項目": ["設備維護", "人員考核", "庫存盤點"],
+            "優先級": ["高", "中", "低"]
+        })
+        st.table(tasks)
         
-        # 範例資料
-        data = {
-            "狀態": ["🔴 緊急", "🟡 處理中", "🟢 已排程"],
-            "任務名稱": ["設備異常排除", "員工技能核對", "庫存盤點"],
-            "截止日期": ["2026-06-09", "2026-06-10", "2026-06-15"]
-        }
-        df = pd.DataFrame(data)
-        st.table(df)
-        
-        if st.button("新增待辦事項"):
-            st.info("功能開發中...")
-
     elif st.session_state.menu_selection == "📊 製造部派工專區":
-        st.write("這裡是派工專區內容...")
-
-    # 其他頁面依此類推...
+        st.write("這裡是派工區...")
+    
+    # 其他頁面邏輯可在此延伸...
