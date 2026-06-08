@@ -1790,7 +1790,7 @@ else:
 
 
 # ==========================================
-# 📘 頁面：標準SOP功能 (修正PDF封鎖、單欄直式排列版)
+# 📘 頁面：標準SOP功能 (工序統計總覽版)
 # ==========================================
     elif st.session_state.menu_selection == "📘 標準SOP功能":
         import base64
@@ -1808,11 +1808,46 @@ else:
         sop_settings = requests.get(f"{SOP_LIST_URL}.json").json() or {"sop_types": []}
         sop_types = sop_settings.get("sop_types", ["骨架作業", "前置作業", "配電作業"]) # 預設保底選單
 
+        # 2. 預先讀取所有工序的檔案資料，用來計算每個工序有多少檔案
+        all_file_data = requests.get(f"{SOP_FILE_URL}.json").json() or {}
+
 
         # ==========================================
-        # 🔝 【位置 1】第一步：選擇查閱工序 (最上方)
+        # 📊 【全新功能】所有工序 SOP 數量統計總覽看板
         # ==========================================
-        st.markdown("### 🎯 第一步：選擇查閱工序")
+        st.markdown("### 📊 各工序 SOP 配置總覽")
+        
+        # 建立動態排版，每 4 個工序排成一列
+        for i in range(0, len(sop_types), 4):
+            chunk = sop_types[i:i+4]
+            cols = st.columns(4)
+            for idx, proc_name in enumerate(chunk):
+                # 計算該工序安不安全 key
+                proc_key_tmp = base64.b64encode(proc_name.encode('utf-8')).decode('utf-8').replace('=', '')
+                
+                # 檢查這個工序有沒有對應的檔案資料
+                has_file = proc_key_tmp in all_file_data and "file_base64" in all_file_data[proc_key_tmp]
+                doc_count = 1 if has_file else 0
+                
+                # 根據有沒有檔案給予不同的精美顏色卡片
+                card_bg = "#065f46" if doc_count > 0 else "#1e293b" # 有檔案用深綠色，沒檔案用深灰色
+                text_color = "#34d399" if doc_count > 0 else "#94a3b8"
+                
+                with cols[idx]:
+                    st.markdown(f"""
+                        <div style="background-color: {card_bg}; border: 1px solid #38bdf8; border-radius: 8px; padding: 12px; text-align: center;">
+                            <span style="color: white; font-weight: 800; font-size: 1rem; display: block; margin-bottom: 5px;">🛠️ {proc_name}</span>
+                            <span style="color: {text_color}; font-weight: 900; font-size: 1.2rem;">📄 已配置：{doc_count} 份</span>
+                        </div>
+                    """, unsafe_allow_html=True)
+        st.write("")
+        st.divider()
+
+
+        # ==========================================
+        # 🔝 【位置 1】選擇查閱工序
+        # ==========================================
+        st.markdown("### 🎯 選擇查閱工序")
         selected_sop_proc = st.selectbox("請選擇當前要查閱或指派的製造工序：", options=sop_types, key="main_sop_selectbox")
         st.write("")
 
@@ -1820,17 +1855,14 @@ else:
         # ==========================================
         # 📄 【位置 2】SOP 文件管理與下載按鈕 (放在中間)
         # ==========================================
-        # 安全防呆：若選單暫時抓不到值，直接不往下執行或給予保底值，避免噴出 AttributeError
         if not selected_sop_proc:
             st.warning("⏳ 正在載入工序資料，請稍候...")
         else:
             st.markdown(f"### 📑 工序：【{selected_sop_proc}】SOP 文件管理")
             
-            # 從資料庫抓取此工序目前有沒有存過的 PDF
-            # 針對特殊字元與中文進行安全編碼，避免 Firebase 路徑報錯
+            # 安全編碼路徑
             safe_proc_key = base64.b64encode(selected_sop_proc.encode('utf-8')).decode('utf-8').replace('=', '')
-            
-            existing_file_data = requests.get(f"{SOP_FILE_URL}/{safe_proc_key}.json").json()
+            existing_file_data = all_file_data.get(safe_proc_key)
 
             # 提供上傳元件
             uploaded_pdf = st.file_uploader(f"📤 上傳或更新【{selected_sop_proc}】的 SOP (限制 PDF 格式)", type=["pdf"], key=f"file_uploader_{safe_proc_key}")
@@ -1838,7 +1870,6 @@ else:
             if uploaded_pdf is not None:
                 if st.button("🚀 確定上傳並覆蓋舊檔案", use_container_width=True):
                     with st.spinner("檔案封裝傳輸中，請稍候..."):
-                        # 將 PDF 檔案轉為 Base64 字串以存入 Realtime Database
                         file_bytes = uploaded_pdf.read()
                         base64_pdf = base64.b64encode(file_bytes).decode('utf-8')
                         
@@ -1849,7 +1880,6 @@ else:
                             "file_base64": base64_pdf
                         }
                         
-                        # 寫入 Firebase
                         requests.put(f"{SOP_FILE_URL}/{safe_proc_key}.json", data=json.dumps(payload))
                         st.success(f"🎉 【{uploaded_pdf.name}】已成功與【{selected_sop_proc}】關聯儲存！")
                         time.sleep(0.8)
@@ -1859,9 +1889,9 @@ else:
             st.markdown("### 🔍 SOP 現場即時看板")
 
             if existing_file_data and "file_base64" in existing_file_data:
-                st.info(f"📄 目前文件：**{existing_file_data.get('file_name')}** 💾 登記人：{existing_file_data.get('uploader','系統')} ({existing_file_data.get('upload_time')})")
+                # 💡 已經將「💾 登記人：劉志偉...」這行文字完全移除，只保留文件資訊
+                st.info(f"📄 目前文件：**{existing_file_data.get('file_name')}**")
                 
-                # 💡 【核心修復關鍵】不再使用 iframe 顯示，改成提供安全的點擊下載/查閱按鈕
                 try:
                     pdf_b64 = existing_file_data["file_base64"]
                     pdf_bytes = base64.b64decode(pdf_b64)
@@ -1905,7 +1935,6 @@ else:
             sop_input = st.text_area("編輯工序下拉選單 (請以逗號或分行隔開)", value=current_sop_str, height=120, help="修改此處可動態調整上方的工序選擇清單")
             
             if st.button("💾 儲存選單項目", use_container_width=True, type="primary", key="save_sop_list_btn"):
-                # 同步支援中英文逗號與換行拆分
                 new_sop_list = [t.strip() for t in re.split(r'[，,\n]', sop_input) if t.strip()]
                 requests.put(f"{SOP_LIST_URL}.json", data=json.dumps({"sop_types": new_sop_list}))
                 st.success("✅ 下拉選單項目已成功更新！")
