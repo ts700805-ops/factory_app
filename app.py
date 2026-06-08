@@ -414,46 +414,52 @@ else:
                         st.error(f"❌ 錯誤：{e}")
 
 
+# --- 點選組長查看該組員已回報清單 ---
+        st.markdown("---")
+        st.markdown("##### 📋 點選組長查看組員今日回報狀況")
+        
+        # 1. 取得所有組長清單
+        all_leaders_list = list(leader_member_mapping.keys())
+        selected_leader = st.selectbox("請選擇組長：", all_leaders_list, key="6s_leader_select")
+        
+        # 2. 獲取該組長名下的組員
+        target_members = leader_member_mapping.get(selected_leader, [])
+        
+        # 3. 取得今日日期
+        import datetime
+        now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
+        today_str = now.strftime("%Y-%m-%d")
+        
+        try:
+            # 4. 抓取 6S 紀錄
+            r_6s = requests.get(f"{DB_BASE_URL}/6s_logs.json").json()
+            r_6s = r_6s if isinstance(r_6s, dict) else {}
+            
+            # 5. 篩選出「該組長名下」且「今天有回報」的紀錄
+            # 我們建立一個字典來存姓名對應到的時間，確保顯示最新一筆
+            report_data = {}
+            for v in r_6s.values():
+                if isinstance(v, dict) and v.get("姓名") in target_members and v.get("日期") == today_str:
+                    report_data[v.get("姓名")] = v.get("時間", "無紀錄")
+            
+            # 顯示結果
+            st.write(f"**{selected_leader} 組的今日已回報清單：**")
+            
+            if not report_data:
+                st.warning("⚠️ 目前該組今日無人員完成回報。")
+            else:
+                # 建立表格顯示
+                df_report = pd.DataFrame(
+                    list(report_data.items()), 
+                    columns=["姓名", "回報時間"]
+                )
+                # 顯示表格 (增加一點樣式)
+                st.table(df_report)
+                st.success(f"共計 {len(report_data)} 位成員已完成回報。")
 
- # ==========================================
-        # ==========================================
-            # --- 點選組長查看該組員未回報清單 ---
-            st.markdown("---")
-            st.markdown("##### 🔍 點選組長查看組員回報狀況")
-            
-            # 1. 取得所有組長清單
-            all_leaders_list = list(leader_member_mapping.keys())
-            selected_leader = st.selectbox("請選擇組長：", all_leaders_list, key="6s_leader_select")
-            
-            # 2. 獲取該組長名下的組員
-            target_members = leader_member_mapping.get(selected_leader, [])
-            
-            # 3. 取得今日日期
-            import datetime
-            now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
-            today_str = now.strftime("%Y-%m-%d")
-            
-            try:
-                # 4. 抓取 6S 紀錄
-                r_6s = requests.get(f"{DB_BASE_URL}/6s_logs.json").json()
-                r_6s = r_6s if isinstance(r_6s, dict) else {}
-                
-                # 找出今天已回報的人
-                reported_staff = [v.get("姓名") for v in r_6s.values() if isinstance(v, dict) and v.get("日期") == today_str]
-                
-                # 5. 計算該組長名下未回報的人
-                not_reported = [name for name in target_members if name not in reported_staff]
-                
-                # 顯示結果
-                st.write(f"**{selected_leader} 組的狀況：**")
-                if not not_reported:
-                    st.success(f"✅ {selected_leader} 組的所有組員 ({len(target_members)} 人) 皆已完成回報！")
-                else:
-                    st.warning(f"以下 {len(not_reported)} 位成員尚未回報：")
-                    st.write(", ".join(not_reported))
-            except:
-                st.info("ℹ️ 目前暫無 6S 回報資料。")
-# ==========================================
+        except Exception as e:
+            st.error(f"讀取資料發生錯誤，請稍後再試。")
+  # ==========================================
     # 🎮 6S 戰境養成功能區塊
     # ==========================================
   # 更改為獨立 if 判定，徹底解決 elif 造成的 SyntaxError 語法錯誤
