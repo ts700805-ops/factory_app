@@ -1789,7 +1789,7 @@ else:
 
 
 # ==========================================
-# 📘 頁面：標準SOP功能 (網頁自動內嵌開啟版)
+# 📘 頁面：標準SOP功能 (右側雙按鈕 + 新開視窗安全版)
 # ==========================================
     elif st.session_state.menu_selection == "📘 標準SOP功能":
         import base64
@@ -1797,11 +1797,11 @@ else:
 
         # 資料庫路徑設定
         SOP_CONFIG_URL = f"{DB_BASE_URL}/sop_main_config"  # 儲存機型與工序項目
-        SOP_FILE_URL = f"{DB_BASE_URL}/sop_file_data"      # 儲存 PDF 檔案 (多檔案獨立儲存)
+        SOP_FILE_URL = f"{DB_BASE_URL}/sop_file_data"      # 儲存 PDF 檔案
 
         # 頂部大標題
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900; font-size:2.5rem;">📘 標準 SOP 線上查閱中心</h1>', unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center; color:#334155; font-weight:700;'>點選工序按鈕後，下方將直接自動開啟並呈現 PDF 文件內容，無須手動下載</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center; color:#334155; font-weight:700;'>請至心智圖右側檔案清單，點擊「👁️ 查看」可在全新視窗閱讀；點擊「🗑️ 刪除」可個別移除</p>", unsafe_allow_html=True)
         st.divider()
 
         # 1. 讀取機型規格清單
@@ -1826,10 +1826,10 @@ else:
                 "前置作業(門板組立)", "S.T作業"
             ]
 
-        # 4. 一次性載入整個檔案資料庫，供心智圖與閱讀器渲染
+        # 4. 一次性載入整個檔案資料庫
         all_file_nodes = requests.get(f"{SOP_FILE_URL}.json").json() or {}
 
-        # 初始化選中工序
+        # 初始化選中工序 (保留高亮邏輯)
         if "active_sop_proc" not in st.session_state:
             st.session_state.active_sop_proc = sop_types[0] if sop_types else ""
         if st.session_state.active_sop_proc not in sop_types and sop_types:
@@ -1839,7 +1839,7 @@ else:
 
 
         # ==========================================
-        # 🧠 【三層獨立心智圖看板 - 支援多文件展開】
+        # 🧠 【三層獨立心智圖看板 - 右側圈選處按鈕升級】
         # ==========================================
         st.markdown(f"### 🧠 【{selected_model}】多文件心智圖總覽")
         
@@ -1854,8 +1854,8 @@ else:
                 
                 is_current = (current_active == proc_name)
                 
-                # 心智圖發散五橫欄
-                mm_cols = st.columns([1.5, 0.4, 2.5, 0.4, 4.0])
+                # 調整欄位配置比例，留更寬的空間（最後一欄）給檔案、查看鈕、刪除鈕
+                mm_cols = st.columns([1.2, 0.3, 2.0, 0.3, 5.2])
                 
                 # 第一欄：機型核心根節點
                 with mm_cols[0]:
@@ -1880,42 +1880,23 @@ else:
                         </div>
                     """, unsafe_allow_html=True)
                     
-                    if st.button(f"👆 查看 {proc_name}", key=f"btn_p_{combined_node_key}", use_container_width=True):
+                    if st.button(f"👆 選定 {proc_name}", key=f"btn_p_{combined_node_key}", use_container_width=True):
                         st.session_state.active_sop_proc = proc_name
                         st.rerun()
                     
-                    # 點選時變：紅底黑字，沒點選：正常黑字
+                    # 選中高亮外觀樣式
                     if is_current:
                         st.markdown(f"""
                             <style>
                             div[data-testid="stButton"] button[key="btn_p_{combined_node_key}"],
                             div.stButton > button[key="btn_p_{combined_node_key}"],
-                            div.stButton > button[key="btn_p_{combined_node_key}"]:hover,
-                            div.stButton > button[key="btn_p_{combined_node_key}"]:active,
-                            div.stButton > button[key="btn_p_{combined_node_key}"]:focus {{
+                            div.stButton > button[key="btn_p_{combined_node_key}"]:hover {{
                                 background-color: #ef4444 !important;
                                 border: 2px solid #ef4444 !important;
-                                background: #ef4444 !important;
                             }}
-                            div[data-testid="stButton"] button[key="btn_p_{combined_node_key}"] *,
-                            div.stButton > button[key="btn_p_{combined_node_key}"] span,
-                            div.stButton > button[key="btn_p_{combined_node_key}"] p {{
+                            div[data-testid="stButton"] button[key="btn_p_{combined_node_key}"] span {{
                                 color: #000000 !important;
-                                -webkit-text-fill-color: #000000 !important;
                                 font-weight: 900 !important;
-                                font-size: 15px !important;
-                            }}
-                            </style>
-                        """, unsafe_allow_html=True)
-                    else:
-                        st.markdown(f"""
-                            <style>
-                            div[data-testid="stButton"] button[key="btn_p_{combined_node_key}"] *,
-                            div.stButton > button[key="btn_p_{combined_node_key}"] span,
-                            div.stButton > button[key="btn_p_{combined_node_key}"] p {{
-                                color: #000000 !important;
-                                -webkit-text-fill-color: #000000 !important;
-                                font-weight: 800 !important;
                             }}
                             </style>
                         """, unsafe_allow_html=True)
@@ -1924,16 +1905,47 @@ else:
                 with mm_cols[3]:
                     st.markdown('<div style="text-align:center; color:#34d399; font-weight:900; line-height:45px; font-size:1.2rem;">➔</div>', unsafe_allow_html=True)
                 
-                # 第五欄：【多檔案獨立分支展開】
+                # 第五欄：🎯 【精準定位：右側圈選處】直接生成檔案名稱與 查看/刪除 控制鈕
                 with mm_cols[4]:
                     if file_count > 0:
                         for file_id, file_info in proc_files_dict.items():
                             f_name = file_info.get("file_name", "未命名文件")
-                            st.markdown(f"""
-                                <div style="background-color: #065f46; border-left: 4px solid #34d399; border-radius: 4px; padding: 3px 8px; margin-bottom: 3px;">
-                                    <span style="color: #ffffff; font-weight: 700; font-size: 0.85rem; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">📄 {f_name}</span>
-                                </div>
-                            """, unsafe_allow_html=True)
+                            pdf_b64 = file_info.get("file_base64", "")
+                            
+                            # 建立橫向子排版：[檔案名稱文字, 查看按鈕, 刪除微型盒]
+                            f_sub_cols = st.columns([5, 2.5, 2.5])
+                            
+                            with f_sub_cols[0]:
+                                # 檔案名標籤
+                                st.markdown(f"""
+                                    <div style="background-color: #065f46; border-left: 4px solid #34d399; border-radius: 4px; padding: 4px 8px; margin-top:2px; height:34px;">
+                                        <span style="color: #ffffff; font-weight: 700; font-size: 0.82rem; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height:26px;">📄 {f_name}</span>
+                                    </div>
+                                """, unsafe_allow_html=True)
+                                
+                            with f_sub_cols[1]:
+                                # 💡 核心改良：建立點擊後在「全新分頁」直接打開的萬能 HTML 密技，絕不被封鎖網頁
+                                html_link = f"""
+                                    <a href="data:application/pdf;base64,{pdf_b64}" target="_blank" style="text-decoration: none;">
+                                        <div style="background-color: #1e40af; color: white; text-align: center; font-weight: 800; font-size: 0.85rem; border-radius: 4px; padding: 6px 0; margin-top:2px; cursor: pointer; border: 1px solid #3b82f6; height:34px; line-height:20px;">
+                                            👁️ 查看
+                                        </div>
+                                    </a>
+                                """
+                                st.markdown(html_link, unsafe_allow_html=True)
+                                
+                            with f_sub_cols[2]:
+                                # 刪除防誤觸小收納
+                                with st.popover("🗑️ 刪除", use_container_width=True):
+                                    pwd_del = st.text_input("輸入管理密碼：", type="password", key=f"pwd_{combined_node_key}_{file_id}")
+                                    if st.button("❌ 確定抹除", type="primary", key=f"del_{combined_node_key}_{file_id}", use_container_width=True):
+                                        if pwd_del == "0000":
+                                            requests.delete(f"{SOP_FILE_URL}/{combined_node_key}/{file_id}.json")
+                                            st.success("檔案已刪除！")
+                                            time.sleep(0.5)
+                                            st.rerun()
+                                        else:
+                                            st.error("密碼錯誤")
                     else:
                         st.markdown('<div style="color: #94a3b8; font-style: italic; font-weight:700; line-height:45px; font-size:0.9rem;">❌ 尚未配置 SOP</div>', unsafe_allow_html=True)
 
@@ -1942,54 +1954,17 @@ else:
 
 
         # ==========================================
-        # 📄 【動態內容區】🎯 點選後直接自動開啟 PDF 閱讀器
+        # 📤 下方僅保留：新增檔案上傳區 (不干擾上方視覺)
         # ==========================================
         if current_active:
-            st.markdown(f"## 🔍 當前開啟查閱：【{selected_model}】➔【{current_active}】")
+            st.markdown(f"### 📤 上傳新文件至：【{selected_model}】➔ 【{current_active}】")
             
             target_node_key = f"{model_safe_key}_" + base64.b64encode(current_active.encode('utf-8')).decode('utf-8').replace('=', '')
-            current_files = all_file_nodes.get(target_node_key, {})
-
-            # 📣 這裡就是自動開啟的核心區塊
-            if current_files and isinstance(current_files, dict):
-                file_items = list(current_files.items())
-                
-                # 如果該工序有「多份」PDF，用分頁（Tabs）呈現，點到哪份就自動開哪份！
-                if len(file_items) > 1:
-                    tab_titles = [item[1].get("file_name", "未命名文件") for item in file_items]
-                    tabs = st.tabs(tab_titles)
-                    
-                    for t_idx, (f_id, f_data) in enumerate(file_items):
-                        with tabs[t_idx]:
-                            try:
-                                pdf_b64 = f_data["file_base64"]
-                                # 💡 核心魔術：利用 base64 資料串直接嵌入瀏覽器，達成「免下載直接開啟」
-                                pdf_display = f'<iframe src="data:application/pdf;base64,{pdf_b64}" width="100%" height="800" type="application/pdf"></iframe>'
-                                st.markdown(pdf_display, unsafe_allow_html=True)
-                            except Exception as e:
-                                st.error(f"PDF 檔案載入失敗: {e}")
-                else:
-                    # 如果只有一份檔案，直接霸氣地滿版打開
-                    f_id, f_data = file_items[0]
-                    st.markdown(f"##### 📄 文件名稱：{f_data.get('file_name')}")
-                    try:
-                        pdf_b64 = f_data["file_base64"]
-                        pdf_display = f'<iframe src="data:application/pdf;base64,{pdf_b64}" width="100%" height="800" type="application/pdf"></iframe>'
-                        st.markdown(pdf_display, unsafe_allow_html=True)
-                    except Exception as e:
-                        st.error(f"PDF 檔案載入失敗: {e}")
-            else:
-                st.warning(f"💡 目前【{selected_model}】➔【{current_active}】尚未配置任何 SOP 說明書。請在下方進行上傳。")
-
-            st.write("")
-            st.divider()
-
-            # 區塊：上傳與管理維護 (移到最下方，避免干擾人員看文件)
-            st.markdown("### 🛠️ 此工序文件管理後台")
-            uploaded_pdf = st.file_uploader(f"📤 新增獨立 SOP 文件至【{current_active}】(可多次上傳不同的檔案)", type=["pdf"], key=f"uploader_{target_node_key}")
+            
+            uploaded_pdf = st.file_uploader(f"選擇要新增至【{current_active}】的 PDF 作業書 (可多次上傳非同檔案)", type=["pdf"], key=f"uploader_{target_node_key}")
             
             if uploaded_pdf is not None:
-                if st.button("🚀 確定上傳此份獨立文件", use_container_width=True):
+                if st.button("🚀 確定上傳並加入右側心智圖列表", use_container_width=True):
                     with st.spinner("檔案打包傳輸中..."):
                         file_bytes = uploaded_pdf.read()
                         base64_pdf = base64.b64encode(file_bytes).decode('utf-8')
@@ -2003,27 +1978,9 @@ else:
                         }
                         
                         requests.put(f"{SOP_FILE_URL}/{target_node_key}/{unique_file_id}.json", data=json.dumps(payload))
-                        st.success(f"🎉 獨立個體【{uploaded_pdf.name}】上傳成功！")
+                        st.success(f"🎉 檔案【{uploaded_pdf.name}】上傳成功！請至上方右側查看。")
                         time.sleep(0.8)
                         st.rerun()
-
-            # 提供刪除功能
-            if current_files and isinstance(current_files, dict):
-                with st.expander("🗑️ 移除此工序內的文件"):
-                    for f_id, f_data in current_files.items():
-                        col_del1, col_del2 = st.columns([7, 3])
-                        with col_del1:
-                            st.write(f"📄 {f_data.get('file_name')} ({f_data.get('upload_time')})")
-                        with col_del2:
-                            pwd_del = st.text_input("密碼：", type="password", key=f"pwd_{f_id}")
-                            if st.button("❌ 刪除", type="primary", key=f"btn_del_{f_id}", use_container_width=True):
-                                if pwd_del == "0000":
-                                    requests.delete(f"{SOP_FILE_URL}/{target_node_key}/{f_id}.json")
-                                    st.success("檔案已成功抹除！")
-                                    time.sleep(0.5)
-                                    st.rerun()
-                                else:
-                                    st.error("密碼錯誤")
 
 
         # ==========================================
@@ -2032,6 +1989,34 @@ else:
         st.write("")
         st.divider()
         st.markdown("### ⚙️ SOP 後台數據清單維護")
+        
+        col_set1, col_set2 = st.columns(2)
+        
+        with col_set1:
+            with st.container(border=True):
+                st.markdown("##### 🏭 1. 編輯【機型規格】大主選單")
+                model_input_str = "，".join(model_list)
+                model_input = st.text_area("機型項目 (以逗號或分行隔開)", value=model_input_str, height=120, key="txt_model_list")
+                
+                if st.button("💾 儲存機型大清單", use_container_width=True, key="btn_save_models"):
+                    new_models = [m.strip() for m in re.split(r'[，,\n]', model_input) if m.strip()]
+                    requests.put(f"{SOP_CONFIG_URL}/model_list.json", data=json.dumps(new_models))
+                    st.success("✅ 機型大選單項目已成功更新！")
+                    time.sleep(0.5)
+                    st.rerun()
+
+        with col_set2:
+            with st.container(border=True):
+                st.markdown(f"##### 🛠️ 2. 編輯【{selected_model}】的專屬工序")
+                sop_input_str = "，".join(sop_types)
+                sop_input = st.text_area(f"設定該機型專屬工序 (以逗號或分行隔開)", value=sop_input_str, height=120, key=f"txt_sop_list_{model_safe_key}")
+                
+                if st.button(f"💾 儲存【{selected_model}】專用流程", use_container_width=True, key=f"btn_save_sops_{model_safe_key}"):
+                    new_sops = [t.strip() for t in re.split(r'[，,\n]', sop_input) if m.strip()]
+                    requests.put(f"{SOP_CONFIG_URL}/model_procs/{model_safe_key}.json", data=json.dumps({"sop_types": new_sops}))
+                    st.success(f"✅ 【{selected_model}】的專屬工序流程已完成獨立儲存！")
+                    time.sleep(0.5)
+                    st.rerun()
         
         col_set1, col_set2 = st.columns(2)
         
