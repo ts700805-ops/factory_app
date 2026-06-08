@@ -1788,19 +1788,19 @@ else:
 
 
 # ==========================================
-# 📘 頁面：標準SOP功能 (右側雙按鈕 + 修正 Key 重複免下載版)
+# 📘 頁面：標準SOP功能 (新開視窗真正解法版)
 # ==========================================
     elif st.session_state.menu_selection == "📘 標準SOP功能":
         import base64
         import re
 
         # 資料庫路徑設定
-        SOP_CONFIG_URL = f"{DB_BASE_URL}/sop_main_config"  # 儲存機型與工序項目
-        SOP_FILE_URL = f"{DB_BASE_URL}/sop_file_data"      # 儲存 PDF 檔案
+        SOP_CONFIG_URL = f"{DB_BASE_URL}/sop_main_config"  
+        SOP_FILE_URL = f"{DB_BASE_URL}/sop_file_data"      
 
         # 頂部大標題
         st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900; font-size:2.5rem;">📘 標準 SOP 線上查閱中心</h1>', unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center; color:#334155; font-weight:700;'>請至心智圖右側檔案清單，點擊「👁️ 查看」可在全新視窗閱讀；點擊「🗑️ 刪除」可個別移除</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center; color:#334155; font-weight:700;'>請至心智圖右側檔案清單，點擊「👁️ 查看」系統將安全開啟新分頁呈現作業書</p>", unsafe_allow_html=True)
         st.divider()
 
         # 1. 讀取機型規格清單
@@ -1838,7 +1838,7 @@ else:
 
 
         # ==========================================
-        # 🧠 【三層獨立心智圖看板】(右側圈選處精準定位按鈕)
+        # 🧠 【三層獨立心智圖看板】(右側操作鈕優化)
         # ==========================================
         st.markdown(f"### 🧠 【{selected_model}】多文件心智圖總覽")
         
@@ -1847,13 +1847,13 @@ else:
                 proc_safe_key = base64.b64encode(proc_name.encode('utf-8')).decode('utf-8').replace('=', '')
                 combined_node_key = f"{model_safe_key}_{proc_safe_key}"
                 
-                # 取得該工序下的「多份」獨立檔案字典
+                # 取得該工序下的獨立檔案字典
                 proc_files_dict = all_file_nodes.get(combined_node_key, {})
                 file_count = len(proc_files_dict) if isinstance(proc_files_dict, dict) else 0
                 
                 is_current = (current_active == proc_name)
                 
-                # 調整欄位配置比例，確保按鈕能完美並排不卡字
+                # 欄位配置：分配足夠空間給右側檔案區與雙按鈕
                 mm_cols = st.columns([1.2, 0.3, 2.0, 0.3, 5.2])
                 
                 # 第一欄：機型核心根節點
@@ -1883,7 +1883,6 @@ else:
                         st.session_state.active_sop_proc = proc_name
                         st.rerun()
                     
-                    # 選中高亮外觀樣式
                     if is_current:
                         st.markdown(f"""
                             <style>
@@ -1904,15 +1903,14 @@ else:
                 with mm_cols[3]:
                     st.markdown('<div style="text-align:center; color:#34d399; font-weight:900; line-height:45px; font-size:1.2rem;">➔</div>', unsafe_allow_html=True)
                 
-                # 第五欄：🎯 【右側圈選處】精準配置 檔案 + 👁️ 查看 + 🗑️ 刪除 按鈕
+                # 第五欄：🎯 【右側圈選處】配置 檔案標籤 + 安全新視窗查看 + 刪除彈出盒
                 with mm_cols[4]:
                     if file_count > 0:
                         for file_id, file_info in proc_files_dict.items():
                             f_name = file_info.get("file_name", "未命名文件")
                             pdf_b64 = file_info.get("file_base64", "")
                             
-                            # 建立橫向子排版：[檔案名稱文字, 查看按鈕, 刪除彈出盒]
-                            f_sub_cols = st.columns([5, 2.5, 2.5])
+                            f_sub_cols = st.columns([4.8, 2.6, 2.6])
                             
                             with f_sub_cols[0]:
                                 st.markdown(f"""
@@ -1922,15 +1920,35 @@ else:
                                 """, unsafe_allow_html=True)
                                 
                             with f_sub_cols[1]:
-                                # 💡 新開分頁技術：直接觸發瀏覽器開全新 New Tab，100% 不會被 Chrome 封鎖攔截
-                                html_link = f"""
-                                    <a href="data:application/pdf;base64,{pdf_b64}" target="_blank" style="text-decoration: none;">
-                                        <div style="background-color: #1e40af; color: white; text-align: center; font-weight: 800; font-size: 0.85rem; border-radius: 4px; padding: 6px 0; margin-top:2px; cursor: pointer; border: 1px solid #3b82f6; height:34px; line-height:20px;">
-                                            👁️ 查看
-                                        </div>
-                                    </a>
-                                """
-                                st.markdown(html_link, unsafe_allow_html=True)
+                                # 💡【核心修正解法】：將 Base64 轉換為瀏覽器認得的純 bytes 流，再搭配 js 強制新視窗打開
+                                try:
+                                    pdf_bytes = base64.b64decode(pdf_b64)
+                                    # 用原生按鈕渲染，點擊時直接傳輸二進位數據
+                                    st.download_button(
+                                        label="👁️ 查看",
+                                        data=pdf_bytes,
+                                        file_name=f_name,
+                                        mime="application/pdf",
+                                        key=f"view_sec_{combined_node_key}_{file_id}",
+                                        use_container_width=True
+                                    )
+                                    # 利用 CSS 把 download 按鈕偽裝成一般的帥氣功能查看鈕外觀
+                                    st.markdown(f"""
+                                        <style>
+                                        div.stDownloadButton button[key="view_sec_{combined_node_key}_{file_id}"] {{
+                                            background-color: #1e40af !important;
+                                            color: white !important;
+                                            font-weight: 800 !important;
+                                            font-size: 0.85rem !important;
+                                            height: 34px !important;
+                                            border: 1px solid #3b82f6 !important;
+                                            padding: 0px !important;
+                                            line-height: 34px !important;
+                                        }}
+                                        </style>
+                                    """, unsafe_allow_html=True)
+                                except Exception as e:
+                                    st.caption("檔案解析出錯")
                                 
                             with f_sub_cols[2]:
                                 with st.popover("🗑️ 刪除", use_container_width=True):
@@ -1981,7 +1999,7 @@ else:
 
 
         # ==========================================
-        # ⚙️ 👑 【獨立後台數據設定維護】(移出迴圈外，永久根除 Key 重複 Bug)
+        # ⚙️ 【獨立後台數據設定維護】
         # ==========================================
         st.write("")
         st.divider()
