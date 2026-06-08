@@ -180,7 +180,7 @@ if "user" not in st.session_state:
 else:
     # 側邊欄導航 (新增手工具相關選項)
     st.sidebar.markdown(f"### 👤 當前人員：**{st.session_state.user}**")
-     nav = st.sidebar.radio("功能導航", [
+    nav = st.sidebar.radio("功能導航", [
         "🧾組長待辦事項",
         "🛡️🛡️🛡️🛡️🛡️🛡️",
         "📝每日6S任務回報", 
@@ -189,10 +189,9 @@ else:
         "🔧 固資&手工具紀錄表",
         "⚙️ 資產編輯清單", 
         "🛡️🛡️🛡️🛡️🛡️🛡️",
-        "📘核心安全防護SOP",  # 確定使用這個新名稱
+        "📘核心防護SOP",  # 確定使用這個新名稱
         "⚙️ 設定管理",
     ])
-    
     # --- 登出系統按鈕（放到側邊欄 radio 下方，確保 100% 執行與顯示）---
     st.sidebar.markdown(
         """
