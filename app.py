@@ -180,7 +180,7 @@ if "user" not in st.session_state:
 else:
     # 側邊欄導航 (新增手工具相關選項)
     st.sidebar.markdown(f"### 👤 當前人員：**{st.session_state.user}**")
-   nav = st.sidebar.radio("功能導航", [
+    nav = st.sidebar.radio("功能導航", [
         "🧾組長待辦事項",
         "🛡️🛡️🛡️🛡️🛡️🛡️",
         "📝每日6S任務回報", 
