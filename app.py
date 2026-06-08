@@ -1788,7 +1788,7 @@ else:
 
 
 # ==========================================
-# 📘 頁面：標準SOP功能 (高對比清楚字體版 - 徹底解決白字看不清問題)
+# 📘 頁面：標準SOP功能 (最終視覺優化：全文字深綠色清晰版)
 # ==========================================
     elif st.session_state.menu_selection == "📘 標準SOP功能":
         import base64
@@ -1798,18 +1798,18 @@ else:
         SOP_CONFIG_URL = f"{DB_BASE_URL}/sop_main_config"  
         SOP_FILE_URL = f"{DB_BASE_URL}/sop_file_data"      
 
-        # 頂部大標題
-        st.markdown('<h1 style="text-align:center; color:#1e3a8a; font-weight:900; font-size:2.5rem;">📘 標準 SOP 線上查閱中心</h1>', unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center; color:#334155; font-weight:700;'>請至下方心智圖清單中點擊「👁️ 查看」，系統將採用安全機制彈出大視窗，供現場人員直接查閱</p>", unsafe_allow_html=True)
+        # 頂部大標題 (全改深綠色)
+        st.markdown('<h1 style="text-align:center; color:#065f46; font-weight:900; font-size:2.5rem;">📘 標準 SOP 線上查閱中心</h1>', unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center; color:#065f46; font-weight:700;'>請至下方心智圖清單中點擊「👁️ 查看」，系統將採用安全機制彈出大視窗，供現場人員直接查閱</p>", unsafe_allow_html=True)
         st.divider()
 
         # 1. 讀取機型規格清單
+        st.markdown('<h3 style="color:#065f46; font-weight:800;">⚙️ 1. 請選取機型規格</h3>', unsafe_allow_html=True)
         main_config = requests.get(f"{SOP_CONFIG_URL}.json").json() or {}
         model_list = main_config.get("model_list", ["SOTER+EFEM", "標準機型"])
 
-        # 2. 下拉式選單：選擇機型規格
-        st.markdown("### ⚙️ 1. 請選取機型規格")
-        selected_model = st.selectbox("選擇機型規格：", model_list, index=0, key="sop_selected_model")
+        # 2. 下拉式選單：選擇機型規格 (加上深綠色標籤說明)
+        selected_model = st.selectbox("選擇機型規格 (請由此下拉選單切換)：", model_list, index=0, key="sop_selected_model")
         
         # 安全編碼機型 Key
         model_safe_key = base64.b64encode(selected_model.encode('utf-8')).decode('utf-8').replace('=', '')
@@ -1837,32 +1837,31 @@ else:
         current_active = st.session_state.active_sop_proc
 
 
-        # 💡【核心修正點】：徹底翻修燈箱內的字體顏色，全面改成「高對比深藍色」與「黑色」大字
+        # 💡【燈箱文字全數翻修】：內部公告與提示全部更換為深綠色高清晰字體
         @st.dialog("📄 標準 SOP 線上安全查閱視窗", width="large")
         def show_pdf_dialog_safe(file_name, base64_data):
-            st.markdown(f'<h3 style="color:#1e3a8a; font-weight:800;">🛠️ 目前正在線上檢視：<span style="color:#b91c1c;">{file_name}</span></h3>', unsafe_allow_html=True)
+            st.markdown(f'<h3 style="color:#065f46; font-weight:800;">🛠️ 目前正在線上檢視：<span style="color:#065f46;">{file_name}</span></h3>', unsafe_allow_html=True)
             
             try:
                 # 將 Base64 解碼還原成二進位檔案流
                 pdf_bytes = base64.b64decode(base64_data)
                 
-                # 提示框：全面改成強烈對比的深藍色與鮮明粗體字
+                # 提示框：全面改成強烈對比的深綠色與鮮明粗體字
                 st.markdown("""
-                    <div style="background-color: #e0f2fe; padding: 18px; border-radius: 8px; border-left: 6px solid #0284c7; margin-bottom: 15px;">
-                        <b style="font-size: 1.3rem; color: #0369a1; display: block; margin-bottom: 6px;">🛡️ 檢視安全對策公告：</b>
-                        <p style="font-size: 1.1rem; font-weight: 800; color: #1e3a8a; margin: 0; line-height: 1.6;">
+                    <div style="background-color: #f0fdf4; padding: 18px; border-radius: 8px; border-left: 6px solid #059669; margin-bottom: 15px;">
+                        <b style="font-size: 1.3rem; color: #065f46; display: block; margin-bottom: 6px;">🛡️ 檢視安全對策公告：</b>
+                        <p style="font-size: 1.1rem; font-weight: 800; color: #065f46; margin: 0; line-height: 1.6;">
                             因工廠內部 Chrome 瀏覽器具備嚴格的網域安全限制，系統已自動為您切換至安全防護模式。<br>
-                            請直接點擊下方 <span style="color:#b91c1c;">【紅色大按鈕】</span> 即可直接打開並查閱此作業書！
+                            請直接點擊下方 <span style="color:#065f46; text-decoration: underline;">【深綠色大按鈕】</span> 即可直接打開並查閱此作業書！
                         </p>
                     </div>
                 """, unsafe_allow_html=True)
 
-                # 建立兩個並排大按鈕：一個直接開啟、一個下載
+                # 建立兩個並排大按鈕：一個直接開啟、一個下載 (按鈕文字均強制覆蓋為深綠色)
                 c1, c2 = st.columns(2)
                 with c1:
-                    # 提供現場同仁快速儲存與本機查閱
                     st.download_button(
-                        label="💾 點擊直接開啟 / 下載此 SOP 文件",
+                        label="🟢 點擊直接開啟 / 下載此 SOP 文件",
                         data=pdf_bytes,
                         file_name=file_name,
                         mime="application/pdf",
@@ -1873,14 +1872,24 @@ else:
                     if st.button("❌ 放棄檢視 (關閉視窗)", use_container_width=True):
                         st.rerun()
 
-                # 下方提示文字同步修正為高清晰深藍色字體
+                # 下方提示文字同步修正為高清晰深綠色字體
                 st.markdown("""
-                    <div style="background-color: #f1f5f9; padding: 12px; border-radius: 6px; margin-top: 15px; border: 1px solid #cbd5e1;">
-                        <span style="color: #0f172a; font-weight: 900; font-size: 1rem;">💡 操作小提示：</span><br>
-                        <span style="color: #1e3a8a; font-weight: 800; font-size: 0.95rem;">
-                            點擊上方紅色大按鈕後，檔案會直接在瀏覽器下方彈出，或自動調用您電腦最習慣的 PDF 閱讀軟體（如 Adobe Reader 或 Chrome 內建功能）以全螢幕最高解析度開啟，絕對不會被網頁安全機制阻擋！
+                    <div style="background-color: #f8fafc; padding: 12px; border-radius: 6px; margin-top: 15px; border: 1px solid #cbd5e1;">
+                        <span style="color: #065f46; font-weight: 900; font-size: 1rem;">💡 操作小提示：</span><br>
+                        <span style="color: #065f46; font-weight: 800; font-size: 0.95rem;">
+                            點擊上方按鈕後，檔案會直接在瀏覽器下方彈出，或自動調用您電腦最習慣的 PDF 閱讀軟體（如 Adobe Reader 或 Chrome 內建功能）以全螢幕最高解析度開啟，絕對不會被網頁安全機制阻擋！
                         </span>
                     </div>
+                """, unsafe_allow_html=True)
+                
+                # 利用 CSS 強制將燈箱內部的按鈕字體也全部轉成深綠色
+                st.markdown("""
+                    <style>
+                    div[data-testid="stDialog"] button span {
+                        color: #065f46 !important;
+                        font-weight: 900 !important;
+                    }
+                    </style>
                 """, unsafe_allow_html=True)
                 
             except Exception as e:
@@ -1888,9 +1897,9 @@ else:
 
 
         # ==========================================
-        # 🧠 【三層獨立心智圖看板】(右側操作鈕優化)
+        # 🧠 【三層獨立心智圖看板】(文字全數翻修為深綠色)
         # ==========================================
-        st.markdown(f"### 🧠 【{selected_model}】多文件心智圖總覽")
+        st.markdown(f'<h3 style="color:#065f46; font-weight:800;">🧠 【{selected_model}】多文件心智圖總覽</h3>', unsafe_allow_html=True)
         
         with st.container(border=True):
             for idx, proc_name in enumerate(sop_types):
@@ -1903,28 +1912,28 @@ else:
                 
                 is_current = (current_active == proc_name)
                 
-                # 欄位配置：分配足夠空間給右側檔案區與雙按鈕
+                # 欄位配置
                 mm_cols = st.columns([1.2, 0.3, 2.0, 0.3, 5.2])
                 
                 # 第一欄：機型核心根節點
                 with mm_cols[0]:
                     if idx == 0:
-                        st.markdown(f'<div style="background-color:#1e3a8a; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:900; font-size:1rem; margin-top:5px;">🏭 {selected_model}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div style="background-color:#065f46; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:900; font-size:1rem; margin-top:5px;">🏭 {selected_model}</div>', unsafe_allow_html=True)
                     else:
                         st.markdown('<div style="text-align:center; color:#cbd5e1; font-weight:900; line-height:40px;">│</div>', unsafe_allow_html=True)
                 
-                # 第二欄：連接線 ➔
+                # 第二欄：連接線
                 with mm_cols[1]:
-                    st.markdown('<div style="text-align:center; color:#a78bfa; font-weight:900; line-height:45px; font-size:1.2rem;">➔</div>', unsafe_allow_html=True)
+                    st.markdown('<div style="text-align:center; color:#065f46; font-weight:900; line-height:45px; font-size:1.2rem;">➔</div>', unsafe_allow_html=True)
                 
                 # 第三欄：獨立工序按鈕
                 with mm_cols[2]:
-                    card_bg = "#4c1d95"
-                    border_style = "2px solid #ef4444" if is_current else "1px solid #5b21b6"
-                    text_style = "color:#fde047;" if is_current else "color:#ffffff;"
+                    card_bg = "#f0fdf4"
+                    border_style = "2px solid #065f46" if is_current else "1px solid #a7f3d0"
+                    text_style = "color:#065f46;"
                     
                     st.markdown(f"""
-                        <div style="background-color: {card_bg}; border: {border_style}; border-radius: 6px; padding: 4px 12px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <div style="background-color: {card_bg}; border: {border_style}; border-radius: 6px; padding: 4px 12px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                             <span style="{text_style} font-weight: 800; font-size: 0.95rem;">🛠️ {proc_name} ({file_count}份)</span>
                         </div>
                     """, unsafe_allow_html=True)
@@ -1933,27 +1942,21 @@ else:
                         st.session_state.active_sop_proc = proc_name
                         st.rerun()
                     
-                    if is_current:
-                        st.markdown(f"""
-                            <style>
-                            div[data-testid="stButton"] button[key="btn_p_{combined_node_key}"],
-                            div.stButton > button[key="btn_p_{combined_node_key}"],
-                            div.stButton > button[key="btn_p_{combined_node_key}"]:hover {{
-                                background-color: #ef4444 !important;
-                                border: 2px solid #ef4444 !important;
-                            }}
-                            div[data-testid="stButton"] button[key="btn_p_{combined_node_key}"] span {{
-                                color: #000000 !important;
-                                font-weight: 900 !important;
-                            }}
-                            </style>
-                        """, unsafe_allow_html=True)
+                    # 覆蓋工序按鈕本身的字體顏色為深綠色
+                    st.markdown(f"""
+                        <style>
+                        div.stButton > button[key="btn_p_{combined_node_key}"] span {{
+                            color: #065f46 !important;
+                            font-weight: 900 !important;
+                        }}
+                        </style>
+                    """, unsafe_allow_html=True)
 
-                # 第四欄：連接線 ➔
+                # 第四欄：連接線
                 with mm_cols[3]:
-                    st.markdown('<div style="text-align:center; color:#34d399; font-weight:900; line-height:45px; font-size:1.2rem;">➔</div>', unsafe_allow_html=True)
+                    st.markdown('<div style="text-align:center; color:#065f46; font-weight:900; line-height:45px; font-size:1.2rem;">➔</div>', unsafe_allow_html=True)
                 
-                # 第五欄：🎯 【右側配置】配置 檔案標籤 + 免阻擋彈出查看鈕 + 刪除彈出盒
+                # 第五欄：檔案與功能按鈕區
                 with mm_cols[4]:
                     if file_count > 0:
                         for file_id, file_info in proc_files_dict.items():
@@ -1964,34 +1967,29 @@ else:
                             
                             with f_sub_cols[0]:
                                 st.markdown(f"""
-                                    <div style="background-color: #065f46; border-left: 4px solid #34d399; border-radius: 4px; padding: 4px 8px; margin-top:2px; height:34px;">
-                                        <span style="color: #ffffff; font-weight: 700; font-size: 0.82rem; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height:26px;">📄 {f_name}</span>
+                                    <div style="background-color: #f0fdf4; border-left: 4px solid #065f46; border-radius: 4px; padding: 4px 8px; margin-top:2px; height:34px;">
+                                        <span style="color: #065f46; font-weight: 800; font-size: 0.82rem; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height:26px;">📄 {f_name}</span>
                                     </div>
                                 """, unsafe_allow_html=True)
                                 
                             with f_sub_cols[1]:
-                                # 💡 調用全新高清晰對比大燈箱
                                 if st.button("👁️ 查看", key=f"view_dlg_{combined_node_key}_{file_id}", use_container_width=True):
                                     show_pdf_dialog_safe(f_name, pdf_b64)
                                 
-                                # 美化查看按鈕外觀
+                                # 查看按鈕字體強制深綠色
                                 st.markdown(f"""
                                     <style>
-                                    div.stButton button[key="view_dlg_{combined_node_key}_{file_id}"] {{
-                                        background-color: #1e40af !important;
-                                        color: white !important;
-                                        font-weight: 800 !important;
-                                        font-size: 0.85rem !important;
-                                        height: 34px !important;
-                                        border: 1px solid #3b82f6 !important;
-                                        line-height: 18px !important;
+                                    div.stButton button[key="view_dlg_{combined_node_key}_{file_id}"] span {{
+                                        color: #065f46 !important;
+                                        font-weight: 900 !important;
                                     }}
                                     </style>
                                 """, unsafe_allow_html=True)
                                 
                             with f_sub_cols[2]:
                                 with st.popover("🗑️ 刪除", use_container_width=True):
-                                    pwd_del = st.text_input("輸入管理密碼：", type="password", key=f"pwd_{combined_node_key}_{file_id}")
+                                    st.markdown('<p style="color:#065f46; font-weight:700; margin:0;">請輸入管理密碼：</p>', unsafe_allow_html=True)
+                                    pwd_del = st.text_input("密碼欄位：", type="password", key=f"pwd_{combined_node_key}_{file_id}", label_visibility="collapsed")
                                     if st.button("❌ 確定抹除", type="primary", key=f"del_{combined_node_key}_{file_id}", use_container_width=True):
                                         if pwd_del == "0000":
                                             requests.delete(f"{SOP_FILE_URL}/{combined_node_key}/{file_id}.json")
@@ -2000,22 +1998,34 @@ else:
                                             st.rerun()
                                         else:
                                             st.error("密碼錯誤")
+                                            
+                                # 彈出刪除按鈕字體更換為深綠色
+                                st.markdown(f"""
+                                    <style>
+                                    div.stPopover button span {{
+                                        color: #065f46 !important;
+                                        font-weight: 800 !important;
+                                    }}
+                                    </style>
+                                """, unsafe_allow_html=True)
                     else:
-                        st.markdown('<div style="color: #94a3b8; font-style: italic; font-weight:700; line-height:45px; font-size:0.9rem;">❌ 尚未配置 SOP</div>', unsafe_allow_html=True)
+                        st.markdown('<div style="color: #065f46; font-style: italic; font-weight:800; line-height:45px; font-size:0.9rem;">❌ 尚未配置 SOP</div>', unsafe_allow_html=True)
 
         st.write("")
         st.divider()
 
 
         # ==========================================
-        # 📤 下方檔案上傳功能區
+        # 📤 下方檔案上傳功能區 (文字轉為深綠色)
         # ==========================================
         if current_active:
-            st.markdown(f"### 📤 上傳新文件至：【{selected_model}】➔ 【{current_active}】")
+            st.markdown(f'<h3 style="color:#065f46; font-weight:800;">📤 上傳新文件至：【{selected_model}】➔ 【{current_active}】</h3>', unsafe_allow_html=True)
             
             target_node_key = f"{model_safe_key}_" + base64.b64encode(current_active.encode('utf-8')).decode('utf-8').replace('=', '')
             
-            uploaded_pdf = st.file_uploader(f"選擇要新增至【{current_active}】的 PDF 作業書", type=["pdf"], key=f"uploader_{target_node_key}")
+            # 使用深綠色標題指引上傳
+            st.markdown(f'<p style="color:#065f46; font-weight:700; margin-bottom:0;">選擇要新增至【{current_active}】的 PDF 作業書：</p>', unsafe_allow_html=True)
+            uploaded_pdf = st.file_uploader("PDF上傳器", type=["pdf"], key=f"uploader_{target_node_key}", label_visibility="collapsed")
             
             if uploaded_pdf is not None:
                 if st.button("🚀 確定上傳並加入右側心智圖列表", use_container_width=True):
@@ -2038,19 +2048,20 @@ else:
 
 
         # ==========================================
-        # ⚙️ 【獨立後台數據設定維護】
+        # ⚙️ 【獨立後台數據設定維護】 (文字轉為深綠色)
         # ==========================================
         st.write("")
         st.divider()
-        st.markdown("### ⚙️ SOP 後台數據清單維護")
+        st.markdown('<h3 style="color:#065f46; font-weight:800;">⚙️ SOP 後台數據清單維護</h3>', unsafe_allow_html=True)
         
         col_set1, col_set2 = st.columns(2)
         
         with col_set1:
             with st.container(border=True):
-                st.markdown("##### 🏭 1. 編輯【機型規格】大主選單")
+                st.markdown('<h5 style="color:#065f46; font-weight:800;">🏭 1. 編輯【機型規格】大主選單</h5>', unsafe_allow_html=True)
                 model_input_str = "，".join(model_list)
-                model_input = st.text_area("機型項目 (以逗號或分行隔開)", value=model_input_str, height=120, key="txt_model_list")
+                st.markdown('<p style="color:#065f46; font-weight:700; margin-bottom:0;">機型項目 (以逗號或分行隔開)：</p>', unsafe_allow_html=True)
+                model_input = st.text_area("機型項目編輯區", value=model_input_str, height=120, key="txt_model_list", label_visibility="collapsed")
                 
                 if st.button("💾 儲存機型大清單", use_container_width=True, key="btn_save_models"):
                     new_models = [m.strip() for m in re.split(r'[，,\n]', model_input) if m.strip()]
@@ -2061,13 +2072,25 @@ else:
 
         with col_set2:
             with st.container(border=True):
-                st.markdown(f"##### 🛠️ 2. 編輯【{selected_model}】的專屬工序")
+                st.markdown(f'<h5 style="color:#065f46; font-weight:800;">🛠️ 2. 編輯【{selected_model}】的專屬工序</h5>', unsafe_allow_html=True)
                 sop_input_str = "，".join(sop_types)
-                sop_input = st.text_area(f"設定該機型專屬工序 (以逗號或分行隔開)", value=sop_input_str, height=120, key=f"txt_sop_list_{model_safe_key}")
+                st.markdown(f'<p style="color:#065f46; font-weight:700; margin-bottom:0;">設定該機型專屬工序 (以逗號或分行隔開)：</p>', unsafe_allow_html=True)
+                sop_input = st.text_area("工序項目編輯區", value=sop_input_str, height=120, key=f"txt_sop_list_{model_safe_key}", label_visibility="collapsed")
                 
-                if st.button(f"💾 儲存【{selected_model}】專用流程", use_container_width=True, key="btn_save_sops_{model_safe_key}"):
+                if st.button(f"💾 儲存【{selected_model}】專用流程", use_container_width=True, key=f"btn_save_sops_{model_safe_key}"):
                     new_sops = [t.strip() for t in re.split(r'[，,\n]', sop_input) if t.strip()]
                     requests.put(f"{SOP_CONFIG_URL}/model_procs/{model_safe_key}.json", data=json.dumps({"sop_types": new_sops}))
                     st.success(f"✅ 【{selected_model}】的專屬工序流程已完成獨立儲存！")
                     time.sleep(0.5)
                     st.rerun()
+
+        # 全局按鈕字體與輸入元件標題強制渲染成深綠色的通用樣式表
+        st.markdown("""
+            <style>
+            div[data-testid="stAppViewContainer"] button span,
+            div[data-testid="stAppViewContainer"] label p {
+                color: #065f46 !important;
+                font-weight: 900 !important;
+            }
+            </style>
+        """, unsafe_allow_html=True)
