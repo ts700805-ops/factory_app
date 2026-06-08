@@ -1790,7 +1790,7 @@ else:
 
 
 # ==========================================
-# 📘 頁面：標準SOP功能 (工序統計總覽版)
+# 📘 頁面：標準SOP功能 (點擊看板直接連動版)
 # ==========================================
     elif st.session_state.menu_selection == "📘 標準SOP功能":
         import base64
@@ -1801,64 +1801,62 @@ else:
         SOP_FILE_URL = f"{DB_BASE_URL}/sop_file_data"     # 儲存各工序對應的 PDF 檔案內容
 
         st.markdown('<h1 style="text-align:center; color:#38bdf8; font-weight:900; font-size:2.5rem;">📘 標準 SOP 線上查閱中心</h1>', unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center; color:#cbd5e1;'>依據工序查詢對應標準作業書，支援線上直接下載與動態管理</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center; color:#cbd5e1;'>點擊下方工序按鈕，直接查閱或管理對應的標準作業書</p>", unsafe_allow_html=True)
         st.divider()
 
         # 1. 讀取與初始化 Firebase 後台工序選單資料
         sop_settings = requests.get(f"{SOP_LIST_URL}.json").json() or {"sop_types": []}
         sop_types = sop_settings.get("sop_types", ["骨架作業", "前置作業", "配電作業"]) # 預設保底選單
 
-        # 2. 預先讀取所有工序的檔案資料，用來計算每個工序有多少檔案
+        # 2. 預先讀取所有工序的檔案資料，用來計算每個工序是否有檔案
         all_file_data = requests.get(f"{SOP_FILE_URL}.json").json() or {}
 
+        # 3. 初始化 session_state 用來紀錄目前點選了哪一個工序
+        if "active_sop_proc" not in st.session_state:
+            st.session_state.active_sop_proc = sop_types[0] if sop_types else ""
+
 
         # ==========================================
-        # 📊 【全新功能】所有工序 SOP 數量統計總覽看板
+        # 📊 【全新互動看板】點擊按鈕直接切換工序
         # ==========================================
-        st.markdown("### 📊 各工序 SOP 配置總覽")
+        st.markdown("### 📊 請點選欲查閱的製造工序")
         
         # 建立動態排版，每 4 個工序排成一列
         for i in range(0, len(sop_types), 4):
             chunk = sop_types[i:i+4]
             cols = st.columns(4)
             for idx, proc_name in enumerate(chunk):
-                # 計算該工序安不安全 key
+                # 計算該工序安全 key
                 proc_key_tmp = base64.b64encode(proc_name.encode('utf-8')).decode('utf-8').replace('=', '')
                 
                 # 檢查這個工序有沒有對應的檔案資料
                 has_file = proc_key_tmp in all_file_data and "file_base64" in all_file_data[proc_key_tmp]
                 doc_count = 1 if has_file else 0
                 
-                # 根據有沒有檔案給予不同的精美顏色卡片
-                card_bg = "#065f46" if doc_count > 0 else "#1e293b" # 有檔案用深綠色，沒檔案用深灰色
-                text_color = "#34d399" if doc_count > 0 else "#94a3b8"
+                # 依據是否為當前選中，以及有無檔案，決定按鈕文字標記
+                btn_label = f"🛠️ {proc_name} ({doc_count}份)"
                 
+                # 讓按鈕本身具有切換功能
                 with cols[idx]:
-                    st.markdown(f"""
-                        <div style="background-color: {card_bg}; border: 1px solid #38bdf8; border-radius: 8px; padding: 12px; text-align: center;">
-                            <span style="color: white; font-weight: 800; font-size: 1rem; display: block; margin-bottom: 5px;">🛠️ {proc_name}</span>
-                            <span style="color: {text_color}; font-weight: 900; font-size: 1.2rem;">📄 已配置：{doc_count} 份</span>
-                        </div>
-                    """, unsafe_allow_html=True)
+                    # 如果是當前選中的工序，用 primary 顏色凸顯
+                    is_current = (st.session_state.active_sop_proc == proc_name)
+                    if st.button(btn_label, key=f"btn_proc_{proc_key_tmp}", use_container_width=True, type="primary" if is_current else "secondary"):
+                        st.session_state.active_sop_proc = proc_name
+                        st.rerun()
+
         st.write("")
         st.divider()
 
 
         # ==========================================
-        # 🔝 【位置 1】選擇查閱工序
+        # 📄 【動態內容區】依據點選的按鈕直接呈現對應 PDF 資訊
         # ==========================================
-        st.markdown("### 🎯 選擇查閱工序")
-        selected_sop_proc = st.selectbox("請選擇當前要查閱或指派的製造工序：", options=sop_types, key="main_sop_selectbox")
-        st.write("")
+        selected_sop_proc = st.session_state.active_sop_proc
 
-
-        # ==========================================
-        # 📄 【位置 2】SOP 文件管理與下載按鈕 (放在中間)
-        # ==========================================
         if not selected_sop_proc:
-            st.warning("⏳ 正在載入工序資料，請稍候...")
+            st.warning("💡 請先於上方建立或選擇一個工序。")
         else:
-            st.markdown(f"### 📑 工序：【{selected_sop_proc}】SOP 文件管理")
+            st.markdown(f"## 🔍 當前檢視：【{selected_sop_proc}】")
             
             # 安全編碼路徑
             safe_proc_key = base64.b64encode(selected_sop_proc.encode('utf-8')).decode('utf-8').replace('=', '')
@@ -1885,11 +1883,10 @@ else:
                         time.sleep(0.8)
                         st.rerun()
 
-            st.divider()
-            st.markdown("### 🔍 SOP 現場即時看板")
+            st.write("")
 
+            # 顯示下載按鈕或未上傳提示
             if existing_file_data and "file_base64" in existing_file_data:
-                # 💡 已經將「💾 登記人：劉志偉...」這行文字完全移除，只保留文件資訊
                 st.info(f"📄 目前文件：**{existing_file_data.get('file_name')}**")
                 
                 try:
@@ -1921,11 +1918,11 @@ else:
                         else:
                             st.error("❌ 密碼錯誤，拒絕刪除！")
             else:
-                st.warning(f"💡 目前【{selected_sop_proc}】尚未上傳任何標準 SOP 說明書。請於上方選擇 PDF 檔案進行指派。")
+                st.warning(f"💡 目前【{selected_sop_proc}】尚未上傳任何標準 SOP 說明書。請於上方選擇 PDF 檔案進行上傳。")
 
 
         # ==========================================
-        # ⚙️ 【位置 3】SOP 下拉選單管理 (移到最下方)
+        # ⚙️ 【位置 3】SOP 下拉選單管理 (最下方)
         # ==========================================
         st.write("")
         st.divider()
