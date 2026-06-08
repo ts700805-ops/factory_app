@@ -430,48 +430,32 @@ if "leader_member_mapping" not in locals():
         "劉志偉": ["劉志偉", "劉定澤", "胡瑄芸", "蕭詩瓊"] # 請務必確保這裡的名稱與資料庫完全一致
     }
 
-# --- 修正後的資料撈取邏輯 ---
-st.markdown("---")
-st.markdown("##### 📋 全員回報清單 (偵錯模式)")
-
-# 取得今日日期
-today_str = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d")
-
-try:
-    # 修改路徑為 'work_logs'，因為截圖中沒有 6s_logs
-    r = requests.get(f"{DB_BASE_URL}/work_logs.json") 
-    r_data = r.json() if r.status_code == 200 else {}
-    
-    if isinstance(r_data, dict):
-        all_logs = []
-        for key, val in r_data.items():
-            if isinstance(val, dict):
-                all_logs.append({
-                    "姓名": val.get("姓名", "無姓名"),
-                    "日期": val.get("日期", "無日期"),
-                    "時間": val.get("時間", "無時間")
-                })
+# --- 整合後的回報清單顯示邏輯 ---
+        st.markdown("---")
+        st.markdown(f"##### 📋 {selected_leader} 組的今日已回報清單 (日期: {today_tw_str})")
         
-        df_all = pd.DataFrame(all_logs)
-        
-        # 顯示資料，讓您確認裡面是否有資料
-        st.write("資料庫 'work_logs' 中的最新 10 筆資料：")
-        st.table(df_all.tail(10))
-        
-        # 篩選今日資料
-        today_logs = df_all[df_all["日期"] == today_str]
-        
-        if not today_logs.empty:
-            st.success(f"在 'work_logs' 中找到 {len(today_logs)} 筆符合今日日期的回報！")
-            st.table(today_logs)
-        else:
-            st.warning("⚠️ 在 'work_logs' 中找不到今日日期資料，請檢查上表日期格式。")
-    else:
-        st.error("資料庫中無資料或格式錯誤。")
-
-except Exception as e:
-    st.error(f"讀取失敗: {e}")
-    
+        try:
+            # 讀取該日期下的所有回報 (使用您原系統寫入的 URL 路徑)
+            res = requests.get(f"{REPORT_LOG_URL}/{today_tw_str}.json").json()
+            
+            if res and isinstance(res, dict):
+                # 過濾出該組成員，並建立表格
+                group_reports = []
+                for name, info in res.items():
+                    # 檢查姓名是否屬於當前選定組長的成員列表
+                    if name in leader_member_mapping.get(selected_leader, []):
+                        group_reports.append({"姓名": name, "回報時間": info.get("reported_at", "")})
+                
+                if group_reports:
+                    df_report = pd.DataFrame(group_reports)
+                    st.table(df_report)
+                    st.success(f"共計 {len(group_reports)} 位成員已完成回報。")
+                else:
+                    st.warning("⚠️ 目前該組今日無人員完成回報。")
+            else:
+                st.warning("⚠️ 今日尚無人員完成回報。")
+        except Exception as e:
+            st.error(f"讀取回報清單失敗: {e}")
   # ==========================================
     # 🎮 6S 戰境養成功能區塊
     # ==========================================
