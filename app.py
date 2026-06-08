@@ -1788,7 +1788,7 @@ else:
 
 
 # ==========================================
-# 📘 頁面：標準SOP功能 (右側雙按鈕 + 內嵌全螢幕彈窗免下載版)
+# 📘 頁面：標準SOP功能 (優化內嵌大燈箱不被封鎖版)
 # ==========================================
     elif st.session_state.menu_selection == "📘 標準SOP功能":
         import base64
@@ -1830,30 +1830,39 @@ else:
 
         # 初始化選中工序
         if "active_sop_proc" not in st.session_state:
-            st.session_state.active_sop_proc = map_types[0] if sop_types else ""
+            st.session_state.active_sop_proc = sop_types[0] if sop_types else ""
         if st.session_state.active_sop_proc not in sop_types and sop_types:
             st.session_state.active_sop_proc = sop_types[0]
 
         current_active = st.session_state.active_sop_proc
 
 
-        # 💡【核心創新技術】：定義點擊「👁️ 查看」時要彈出的全螢幕大燈箱視窗
+        # 💡【核心修正處】：提升彈出視窗對 PDF 瀏覽器的完美相容性
         @st.dialog("📄 標準 SOP 線上查閱視窗", width="large")
         def show_pdf_dialog(file_name, base64_data):
-            st.markdown(f"#### 🛠️ 目前正在瀏覽：`{file_name}`")
+            st.markdown(f"#### 🛠️ 目前正在線上檢視：`{file_name}`")
+            
+            # 使用相容性最高的 iframe 加上全權限宣告
+            pdf_link = f"data:application/pdf;base64,{base64_data}"
+            
+            # 如果部分老舊電腦 iframe 轉不出來，在下方永遠提供一個「安全直開分頁連結」當作雙重防護
+            st.markdown(f"""
+                <div style="background-color: #eff6ff; padding: 12px; border-radius: 6px; margin-bottom: 10px; border-left: 5px solid #3b82f6;">
+                    💡 <b>小提示：</b>若下方無法正常顯示，請點擊右側連結直接開啟 ➔ 
+                    <a href="{pdf_link}" target="_blank" style="color: #1d4ed8; font-weight: 800; text-decoration: underline;">【🔗 使用全新安全分頁打開此文件】</a>
+                </div>
+            """, unsafe_allow_html=True)
+            
             try:
-                # 使用 object 標籤嵌入，並加上完全控制參數，讓瀏覽器內建的 PDF 閱讀器霸氣登場
+                # 換用內嵌式 iframe 技術，高度調大方便閱讀
                 pdf_html = f"""
-                    <object data="data:application/pdf;base64,{base64_data}" type="application/pdf" width="100%" height="750px">
-                        <div style="padding:20px; text-align:center; background:#fee2e2; border-radius:8px;">
-                            ⚠️ 您的瀏覽器不支援直接預覽，請更換瀏覽器或聯絡管理員。
-                        </div>
-                    </object>
+                    <iframe src="{pdf_link}" width="100%" height="700px" style="border: none; border-radius: 8px;"></iframe>
                 """
                 st.markdown(pdf_html, unsafe_allow_html=True)
             except Exception as e:
                 st.error(f"預覽渲染失敗: {e}")
             
+            st.write("")
             if st.button("❌ 關閉視窗", use_container_width=True):
                 st.rerun()
 
@@ -1924,7 +1933,7 @@ else:
                 with mm_cols[3]:
                     st.markdown('<div style="text-align:center; color:#34d399; font-weight:900; line-height:45px; font-size:1.2rem;">➔</div>', unsafe_allow_html=True)
                 
-                # 第五欄：🎯 【右側圈選處】配置 檔案標籤 + 免下載彈出查看鈕 + 刪除彈出盒
+                # 第五欄：🎯 【右側配置】
                 with mm_cols[4]:
                     if file_count > 0:
                         for file_id, file_info in proc_files_dict.items():
@@ -1941,11 +1950,9 @@ else:
                                 """, unsafe_allow_html=True)
                                 
                             with f_sub_cols[1]:
-                                # 💡 改用 Streamlit 原生 Button 綁定 燈箱函式，點擊後「免下載」直接滿版跳出來！
                                 if st.button("👁️ 查看", key=f"view_dlg_{combined_node_key}_{file_id}", use_container_width=True):
                                     show_pdf_dialog(f_name, pdf_b64)
                                 
-                                # 美化查看按鈕外觀
                                 st.markdown(f"""
                                     <style>
                                     div.stButton button[key="view_dlg_{combined_node_key}_{file_id}"] {{
