@@ -535,12 +535,24 @@ else:
             GAME_CONFIG_URL = "https://your-firebase-url/game_config"
             BASE_URL = "https://your-firebase-url"
 
+
+        # 讀取遊戲稱號配置檔
+        cfg_data = requests.get(f"{GAME_CONFIG_URL}.json").json() or {}
+        t_list = cfg_data.get("titles", ["🌾 平民", "⚔️ 驍勇新兵", "🛡️ 堅毅騎士", "🦅 戰境領主", "👑 傳奇戰神"])
+
+        def get_auto_title(tot_p):
+            if tot_p >= 100: return t_list[4] if len(t_list) > 4 else t_list[-1]
+            elif tot_p >= 60: return t_list[3] if len(t_list) > 3 else t_list[-1]
+            elif tot_p >= 30: return t_list[2] if len(t_list) > 2 else t_list[-1]
+            elif tot_p >= 10: return t_list[1] if len(t_list) > 1 else t_list[-1]
+            else: return t_list[0]
+
         # 1. 取得當前登入者 (配合回報中心傳遞的 user)
         current_user = str(st.session_state.get("user", "未登入同仁")).strip()
         
         # 2. 讀取目前玩家的 RPG 資料庫
         all_players_data = requests.get(f"{GAME_DB_URL}.json").json() or {}
-        user_stats = all_players_data.get(current_user, {"str": 0, "vit": 0, "agi": 0, "cha": 0, "avail_pts": 0, "level_name": "🌾 平民"})
+        user_stats = all_players_data.get(current_user, {"str": 0, "vit": 0, "agi": 0, "cha": 0, "avail_pts": 0, "level_name": t_list[0]})
 
         # 防呆確保數值是數字
         u_str = int(user_stats.get("str", 0))
@@ -548,9 +560,19 @@ else:
         u_agi = int(user_stats.get("agi", 0))
         u_cha = int(user_stats.get("cha", 0))
         u_pts = int(user_stats.get("avail_pts", 0))
-        u_title = user_stats.get("level_name", "🌾 平民")
+        
+        # 總獲得點數 = 已分配屬性點 + 未分配自由點數
+        u_total_pts = u_str + u_vit + u_agi + u_cha + u_pts
+        u_title = get_auto_title(u_total_pts)
+        
+        # 若雲端記錄的稱號與自動計算的不同，自動更新
+        if user_stats.get("level_name") != u_title:
+            user_stats["level_name"] = u_title
+            all_players_data[current_user] = user_stats
+            requests.patch(f"{GAME_DB_URL}/{current_user}.json", data=json.dumps({"level_name": u_title}))
 
-        st.markdown(f"### 🥷 我的個人戰力面板：【{u_title}】 — 身份：【{current_user}】")
+        st.markdown(f"### 🥷 我的個人戰力面板：【{u_title}】 — 身份：【{current_user}】 (總點數：{u_total_pts} 點 | 已分配: {u_str+u_vit+u_agi+u_cha} | 未分配: {u_pts})")
+
 
         # 3. 渲染屬性點數配點面板
         col_str, col_vit, col_agi, col_cha, col_pool = st.columns([2, 2, 2, 2, 3])
@@ -716,15 +738,12 @@ else:
         st.write("")
         st.write("")
         
+        
         # ==========================================
         # 👑 稱號查詢與升級門檻對照區
         # ==========================================
         st.markdown("---")
         st.markdown("### 👑 稱號查詢與升級門檻對照區")
-        
-        # 讀取最新稱號配置
-        cfg_data = requests.get(f"{GAME_CONFIG_URL}.json").json() or {}
-        t_list = cfg_data.get("titles", ["🌾 平民", "⚔️ 驍勇新兵", "🛡️ 堅毅騎士", "🦅 戰境領主", "👑 傳奇戰神"])
         
         tc1, tc2 = st.columns(2)
         with tc1:
@@ -744,9 +763,14 @@ else:
                 selected_q_name = st.selectbox("選擇要查詢的同仁姓名：", query_names, key="query_player_title_sel")
                 if selected_q_name:
                     p_info = all_players_data[selected_q_name]
-                    p_tot = int(p_info.get("str", 0)) + int(p_info.get("vit", 0)) + int(p_info.get("agi", 0)) + int(p_info.get("cha", 0))
-                    p_lvl = p_info.get("level_name", t_list[0])
-                    st.info(f"👤 **{selected_q_name}** | 當前稱號：**{p_lvl}** | 總屬性點：**{p_tot} 點**")
+                    p_str = int(p_info.get("str", 0))
+                    p_vit = int(p_info.get("vit", 0))
+                    p_agi = int(p_info.get("agi", 0))
+                    p_cha = int(p_info.get("cha", 0))
+                    p_pts = int(p_info.get("avail_pts", 0))
+                    p_tot = p_str + p_vit + p_agi + p_cha + p_pts  # 總點數 = 已分配 + 未分配
+                    p_lvl = get_auto_title(p_tot)                 # 自動判定正確稱號
+                    st.info(f"👤 **{selected_q_name}** | 當前稱號：**{p_lvl}** | 總點數：**{p_tot} 點** (已分配: {p_str+p_vit+p_agi+p_cha} | 未分配: {p_pts})")
             else:
                 st.info("💡 目前尚無人員屬性戰力資料。")
 
