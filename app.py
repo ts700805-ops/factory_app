@@ -434,19 +434,25 @@ else:
                     except Exception as e:
                         st.error(f"❌ 錯誤：{e}")
 
-                # --- 整合後的回報與未回報清單顯示邏輯 ---
+                        # --- 整合後的回報與未回報清單顯示邏輯（支援挑選日期查詢） ---
         st.markdown("---")
-        st.markdown(f"##### 📋 各組今日 6S 回報狀況與未回報人員查詢 (日期: {today_tw_str})")
+        st.markdown("##### 📋 各組 6S 回報狀況與未回報人員歷史查詢")
         
-        view_mode_col1, view_mode_col2 = st.columns([2, 1])
-        with view_mode_col1:
+        q_col1, q_col2 = st.columns([1, 1])
+        with q_col1:
+            # 預設為今日台北時間
+            query_date = st.date_input("📅 選擇要查詢的日期：", value=datetime.now(tz_taiwan).date(), key="query_report_date_input")
+            query_date_str = query_date.strftime("%Y-%m-%d")
+        
+        with q_col2:
             all_view_leaders = ["🌐 全部組別總覽"] + leader_list
             view_selected_group = st.selectbox("👁️ 選擇要檢視回報狀況的組別：", all_view_leaders, key="view_report_group_select")
         
+        st.info(f"📅 目前查詢基準日：**{query_date_str}**")
+        
         try:
-            res = requests.get(f"{REPORT_LOG_URL}/{today_tw_str}.json").json() or {}
+            res = requests.get(f"{REPORT_LOG_URL}/{query_date_str}.json").json() or {}
             
-            # 決定目標組別與所有成員
             target_leaders = leader_list if view_selected_group == "🌐 全部組別總覽" else [view_selected_group]
             
             reported_names = set()
@@ -459,7 +465,6 @@ else:
             for l_name in target_leaders:
                 members = leader_member_mapping.get(l_name, [])
                 for m in members:
-                    # 檢查是否已回報
                     if m in reported_names:
                         info = res.get(m, {})
                         group_reports.append({
@@ -476,22 +481,22 @@ else:
                         })
             
             # 顯示已回報清單
-            st.markdown(f"###### ✅ 今日已回報人員清單 (共 {len(group_reports)} 人)")
+            st.markdown(f"###### ✅ {query_date_str} 已回報人員清單 (共 {len(group_reports)} 人)")
             if group_reports:
                 df_report = pd.DataFrame(group_reports)
                 st.dataframe(df_report, use_container_width=True)
             else:
-                st.info("ℹ️ 目前無人員完成回報。")
+                st.info(f"ℹ️ {query_date_str} 當日無人員完成回報。")
             
             st.markdown("")
             
             # 顯示未回報人員清單
-            st.markdown(f"###### ❌ 今日未回報人員清單 (共 {len(unreported_members)} 人)")
+            st.markdown(f"###### ❌ {query_date_str} 未回報人員清單 (共 {len(unreported_members)} 人)")
             if unreported_members:
                 df_unreported = pd.DataFrame(unreported_members)
                 st.dataframe(df_unreported, use_container_width=True)
             else:
-                st.success("🎉 太棒了！選擇的組別全員皆已完成回報！")
+                st.success(f"🎉 太棒了！{query_date_str} 選擇的組別全員皆已完成回報！")
                 
         except Exception as e:
             st.error(f"讀取回報清單失敗: {e}")
