@@ -9,12 +9,12 @@ import time
 # --- Master UI Style Override ---
 st.markdown("""
 <style>
-    /* 全網頁背景改為更深一點的灰色 (同時確保黑色粗體字清晰可讀) */
+    /* 全網頁背景改為比灰白色再深一點的灰色 */
     .stApp { 
-        background-color: #cfd8dc !important; 
+        background-color: #e5e7eb !important; /* 質感淺灰色 */
     }
     .stSidebar, [data-testid="stSidebarUserContent"] {
-        background-color: #b0bec5 !important;
+        background-color: #d1d5db !important; /* 側邊欄更深一階的灰色 */
     }
     
     /* 統一所有標題與文字顏色為黑色、粗體 */
@@ -56,13 +56,13 @@ st.markdown("""
     div[data-testid="stTabs"] button[aria-selected="true"] p {
         color: #1e40af !important;
     }
-    div[data-selected="true"] {
+    div[data-testid="stTabs"] button[aria-selected="true"] {
         border-bottom: 3px solid #1e40af !important;
     }
     
-    /* 卡片與特殊區塊的底色改為明亮灰白以建立層次感，邊框改為黑色 */
+    /* 卡片與特殊區塊的底色改為純白以對比灰色背景，邊框改為黑色 */
     .order-card, .proc-row-container, div[style*="border-left"] {
-        background-color: #eceff1 !important;
+        background-color: #ffffff !important;
         border-color: #000000 !important;
     }
 </style>
