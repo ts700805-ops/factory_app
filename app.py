@@ -11,10 +11,10 @@ st.markdown("""
 <style>
     /* 全網頁背景改為比灰白色再深一點的灰色 */
     .stApp { 
-        background-color: #e5e7eb !important; /* 質感淺灰色 */
+        background-color: #e5e7eb !important; 
     }
     .stSidebar, [data-testid="stSidebarUserContent"] {
-        background-color: #d1d5db !important; /* 側邊欄更深一階的灰色 */
+        background-color: #d1d5db !important; 
     }
     
     /* 統一所有標題與文字顏色為黑色、粗體 */
@@ -23,7 +23,7 @@ st.markdown("""
         font-weight: 900 !important;
     }
     
-    /* 統一標題字體大小 (保持不變) */
+    /* 統一標題字體大小 */
     h1 { font-size: 2.8rem !important; text-align: center !important; }
     h2 { font-size: 2.2rem !important; }
     h3 { font-size: 1.8rem !important; }
@@ -31,14 +31,14 @@ st.markdown("""
     h5 { font-size: 1.3rem !important; }
     p, label p, div[data-testid="stMarkdownContainer"] p, span { font-size: 1.25rem !important; }
     
-    /* 統一所有按鈕為填滿藍色 + 白色粗體文字 (保持不變) */
+    /* 統一所有按鈕為填滿亮綠色 + 黑色外框 + 白色粗體文字 */
     button, div[data-testid="stAppViewContainer"] button, div[data-testid="stSidebarUserContent"] button, .stButton>button {
-        background-color: #1e40af !important;
-        border: 2px solid #3b82f6 !important;
+        background-color: #10b981 !important; /* 亮綠色填滿 */
+        border: 2px solid #000000 !important; /* 黑色外框 */
         border-radius: 8px !important;
     }
     
-    /* 按鈕內的文字必須是白色 */
+    /* 按鈕內的文字必須是白色放大粗體 */
     button p, button span, div[data-testid="stAppViewContainer"] button span, .stButton>button span {
         color: #ffffff !important;
         font-weight: 900 !important;
@@ -54,10 +54,10 @@ st.markdown("""
         color: #000000 !important;
     }
     div[data-testid="stTabs"] button[aria-selected="true"] p {
-        color: #1e40af !important;
+        color: #10b981 !important;
     }
     div[data-testid="stTabs"] button[aria-selected="true"] {
-        border-bottom: 3px solid #1e40af !important;
+        border-bottom: 3px solid #10b981 !important;
     }
     
     /* 卡片與特殊區塊的底色改為純白以對比灰色背景，邊框改為黑色 */
