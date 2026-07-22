@@ -9,12 +9,12 @@ import time
 # --- Master UI Style Override ---
 st.markdown("""
 <style>
-    /* 全網頁背景改為比灰白色再深一點的灰色 */
+    /* 全網頁背景改為圖片抓取之顏色: #00cdff */
     .stApp { 
-        background-color: #e5e7eb !important; 
+        background-color: #00cdff !important; 
     }
     .stSidebar, [data-testid="stSidebarUserContent"] {
-        background-color: #d1d5db !important; 
+        background-color: #e5e5e5 !important; 
     }
     
     /* 統一所有標題與文字顏色為黑色、粗體 */
@@ -23,13 +23,13 @@ st.markdown("""
         font-weight: 900 !important;
     }
     
-    /* 統一標題字體大小 */
-    h1 { font-size: 2.8rem !important; text-align: center !important; }
-    h2 { font-size: 2.2rem !important; }
-    h3 { font-size: 1.8rem !important; }
-    h4 { font-size: 1.5rem !important; }
-    h5 { font-size: 1.3rem !important; }
-    p, label p, div[data-testid="stMarkdownContainer"] p, span { font-size: 1.25rem !important; }
+    /* 字體大小全面再放大 1.2 倍 */
+    h1 { font-size: 3.36rem !important; text-align: center !important; }
+    h2 { font-size: 2.64rem !important; }
+    h3 { font-size: 2.16rem !important; }
+    h4 { font-size: 1.8rem !important; }
+    h5 { font-size: 1.56rem !important; }
+    p, label p, div[data-testid="stMarkdownContainer"] p, span { font-size: 1.5rem !important; }
     
     /* 統一所有按鈕為填滿亮綠色 + 黑色外框 + 白色粗體文字 */
     button, div[data-testid="stAppViewContainer"] button, div[data-testid="stSidebarUserContent"] button, .stButton>button {
@@ -42,7 +42,7 @@ st.markdown("""
     button p, button span, div[data-testid="stAppViewContainer"] button span, .stButton>button span {
         color: #ffffff !important;
         font-weight: 900 !important;
-        font-size: 1.25rem !important;
+        font-size: 1.5rem !important;
     }
     
     /* 針對分頁 Tab 的特殊處理 */
@@ -52,6 +52,7 @@ st.markdown("""
     }
     div[data-testid="stTabs"] button p {
         color: #000000 !important;
+        font-size: 1.5rem !important;
     }
     div[data-testid="stTabs"] button[aria-selected="true"] p {
         color: #10b981 !important;
@@ -60,7 +61,7 @@ st.markdown("""
         border-bottom: 3px solid #10b981 !important;
     }
     
-    /* 卡片與特殊區塊的底色改為純白以對比灰色背景，邊框改為黑色 */
+    /* 卡片與特殊區塊的底色改為純白以對比背景，邊框改為黑色 */
     .order-card, .proc-row-container, div[style*="border-left"] {
         background-color: #ffffff !important;
         border-color: #000000 !important;
