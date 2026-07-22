@@ -107,7 +107,23 @@ st.markdown("""
         font-size: 1.45rem !important;
         font-weight: 900 !important;
     }
+
+    /* 修正固資&手工具紀錄表中 expander 人員標題看不清楚的問題 */
+    div[data-testid="stExpander"] details summary p, 
+    div[data-testid="stExpander"] details summary span,
+    div[data-testid="stExpander"] details summary {
+        color: #00ffff !important;
+        font-size: 1.6rem !important;
+        font-weight: 900 !important;
+    }
+    div[data-testid="stExpander"] details {
+        background-color: #0c1b33 !important;
+        border: 2px solid #00ffff !important;
+        border-radius: 10px !important;
+        margin-bottom: 12px !important;
+    }
 </style>
+
 
 
 """, unsafe_allow_html=True)
