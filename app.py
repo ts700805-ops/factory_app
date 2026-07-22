@@ -715,6 +715,42 @@ else:
         # ==========================================
         st.write("")
         st.write("")
+        
+        # ==========================================
+        # 👑 稱號查詢與升級門檻對照區
+        # ==========================================
+        st.markdown("---")
+        st.markdown("### 👑 稱號查詢與升級門檻對照區")
+        
+        # 讀取最新稱號配置
+        cfg_data = requests.get(f"{GAME_CONFIG_URL}.json").json() or {}
+        t_list = cfg_data.get("titles", ["🌾 平民", "⚔️ 驍勇新兵", "🛡️ 堅毅騎士", "🦅 戰境領主", "👑 傳奇戰神"])
+        
+        tc1, tc2 = st.columns(2)
+        with tc1:
+            st.markdown("##### 📌 升級門檻與稱號對照表")
+            st.markdown(f"""
+            - **{t_list[0]}**：總點數 0 ~ 9 點 (初始階級)
+            - **{t_list[1]}**：總點數達 **10 點** 以上
+            - **{t_list[2]}**：總點數達 **30 點** 以上
+            - **{t_list[3]}**：總點數達 **60 點** 以上
+            - **{t_list[4]}**：總點數達 **100 點** 以上 (頂峰稱號)
+            """)
+        
+        with tc2:
+            st.markdown("##### 🔍 全廠同仁稱號與點數查詢")
+            if all_players_data:
+                query_names = sorted(list(all_players_data.keys()))
+                selected_q_name = st.selectbox("選擇要查詢的同仁姓名：", query_names, key="query_player_title_sel")
+                if selected_q_name:
+                    p_info = all_players_data[selected_q_name]
+                    p_tot = int(p_info.get("str", 0)) + int(p_info.get("vit", 0)) + int(p_info.get("agi", 0)) + int(p_info.get("cha", 0))
+                    p_lvl = p_info.get("level_name", t_list[0])
+                    st.info(f"👤 **{selected_q_name}** | 當前稱號：**{p_lvl}** | 總屬性點：**{p_tot} 點**")
+            else:
+                st.info("💡 目前尚無人員屬性戰力資料。")
+
+
         with st.expander("⚙️ 6S 戰境養成管理後台"):
             st.markdown("##### 👑 稱號與升級門檻點數自訂")
             
