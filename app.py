@@ -9,21 +9,21 @@ import time
 # --- Master UI Style Override ---
 st.markdown("""
 <style>
-    /* 全網頁背景深色 */
+    /* 全網頁背景改為灰白色 */
     .stApp { 
-        background-color: #0e1117 !important; 
+        background-color: #f8f9fa !important; 
     }
     .stSidebar, [data-testid="stSidebarUserContent"] {
-        background-color: #262730 !important;
+        background-color: #f1f3f5 !important;
     }
     
-    /* 統一所有標題與文字顏色為橙色、粗體 */
+    /* 統一所有標題與文字顏色為黑色、粗體 */
     h1, h2, h3, h4, h5, h6, p, label, .stWidgetLabel, span, div[data-testid="stMarkdownContainer"] p, div[data-testid="stExpander"] details summary p {
-        color: #ea580c !important;
+        color: #000000 !important;
         font-weight: 900 !important;
     }
     
-    /* 統一標題字體大小 */
+    /* 統一標題字體大小 (保持不變) */
     h1 { font-size: 2.8rem !important; text-align: center !important; }
     h2 { font-size: 2.2rem !important; }
     h3 { font-size: 1.8rem !important; }
@@ -31,14 +31,14 @@ st.markdown("""
     h5 { font-size: 1.3rem !important; }
     p, label p, div[data-testid="stMarkdownContainer"] p, span { font-size: 1.25rem !important; }
     
-    /* 統一所有按鈕為填滿藍色 + 白色粗體文字 */
+    /* 統一所有按鈕為填滿藍色 + 白色粗體文字 (保持不變) */
     button, div[data-testid="stAppViewContainer"] button, div[data-testid="stSidebarUserContent"] button, .stButton>button {
         background-color: #1e40af !important;
         border: 2px solid #3b82f6 !important;
         border-radius: 8px !important;
     }
     
-    /* 按鈕內的文字必須是白色 (覆蓋前面的橙色設定) */
+    /* 按鈕內的文字必須是白色 */
     button p, button span, div[data-testid="stAppViewContainer"] button span, .stButton>button span {
         color: #ffffff !important;
         font-weight: 900 !important;
@@ -51,19 +51,19 @@ st.markdown("""
         border: none !important;
     }
     div[data-testid="stTabs"] button p {
-        color: #ea580c !important;
+        color: #000000 !important;
     }
     div[data-testid="stTabs"] button[aria-selected="true"] p {
-        color: #ffffff !important;
+        color: #1e40af !important;
     }
     div[data-testid="stTabs"] button[aria-selected="true"] {
-        border-bottom: 3px solid #ea580c !important;
+        border-bottom: 3px solid #1e40af !important;
     }
     
-    /* 卡片與特殊區塊的底色 */
+    /* 卡片與特殊區塊的底色改為純白，邊框改為黑色 */
     .order-card, .proc-row-container, div[style*="border-left"] {
-        background-color: #fff7ed !important;
-        border-color: #ea580c !important;
+        background-color: #ffffff !important;
+        border-color: #000000 !important;
     }
 </style>
 """, unsafe_allow_html=True)
