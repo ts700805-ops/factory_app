@@ -72,7 +72,18 @@ st.markdown("""
         background-color: #0c1b33 !important;
         border-color: #3b82f6 !important;
     }
+
+    /* 固資&手工具紀錄表的編輯與刪除按鈕改為綠色填滿 */
+    div[data-testid="stHorizontalBlock"] button {
+        background-color: #10b981 !important;
+        border: 2px solid #059669 !important;
+    }
+    div[data-testid="stHorizontalBlock"] button p, div[data-testid="stHorizontalBlock"] button span {
+        color: #ffffff !important;
+        font-weight: 900 !important;
+    }
 </style>
+
 """, unsafe_allow_html=True)
 
 
@@ -142,7 +153,7 @@ if "user" not in st.session_state:
                 st.rerun()
 else:
     # 側邊欄導航 (新增手工具相關選項)
-    st.sidebar.markdown(f"### 👤 當前人員：**{st.session_state.user}**")
+    st.sidebar.markdown(f'<p style="font-size: 1.15rem !important; font-weight: 900; color: #e1ebf8; margin-bottom: 5px;">👤 當前人員：<b>{{st.session_state.user}}</b></p>', unsafe_allow_html=True)
     nav = st.sidebar.radio("功能導航", [
    
     "🧾組長待辦事項",
@@ -1133,7 +1144,7 @@ else:
                                 with col1:
                                     # 卡片內部的手工具名稱、數量、與登記資訊
                                     st.markdown(f'<div class="t-title">🛠️ {row["手工具名稱"]} <span class="t-qty">x {row["數量"]}</span></div>', unsafe_allow_html=True)
-                                    st.markdown(f'<div class="t-meta">登記人: {row.get("登記人","-")} | 時間: {row["登記時間"]}</div>', unsafe_allow_html=True)
+                                    st.markdown(f'<div class="t-meta" style="font-size: 1.35rem !important; color: #fde047 !important; font-weight: 900;">登記人: {row.get("登記人","-")} | 時間: {row["登記時間"]}</div>', unsafe_allow_html=True)
                                 with col2:
                                     sc1, sc2 = st.columns(2)
                                     if sc1.button("✏️", key=f"e_{db_id}"): edit_record_dialog(db_id, row['手工具名稱'], row['數量'], person)
