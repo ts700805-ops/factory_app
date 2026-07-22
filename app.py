@@ -9,17 +9,17 @@ import time
 # --- Master UI Style Override ---
 st.markdown("""
 <style>
-    /* 全網頁背景改為綠色系 */
+    /* 全網頁背景改為再淡一點的舒適綠色 */
     .stApp { 
-        background-color: #064e3b !important; /* 舒適深綠色背景 */
+        background-color: #e8f5e9 !important; /* 非常舒適清爽的淡綠色背景 */
     }
     .stSidebar, [data-testid="stSidebarUserContent"] {
-        background-color: #022c22 !important; /* 側邊欄更深一階的綠色 */
+        background-color: #c8e6c9 !important; /* 側邊欄柔和淺綠色 */
     }
     
-    /* 統一所有標題與文字顏色為黑色、粗體 */
+    /* 統一所有標題與文字顏色為您指定的灰色 (#374151)、粗體 */
     h1, h2, h3, h4, h5, h6, p, label, .stWidgetLabel, span, div[data-testid="stMarkdownContainer"] p, div[data-testid="stExpander"] details summary p {
-        color: #000000 !important;
+        color: #374151 !important;
         font-weight: 900 !important;
     }
     
@@ -45,13 +45,13 @@ st.markdown("""
         font-size: 1.5rem !important;
     }
     
-    /* 針對分頁 Tab 的特殊處理 */
+    /* 針對分頁 Tab 的處理 */
     div[data-testid="stTabs"] button {
         background-color: transparent !important;
         border: none !important;
     }
     div[data-testid="stTabs"] button p {
-        color: #000000 !important;
+        color: #374151 !important;
         font-size: 1.5rem !important;
     }
     div[data-testid="stTabs"] button[aria-selected="true"] p {
@@ -61,13 +61,13 @@ st.markdown("""
         border-bottom: 3px solid #1e40af !important;
     }
     
-    /* 卡片與特殊區塊的底色改為純白以對比綠色背景，邊框改為黑色 */
+    /* 卡片與特殊區塊的底色改為純白以對比淡綠背景，邊框改為黑色 */
     .order-card, .proc-row-container, div[style*="border-left"] {
         background-color: #ffffff !important;
         border-color: #000000 !important;
     }
 </style>
-""", unsafe_allow_html=True)
+""`, unsafe_allow_html=True)
 
 
 # --- 1. 資料庫路徑設定 ---
