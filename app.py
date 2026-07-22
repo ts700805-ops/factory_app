@@ -434,9 +434,9 @@ else:
                     except Exception as e:
                         st.error(f"❌ 錯誤：{e}")
 
-        # --- 整合後的回報清單顯示邏輯（支援檢視任意組別或全部組別） ---
+                # --- 整合後的回報與未回報清單顯示邏輯 ---
         st.markdown("---")
-        st.markdown(f"##### 📋 各組今日 6S 回報狀況查詢 (日期: {today_tw_str})")
+        st.markdown(f"##### 📋 各組今日 6S 回報狀況與未回報人員查詢 (日期: {today_tw_str})")
         
         view_mode_col1, view_mode_col2 = st.columns([2, 1])
         with view_mode_col1:
@@ -444,33 +444,55 @@ else:
             view_selected_group = st.selectbox("👁️ 選擇要檢視回報狀況的組別：", all_view_leaders, key="view_report_group_select")
         
         try:
-            res = requests.get(f"{REPORT_LOG_URL}/{today_tw_str}.json").json()
+            res = requests.get(f"{REPORT_LOG_URL}/{today_tw_str}.json").json() or {}
             
+            # 決定目標組別與所有成員
+            target_leaders = leader_list if view_selected_group == "🌐 全部組別總覽" else [view_selected_group]
+            
+            reported_names = set()
             if res and isinstance(res, dict):
-                group_reports = []
-                target_leaders = leader_list if view_selected_group == "🌐 全部組別總覽" else [view_selected_group]
-                
-                target_members = []
-                for l_name in target_leaders:
-                    target_members.extend(leader_member_mapping.get(l_name, []))
-                
-                for name, info in res.items():
-                    if name in target_members:
-                        member_leader = "未知組別"
-                        for l_n, m_l in leader_member_mapping.items():
-                            if name in m_l:
-                                member_leader = l_n
-                                break
-                        group_reports.append({"組別": member_leader, "姓名": name, "回報時間": info.get("reported_at", ""), "狀態": info.get("status", "已完成")})
-                
-                if group_reports:
-                    df_report = pd.DataFrame(group_reports)
-                    st.dataframe(df_report, use_container_width=True)
-                    st.success(f"共計 {len(group_reports)} 位成員已完成回報。")
-                else:
-                    st.warning(f"⚠️ 目前【{view_selected_group}】今日無人員完成回報。")
+                reported_names = set(res.keys())
+            
+            group_reports = []
+            unreported_members = []
+            
+            for l_name in target_leaders:
+                members = leader_member_mapping.get(l_name, [])
+                for m in members:
+                    # 檢查是否已回報
+                    if m in reported_names:
+                        info = res.get(m, {})
+                        group_reports.append({
+                            "組別": l_name, 
+                            "姓名": m, 
+                            "回報時間": info.get("reported_at", ""), 
+                            "狀態": "✅ 已完成"
+                        })
+                    else:
+                        unreported_members.append({
+                            "組別": l_name, 
+                            "姓名": m, 
+                            "狀態": "❌ 尚未回報"
+                        })
+            
+            # 顯示已回報清單
+            st.markdown(f"###### ✅ 今日已回報人員清單 (共 {len(group_reports)} 人)")
+            if group_reports:
+                df_report = pd.DataFrame(group_reports)
+                st.dataframe(df_report, use_container_width=True)
             else:
-                st.warning("⚠️ 今日尚無任何人員完成回報。")
+                st.info("ℹ️ 目前無人員完成回報。")
+            
+            st.markdown("")
+            
+            # 顯示未回報人員清單
+            st.markdown(f"###### ❌ 今日未回報人員清單 (共 {len(unreported_members)} 人)")
+            if unreported_members:
+                df_unreported = pd.DataFrame(unreported_members)
+                st.dataframe(df_unreported, use_container_width=True)
+            else:
+                st.success("🎉 太棒了！選擇的組別全員皆已完成回報！")
+                
         except Exception as e:
             st.error(f"讀取回報清單失敗: {e}")
 
