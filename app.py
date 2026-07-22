@@ -9,17 +9,23 @@ import time
 # --- Master UI Style Override ---
 st.markdown("""
 <style>
-    /* 全網頁背景改為圖片抓取之黃綠底色 */
+    /* 1. 調整左側導航欄寬度，將其加大避免字體擠在一起 */
+    [data-testid="stSidebar"] {
+        min-width: 380px !important;
+        max-width: 450px !important;
+    }
+
+    /* 全網頁背景改為圖片抓取之深夜藍底色 */
     .stApp { 
-        background-color: #e7f600 !important; 
+        background-color: #091527 !important; 
     }
     .stSidebar, [data-testid="stSidebarUserContent"] {
-        background-color: #d6e400 !important; /* 側邊欄稍微深一階的同色系 */
+        background-color: #0c1b33 !important; /* 側邊欄稍微淺一階的深色 */
     }
     
-    /* 統一所有標題與文字顏色為黑色、粗體 */
+    /* 統一所有標題與文字顏色為冰藍白色 (從圖片抓取的字體顏色)、粗體 */
     h1, h2, h3, h4, h5, h6, p, label, .stWidgetLabel, span, div[data-testid="stMarkdownContainer"] p, div[data-testid="stExpander"] details summary p {
-        color: #000000 !important;
+        color: #e1ebf8 !important;
         font-weight: 900 !important;
     }
     
@@ -31,10 +37,10 @@ st.markdown("""
     h5 { font-size: 1.56rem !important; }
     p, label p, div[data-testid="stMarkdownContainer"] p, span { font-size: 1.5rem !important; }
     
-    /* 統一所有按鈕為填滿藍色 + 黑色外框 + 白色粗體文字 */
+    /* 統一所有按鈕為填滿藍色 + 淺色外框 + 白色粗體文字 */
     button, div[data-testid="stAppViewContainer"] button, div[data-testid="stSidebarUserContent"] button, .stButton>button {
         background-color: #1e40af !important; /* 藍色填滿 */
-        border: 2px solid #000000 !important; /* 黑色外框 */
+        border: 2px solid #3b82f6 !important; /* 淺藍外框 */
         border-radius: 8px !important;
     }
     
@@ -51,20 +57,20 @@ st.markdown("""
         border: none !important;
     }
     div[data-testid="stTabs"] button p {
-        color: #000000 !important;
+        color: #e1ebf8 !important;
         font-size: 1.5rem !important;
     }
     div[data-testid="stTabs"] button[aria-selected="true"] p {
-        color: #1e40af !important;
+        color: #3b82f6 !important; /* 選取時為亮藍色 */
     }
     div[data-testid="stTabs"] button[aria-selected="true"] {
-        border-bottom: 3px solid #1e40af !important;
+        border-bottom: 3px solid #3b82f6 !important;
     }
     
-    /* 卡片與特殊區塊的底色改為純白以對比背景，邊框改為黑色 */
+    /* 卡片與特殊區塊的底色改為微透明的深藍以對比背景，邊框改為淺藍 */
     .order-card, .proc-row-container, div[style*="border-left"] {
-        background-color: #ffffff !important;
-        border-color: #000000 !important;
+        background-color: #0c1b33 !important;
+        border-color: #3b82f6 !important;
     }
 </style>
 """, unsafe_allow_html=True)
