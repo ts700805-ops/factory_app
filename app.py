@@ -112,13 +112,13 @@ st.markdown("""
     div[data-testid="stExpander"] details summary p, 
     div[data-testid="stExpander"] details summary span,
     div[data-testid="stExpander"] details summary {
-        color: #00ffff !important;
+        color: #3b82f6 !important;
         font-size: 1.6rem !important;
         font-weight: 900 !important;
     }
     div[data-testid="stExpander"] details {
         background-color: #0c1b33 !important;
-        border: 2px solid #00ffff !important;
+        border: 2px solid #3b82f6 !important;
         border-radius: 10px !important;
         margin-bottom: 12px !important;
     }
