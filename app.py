@@ -9,12 +9,12 @@ import time
 # --- Master UI Style Override ---
 st.markdown("""
 <style>
-    /* 全網頁背景改為綠色系 */
+    /* 全網頁背景改為圖片抓取之黃綠底色 */
     .stApp { 
-        background-color: #064e3b !important; /* 舒適深綠色背景 */
+        background-color: #e7f600 !important; 
     }
     .stSidebar, [data-testid="stSidebarUserContent"] {
-        background-color: #022c22 !important; /* 側邊欄更深一階的綠色 */
+        background-color: #d6e400 !important; /* 側邊欄稍微深一階的同色系 */
     }
     
     /* 統一所有標題與文字顏色為黑色、粗體 */
@@ -61,7 +61,7 @@ st.markdown("""
         border-bottom: 3px solid #1e40af !important;
     }
     
-    /* 卡片與特殊區塊的底色改為純白以對比綠色背景，邊框改為黑色 */
+    /* 卡片與特殊區塊的底色改為純白以對比背景，邊框改為黑色 */
     .order-card, .proc-row-container, div[style*="border-left"] {
         background-color: #ffffff !important;
         border-color: #000000 !important;
