@@ -322,6 +322,11 @@ else:
                 "李俊霖": ["陳育信", "陳凱彥", "111", "222"]
             }
 
+        # 自動將 leader_member_mapping 中的所有組長納入 leader_list，確保所有組別皆可選
+        for l_key in leader_member_mapping.keys():
+            if l_key not in leader_list:
+                leader_list.append(l_key)
+
         # 如果主清單在後台是空的，自動採用預設完整組長清單
         if not leader_list:
             leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
@@ -429,30 +434,47 @@ else:
                     except Exception as e:
                         st.error(f"❌ 錯誤：{e}")
 
-# --- 整合後的回報清單顯示邏輯 ---
+        # --- 整合後的回報清單顯示邏輯（支援檢視任意組別或全部組別） ---
         st.markdown("---")
-        st.markdown(f"##### 📋 {selected_leader} 組的今日已回報清單 (日期: {today_tw_str})")
+        st.markdown(f"##### 📋 各組今日 6S 回報狀況查詢 (日期: {today_tw_str})")
+        
+        view_mode_col1, view_mode_col2 = st.columns([2, 1])
+        with view_mode_col1:
+            all_view_leaders = ["🌐 全部組別總覽"] + leader_list
+            view_selected_group = st.selectbox("👁️ 選擇要檢視回報狀況的組別：", all_view_leaders, key="view_report_group_select")
         
         try:
             res = requests.get(f"{REPORT_LOG_URL}/{today_tw_str}.json").json()
             
             if res and isinstance(res, dict):
                 group_reports = []
+                target_leaders = leader_list if view_selected_group == "🌐 全部組別總覽" else [view_selected_group]
+                
+                target_members = []
+                for l_name in target_leaders:
+                    target_members.extend(leader_member_mapping.get(l_name, []))
+                
                 for name, info in res.items():
-                    if name in leader_member_mapping.get(selected_leader, []):
-                        group_reports.append({"姓名": name, "回報時間": info.get("reported_at", "")})
+                    if name in target_members:
+                        member_leader = "未知組別"
+                        for l_n, m_l in leader_member_mapping.items():
+                            if name in m_l:
+                                member_leader = l_n
+                                break
+                        group_reports.append({"組別": member_leader, "姓名": name, "回報時間": info.get("reported_at", ""), "狀態": info.get("status", "已完成")})
                 
                 if group_reports:
                     df_report = pd.DataFrame(group_reports)
-                    st.table(df_report)
+                    st.dataframe(df_report, use_container_width=True)
                     st.success(f"共計 {len(group_reports)} 位成員已完成回報。")
                 else:
-                    st.warning("⚠️ 目前該組今日無人員完成回報。")
+                    st.warning(f"⚠️ 目前【{view_selected_group}】今日無人員完成回報。")
             else:
-                st.warning("⚠️ 今日尚無人員完成回報。")
+                st.warning("⚠️ 今日尚無任何人員完成回報。")
         except Exception as e:
             st.error(f"讀取回報清單失敗: {e}")
-  # ==========================================
+
+        # ==========================================
     # 🎮 6S 戰境養成功能區塊
     # ==========================================
   # 更改為獨立 if 判定，徹底解決 elif 造成的 SyntaxError 語法錯誤
