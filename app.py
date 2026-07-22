@@ -82,7 +82,33 @@ st.markdown("""
         color: #ffffff !important;
         font-weight: 900 !important;
     }
+
+    /* 固資&手工具紀錄表的清單卡片美化與高對比設定 */
+    .card {
+        background-color: #112240 !important;
+        border: 2px solid #64ffda !important;
+        border-radius: 12px !important;
+        padding: 16px !important;
+        margin-bottom: 12px !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3) !important;
+    }
+    .asset-card {
+        background-color: #231942 !important;
+        border: 2px solid #e056fd !important;
+    }
+    .t-title {
+        color: #64ffda !important;
+        font-size: 1.6rem !important;
+        font-weight: 900 !important;
+        margin-bottom: 8px !important;
+    }
+    .t-meta {
+        color: #ffeb3b !important;
+        font-size: 1.45rem !important;
+        font-weight: 900 !important;
+    }
 </style>
+
 
 """, unsafe_allow_html=True)
 
