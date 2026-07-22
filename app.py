@@ -5,6 +5,70 @@ import requests
 import json
 import time
 
+
+# --- Master UI Style Override ---
+st.markdown("""
+<style>
+    /* 全網頁背景深色 */
+    .stApp { 
+        background-color: #0e1117 !important; 
+    }
+    .stSidebar, [data-testid="stSidebarUserContent"] {
+        background-color: #262730 !important;
+    }
+    
+    /* 統一所有標題與文字顏色為橙色、粗體 */
+    h1, h2, h3, h4, h5, h6, p, label, .stWidgetLabel, span, div[data-testid="stMarkdownContainer"] p, div[data-testid="stExpander"] details summary p {
+        color: #ea580c !important;
+        font-weight: 900 !important;
+    }
+    
+    /* 統一標題字體大小 */
+    h1 { font-size: 2.8rem !important; text-align: center !important; }
+    h2 { font-size: 2.2rem !important; }
+    h3 { font-size: 1.8rem !important; }
+    h4 { font-size: 1.5rem !important; }
+    h5 { font-size: 1.3rem !important; }
+    p, label p, div[data-testid="stMarkdownContainer"] p, span { font-size: 1.25rem !important; }
+    
+    /* 統一所有按鈕為填滿藍色 + 白色粗體文字 */
+    button, div[data-testid="stAppViewContainer"] button, div[data-testid="stSidebarUserContent"] button, .stButton>button {
+        background-color: #1e40af !important;
+        border: 2px solid #3b82f6 !important;
+        border-radius: 8px !important;
+    }
+    
+    /* 按鈕內的文字必須是白色 (覆蓋前面的橙色設定) */
+    button p, button span, div[data-testid="stAppViewContainer"] button span, .stButton>button span {
+        color: #ffffff !important;
+        font-weight: 900 !important;
+        font-size: 1.25rem !important;
+    }
+    
+    /* 針對分頁 Tab 的特殊處理 */
+    div[data-testid="stTabs"] button {
+        background-color: transparent !important;
+        border: none !important;
+    }
+    div[data-testid="stTabs"] button p {
+        color: #ea580c !important;
+    }
+    div[data-testid="stTabs"] button[aria-selected="true"] p {
+        color: #ffffff !important;
+    }
+    div[data-testid="stTabs"] button[aria-selected="true"] {
+        border-bottom: 3px solid #ea580c !important;
+    }
+    
+    /* 卡片與特殊區塊的底色 */
+    .order-card, .proc-row-container, div[style*="border-left"] {
+        background-color: #fff7ed !important;
+        border-color: #ea580c !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+
 # --- 1. 資料庫路徑設定 ---
 DB_BASE_URL = "https://my-factory-system-default-rtdb.firebaseio.com"
 DB_URL = f"{DB_BASE_URL}/work_logs"
@@ -44,115 +108,7 @@ def get_settings():
 st.set_page_config(page_title="超慧科技管理系統", layout="wide")
 
 st.markdown("""
-    <style>
-    /* 全網頁背景改成深綠至黑綠色漸層 */
-    .stApp { 
-        background: linear-gradient(135deg, #04241a 0%, #01140f 100%) !important; 
-        color: #e2e8f0 !important;
-    }
     
-    /* 側邊欄與相關表單文字顏色微調 */
-    .stSidebar, [data-testid="stSidebarUserContent"] {
-        background-color: #021a14 !important;
-        color: #f0fdf4 !important;
-    }
-    
-    /* 製令卡片改為深綠色帶金屬感的漸層外框 */
-    .order-card { 
-        background: linear-gradient(145deg, #083b2e 0%, #031c16 100%); 
-        border-radius: 14px; 
-        border: 1px solid #10b981; 
-        margin-bottom: 25px; 
-        overflow: hidden; 
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5); 
-    }
-    
-    /* 卡片標頭：亮綠色漸層，配上清楚白字 */
-    .order-header { 
-        background: linear-gradient(90deg, #059669 0%, #047857 100%); 
-        color: white; 
-        padding: 14px 18px; 
-        font-weight: 800; 
-        display: flex; 
-        justify-content: space-between; 
-        align-items: center; 
-        font-size: 1.25rem; 
-        border-bottom: 1px solid #10b981;
-    }
-    
-    /* 通電日期標籤改為顯眼明亮的冰藍或黃金配色 */
-    .power-date-tag { 
-        background: #06b6d4; 
-        color: #ffffff; 
-        padding: 4px 12px; 
-        border-radius: 8px; 
-        font-size: 0.9rem; 
-        font-weight: 800; 
-        display: flex; 
-        align-items: center; 
-        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-    }
-    
-    /* 工序橫條：改為半透明深色底，帶有翠綠邊線 */
-    .proc-row-container { 
-        padding: 15px 18px; 
-        border-bottom: 1px solid #064e3b; 
-        background-color: rgba(2, 44, 34, 0.6); 
-    }
-    
-    /* 工序名稱字體：亮白色，左邊改為亮綠色條 */
-    .proc-name { 
-        font-weight: 900; 
-        color: #ffffff; 
-        font-size: 1.1rem; 
-        border-left: 5px solid #34d399; 
-        padding-left: 12px; 
-    }
-    
-    /* 人員標籤：優化背景與文字對比度，改為明亮清晰字體 */
-    .badge-staff { 
-        background: #059669; 
-        color: #ffffff; 
-        padding: 4px 10px; 
-        border-radius: 6px; 
-        font-size: 0.95rem; 
-        font-weight: 700; 
-        border: 1px solid #34d399; 
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    }
-    
-    /* 狀態框：已完工 (明亮綠) */
-    .status-done-box { 
-        background: #065f46; 
-        color: #34d399; 
-        font-weight: 800; 
-        font-size: 0.9rem; 
-        padding: 6px 12px; 
-        border-radius: 6px; 
-        border: 1px solid #34d399; 
-        display: inline-block; 
-        text-align: center;
-    }
-    
-    /* 狀態框：請指派 (鮮艷橘黃) */
-    .status-assign-box { 
-        background: #78350f; 
-        color: #fcd34d; 
-        font-weight: 700; 
-        padding: 6px 12px; 
-        border-radius: 6px; 
-        border: 1px solid #f59e0b; 
-        font-size: 0.9rem; 
-        text-align: center;
-    }
-    
-    /* 修正下拉選單與一般標題文字在黑底下的顏色 */
-    h1, h2, h3, p, label, .stWidgetLabel {
-        color: #ffffff !important;
-    }
-    
-    .status-empty { color: #cbd5e1; font-style: italic; font-weight: 700; font-size: 0.95rem; }
-    </style>
 """, unsafe_allow_html=True)
 
 # --- 3. 讀取設定 ---
@@ -1125,87 +1081,7 @@ else:
 
         # 注入全新「亮紫色」全網頁字體主題 CSS
         st.markdown("""
-            <style>
-            /* 1. 全網頁基本文字、單選鈕標籤、下拉選單標題等全面強制改為亮工紫色 */
-            div[data-testid="stMarkdownContainer"] p, 
-            .stRadio label, 
-            label, 
-            .stWidgetLabel p,
-            span {
-                color: #e879f9 !important; /* 明亮的紫羅蘭色 */
-                font-weight: 800 !important;
-            }
             
-            /* 2. 修正分頁標籤（Tabs）選取與未選取文字，皆改為紫色系 */
-            div[data-testid="stTabs"] button {
-                font-size: 1.15rem !important;
-                font-weight: 800 !important;
-                color: #c084fc !important; /* 未選中時為淡紫色 */
-            }
-            div[data-testid="stTabs"] button[aria-selected="true"] {
-                color: #ff00ff !important; /* 選中時為極亮粉紫色 */
-                font-weight: 900 !important;
-                border-bottom: 3px solid #ff00ff !important;
-            }
-            
-            /* 3. 修正折疊區塊 (例如: 蘇萬紘 👩‍🔧 標題) 文字顏色為亮紫色 */
-            div[data-testid="stExpander"] details summary p {
-                color: #ff00ff !important;
-                font-weight: 900 !important;
-                font-size: 1.15rem !important;
-            }
-            
-            /* 4. 修正匯出按鈕的文字顏色與邊框顏色 */
-            div.stDownloadButton button p {
-                color: #ff00ff !important;
-                font-weight: 900 !important;
-            }
-            div.stDownloadButton button {
-                border: 2px solid #ff00ff !important;
-                background-color: #ffffff !important;
-            }
-            div.stDownloadButton button:hover {
-                background-color: #fdf4ff !important;
-            }
-            
-            /* 5. 下拉選單與輸入框內部的選中文字優化（維持暗色便於白底閱讀） */
-            .stSelectbox div div, .stTextInput div div input {
-                color: #0f172a !important;
-                font-weight: 700 !important;
-            }
-            
-            /* 6. 小標題 */
-            h3 {
-                color: #ff00ff !important;
-                font-weight: 900 !important;
-            }
-            
-            /* 7. 卡片內部的專屬 class 強制覆寫為亮紫色（解決 C型板手 看不見的問題） */
-            .t-title { 
-                font-weight: 900 !important; 
-                color: #ff00ff !important; /* 強制改亮紫色 */
-                font-size: 1.15rem !important; 
-            } 
-            .t-qty { 
-                color: #ff00ff !important; /* 數量也同步亮紫 */
-                font-weight: 900 !important; 
-                font-size: 1.2rem !important; 
-                margin-left: 8px !important; 
-                background: #fdf4ff !important; /* 淡紫色背景襯托 */
-                padding: 2px 8px !important; 
-                border-radius: 5px !important; 
-            }
-            .t-meta { 
-                color: #e879f9 !important; /* 登記時間與人改為明亮紫 */
-                font-size: 0.85rem !important; 
-                margin-top: 5px !important; 
-                font-weight: 700 !important; 
-            }
-            
-            /* 卡片外框設定 */
-            .card { background: #ffffff; border-radius: 10px; padding: 15px; margin-bottom: 10px; border: 2px solid #e879f9; box-shadow: 0 2px 4px rgba(0,0,0,0.05); } 
-            .asset-card { border-left: 10px solid #7c3aed !important; background: #faf5ff !important; border-color: #d8b4fe; } 
-            </style>
         """, unsafe_allow_html=True)
 
         # 3. 建立分頁
@@ -1276,60 +1152,7 @@ else:
 
         # 1. 注入專屬設定，徹底移除會波及到左側選單的全局 CSS，只針對單一標題標籤進行強制放大
         st.markdown("""
-            <style>
-            /* 【核心修正】僅針對 #my-giant-main-title 這個專屬識別碼進行放大，絕對不會影響到左側導航與其他文字 */
-            #my-giant-main-title {
-                color: #7DD3FC !important;
-                font-size: 3.5rem !important; /* 如果覺得不夠大，可以自行調整為 4.0rem 或 4.5rem */
-                font-weight: 900 !important;
-                text-align: center !important;
-                margin-bottom: 2rem !important;
-                display: block !important;
-            }
             
-            /* 針對各區段的中標題保持系統原樣 */
-            h3 {
-                color: #38BDF8 !important; 
-                font-size: 1.8rem !important; 
-                font-weight: 900 !important;
-                margin-top: 1.2rem !important;
-            }
-            /* CSV 匯出按鈕文字 */
-            div.stDownloadButton button p {
-                color: #7DD3FC !important;
-                font-weight: 900 !important;
-                font-size: 1.2rem !important;
-            }
-            div.stDownloadButton button {
-                border: 2px solid #38BDF8 !important;
-                background-color: #052e16 !important;
-            }
-            /* 輸入框、下拉選單本體、日曆輸入框、以及網格編輯器內的文字 */
-            div[data-baseweb="select"] > div, 
-            div[data-testid="stTextInput"] div div input, 
-            div[data-testid="stTextArea"] textarea,
-            div[data-testid="stDateInput"] input,
-            div[data-testid="stTable"] table,
-            .stDataEditor div {
-                background-color: #052e16 !important; 
-                color: #ffffff !important;           
-                border: 1px solid #38BDF8 !important; 
-                font-size: 1.25rem !important; 
-                font-weight: 700 !important;
-            }
-            /* 表單提交按鈕字體調整 */
-            div[data-testid="stForm"] div.stButton > button {
-                background-color: #052e16 !important;
-                color: #38BDF8 !important;
-                border: 2px solid #38BDF8 !important;
-                font-size: 1.3rem !important;
-                font-weight: 900 !important;
-            }
-            div[data-testid="stForm"] div.stButton > button:hover {
-                background-color: #38BDF8 !important; 
-                color: #052e16 !important;           
-            }
-            </style>
         """, unsafe_allow_html=True)
 
         # 2. 【核心修正】套用專屬識別碼，確保只有此行中間主標題放大
@@ -1553,49 +1376,7 @@ else:
 
         st.markdown("""
 
-            <style>
-
-            .pink-card {
-
-                background-color: #fff1f2;
-
-                border: 2px solid #f43f5e;
-
-                padding: 20px;
-
-                border-radius: 15px;
-
-                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-
-                margin-bottom: 20px;
-
-            }
-
-            .stButton>button {
-
-                border-radius: 10px;
-
-                font-weight: bold;
-
-            }
-
-            h3 {
-
-                color: #be123c !important;
-
-                font-weight: 900 !important;
-
-            }
-
-            label {
-
-                color: #4c0519 !important;
-
-                font-weight: bold !important;
-
-            }
-
-            </style>
+            
 
         """, unsafe_allow_html=True)
 
@@ -1919,18 +1700,7 @@ else:
                 
                 # 燈箱專用按鈕 CSS（保持填滿藍色與白字）
                 st.markdown("""
-                    <style>
-                    div[data-testid="stDialog"] button {
-                        background-color: #1e40af !important;
-                        border: 2px solid #2563eb !important;
-                        height: 45px !important;
-                    }
-                    div[data-testid="stDialog"] button span {
-                        color: #ffffff !important;
-                        font-weight: 900 !important;
-                        font-size: 1.1rem !important;
-                    }
-                    </style>
+                    
                 """, unsafe_allow_html=True)
                 
             except Exception as e:
@@ -1973,19 +1743,7 @@ else:
                     border_color = "#ef4444" if is_current else "#3b82f6"
                     border_width = "3px" if is_current else "1px"
                     st.markdown(f"""
-                        <style>
-                        div.stButton > button[key="btn_p_{combined_node_key}"] {{
-                            background-color: #1e40af !important;
-                            border: {border_width} solid {border_color} !important;
-                            border-radius: 6px !important;
-                            height: 40px !important;
-                        }}
-                        div.stButton > button[key="btn_p_{combined_node_key}"] span {{
-                            color: #ffffff !important;
-                            font-weight: 900 !important;
-                            font-size: 1.05rem !important;
-                        }}
-                        </style>
+                        
                     """, unsafe_allow_html=True)
 
                 # 第四欄：箭頭
@@ -2015,18 +1773,7 @@ else:
                                     show_pdf_dialog_safe(f_name, pdf_b64)
                                 
                                 st.markdown(f"""
-                                    <style>
-                                    div.stButton button[key="view_dlg_{combined_node_key}_{file_id}"] {{
-                                        background-color: #1d4ed8 !important;
-                                        border: 1px solid #60a5fa !important;
-                                        height: 36px !important;
-                                    }}
-                                    div.stButton button[key="view_dlg_{combined_node_key}_{file_id}"] span {{
-                                        color: #ffffff !important;
-                                        font-weight: 900 !important;
-                                        font-size: 1rem !important;
-                                    }}
-                                    </style>
+                                    
                                 """, unsafe_allow_html=True)
                                 
                             with f_sub_cols[2]:
@@ -2045,18 +1792,7 @@ else:
                                             
                                 # 強制修改 Popover 啟動按鈕外觀為藍底白字
                                 st.markdown(f"""
-                                    <style>
-                                    div[data-testid="stPopover"] button[id*="pop_{combined_node_key}_{file_id}"] {{
-                                        background-color: #1d4ed8 !important;
-                                        border: 1px solid #60a5fa !important;
-                                        height: 36px !important;
-                                    }}
-                                    div[data-testid="stPopover"] button[id*="pop_{combined_node_key}_{file_id}"] span {{
-                                        color: #ffffff !important;
-                                        font-weight: 900 !important;
-                                        font-size: 1rem !important;
-                                    }}
-                                    </style>
+                                    
                                 """, unsafe_allow_html=True)
                     else:
                         st.markdown('<div style="color: #ea580c; font-style: italic; font-weight:900; line-height:45px; font-size:1.1rem;">❌ 尚未配置 SOP</div>', unsafe_allow_html=True)
@@ -2135,21 +1871,5 @@ else:
 
         # 🚀 全局覆蓋樣式表
         st.markdown("""
-            <style>
-            /* 1. 將所有頁面常駐型按鈕強制轉化為「填滿深藍色、粗白字」 */
-            div[data-testid="stAppViewContainer"] button {
-                background-color: #1e40af !important;
-                border: 1px solid #3b82f6 !important;
-            }
-            div[data-testid="stAppViewContainer"] button span {
-                color: #ffffff !important;
-                font-weight: 900 !important;
-            }
-            /* 2. 所有一般文字輸入標籤、元件說明標題，改為「加大橙色」 */
-            div[data-testid="stAppViewContainer"] label p {
-                color: #ea580c !important;
-                font-weight: 900 !important;
-                font-size: 1.25rem !important;
-            }
-            </style>
+            
         """, unsafe_allow_html=True)
