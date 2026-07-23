@@ -511,6 +511,13 @@ else:
         import json # 確保有載入 json 模組
 
         # 【6S 戰境養成系統：載入組長與組員對照表】
+        if 'DB_URL' in globals() or 'DB_URL' in locals():
+            BASE_URL = DB_URL
+        elif 'DB_BASE_URL' in globals() or 'DB_BASE_URL' in locals():
+            BASE_URL = DB_BASE_URL
+        else:
+            BASE_URL = "https://your-firebase-url"
+
         leaders_raw = requests.get(f"{BASE_URL}/leaders_list.json").json() or ""
         leader_list = [l.strip() for l in leaders_raw.split(",") if l.strip()] if isinstance(leaders_raw, str) else []
 
