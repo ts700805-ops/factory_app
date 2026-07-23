@@ -510,6 +510,49 @@ else:
         import time
         import json # 確保有載入 json 模組
 
+        # 【6S 戰境養成系統：載入組長與組員對照表】
+        leaders_raw = requests.get(f"{BASE_URL}/leaders_list.json").json() or ""
+        leader_list = [l.strip() for l in leaders_raw.split(",") if l.strip()] if isinstance(leaders_raw, str) else []
+
+        raw_data_1 = requests.get(f"{BASE_URL}/leader_members.json").json() or ""
+        raw_data_2 = requests.get(f"{BASE_URL}/leader_members_2.json").json() or "" 
+        
+        combined_lines = []
+        if isinstance(raw_data_1, str):
+            combined_lines.extend(raw_data_1.splitlines())
+        if isinstance(raw_data_2, str):
+            combined_lines.extend(raw_data_2.splitlines())
+
+        leader_member_mapping = {}
+        for line in combined_lines:
+            line = line.strip()
+            if not line: continue
+            line_fixed = line.replace("：", ":")
+            if ":" in line_fixed:
+                parts = line_fixed.split(":")
+                l_name = parts[0].strip()
+                m_list = [m.strip() for m in parts[1].split(",") if m.strip()]
+                if l_name and m_list:
+                    leader_member_mapping[l_name] = m_list
+
+        if not leader_member_mapping:
+            leader_member_mapping = {
+                "陳德文": ["徐梓翔", "牟育玄", "林建安", "魏瑄毅", "羅立昕", "江金福", "呂是儒", "邱信維", "張瑀榛", "陳宛廷", "戴鎰祥", "鍾明志", "黃瑞翎", "羅文發", "羅章淳", "蕭桓惟", "周棟榮", "李偉誠", "潘信成", "張瑀榛", "周政龍", "傑米", "達文", "吉爾"],
+                "劉志偉": ["劉定澤", "胡瑄芸", "蕭詩瓊", "劉秀鳳", "龍才華", "龍斯愷", "姜治銘", "彭毓萱", "邱珍娜", "陳建勳", "黃建堃", "麥可", "費南"],
+                "吳政昌": ["吳政昌", "劉韋廷", "張佳銓", "陳長彥", "李守益", "林昶志"],
+                "蘇萬紘": ["梁志宏", "謝宛庭", "潘威傑", "徐兆生", "鄭智鍵", "王添應", "徐聖淇", "黃承淮", "溫翠茹", "張瑀榛", "張瑀榛", "周政龍", "保羅", "羅丹"],
+                "陳文山": ["蘇雍盛", "張文品", "趙健浩", "洪敏強", "姚奕舟", "彭鈺麟"],
+                "李俊霖": ["陳育信", "陳凱彥", "111", "222"]
+            }
+
+        for l_key in leader_member_mapping.keys():
+            if l_key not in leader_list:
+                leader_list.append(l_key)
+
+        if not leader_list:
+            leader_list = ["陳德文", "劉志偉", "吳政昌", "蘇萬紘", "陳文山", "李俊霖"]
+
+        
         st.markdown(
             '''
             <div style="text-align:center; margin-bottom:2rem;">
