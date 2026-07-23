@@ -739,123 +739,51 @@ else:
         st.write("")
         
         
+        
         # ==========================================
-        # 👑 稱號查詢與升級門檻對照區
+        # 👑 稱號查詢與升級門檻對照區 (依組長與同仁姓名查詢)
         # ==========================================
         st.markdown("---")
-        st.markdown("### 👑 稱號查詢與升級門檻對照區")
+        st.markdown("### <span style='color:#FBBF24 !important;'>👑 稱號查詢與升級門檻對照區</span>", unsafe_allow_html=True)
         
         tc1, tc2 = st.columns(2)
         with tc1:
-            st.markdown("##### 📌 升級門檻與稱號對照表")
+            st.markdown("##### <span style='color:#FBBF24 !important;'>📌 升級門檻與稱號對照表</span>", unsafe_allow_html=True)
             st.markdown(f"""
-            - **{t_list[0]}**：總點數 0 ~ 9 點 (初始階級)
-            - **{t_list[1]}**：總點數達 **10 點** 以上
-            - **{t_list[2]}**：總點數達 **30 點** 以上
-            - **{t_list[3]}**：總點數達 **60 點** 以上
-            - **{t_list[4]}**：總點數達 **100 點** 以上 (頂峰稱號)
-            """)
+            - <span style='color:#FBBF24 !important;'>**{t_list[0]}**：總點數 0 ~ 9 點 (初始階級)</span>
+            - <span style='color:#FBBF24 !important;'>**{t_list[1]}**：總點數達 **10 點** 以上</span>
+            - <span style='color:#FBBF24 !important;'>**{t_list[2]}**：總點數達 **30 點** 以上</span>
+            - <span style='color:#FBBF24 !important;'>**{t_list[3]}**：總點數達 **60 點** 以上</span>
+            - <span style='color:#FBBF24 !important;'>**{t_list[4]}**：總點數達 **100 點** 以上 (頂峰稱號)</span>
+            """, unsafe_allow_html=True)
         
         with tc2:
-            st.markdown("##### 🔍 全廠同仁稱號與點數查詢")
-            if all_players_data:
-                query_names = sorted(list(all_players_data.keys()))
-                selected_q_name = st.selectbox("選擇要查詢的同仁姓名：", query_names, key="query_player_title_sel")
-                if selected_q_name:
-                    p_info = all_players_data[selected_q_name]
-                    p_str = int(p_info.get("str", 0))
-                    p_vit = int(p_info.get("vit", 0))
-                    p_agi = int(p_info.get("agi", 0))
-                    p_cha = int(p_info.get("cha", 0))
-                    p_pts = int(p_info.get("avail_pts", 0))
-                    p_tot = p_str + p_vit + p_agi + p_cha + p_pts  # 總點數 = 已分配 + 未分配
-                    p_lvl = get_auto_title(p_tot)                 # 自動判定正確稱號
-                    st.info(f"👤 **{selected_q_name}** | 當前稱號：**{p_lvl}** | 總點數：**{p_tot} 點** (已分配: {p_str+p_vit+p_agi+p_cha} | 未分配: {p_pts})")
-            else:
-                st.info("💡 目前尚無人員屬性戰力資料。")
-
-
-        
-        # ==========================================
-        # 👥 全廠戰境人員清單與管理區 (支援展開、密碼驗證 0000 編輯與刪除)
-        # ==========================================
-        st.markdown("---")
-        st.markdown("### 👥 全廠戰境人員清單管理區")
-        st.caption("點擊下方人員姓名展開詳細戰力與管理設定 (編輯/刪除需輸入驗證碼 0000)")
-
-        # 定義編輯與刪除的對話框 (Dialog)
-        @st.dialog("🔒 戰境人員資料修改 (驗證碼: 0000)")
-        def edit_rpg_user_dialog(p_name, p_data):
-            st.markdown(f"**正在修改同仁：{p_name} 的戰力屬性**")
-            pwd_edit = st.text_input("請輸入驗證碼 (預設 0000)", type="password", key=f"rpg_edit_pwd_{p_name}")
+            st.markdown("##### <span style='color:#FBBF24 !important;'>🔍 選擇所屬組長與回報同仁姓名查詢</span>", unsafe_allow_html=True)
             
-            ed_str = st.number_input("力量 (STR)", value=int(p_data.get("str", 0)), key=f"rpg_edit_str_{p_name}")
-            ed_vit = st.number_input("體質 (VIT)", value=int(p_data.get("vit", 0)), key=f"rpg_edit_vit_{p_name}")
-            ed_agi = st.number_input("敏捷 (AGI)", value=int(p_data.get("agi", 0)), key=f"rpg_edit_agi_{p_name}")
-            ed_cha = st.number_input("魅力 (CHA)", value=int(p_data.get("cha", 0)), key=f"rpg_edit_cha_{p_name}")
-            ed_pts = st.number_input("未分配自由點數", value=int(p_data.get("avail_pts", 0)), key=f"rpg_edit_pts_{p_name}")
+            q_lead_col, q_mem_col = st.columns(2)
+            with q_lead_col:
+                q_selected_leader = st.selectbox("👤 選擇所屬組長：", leader_list, key="game_query_leader_select_v2")
+            with q_mem_col:
+                q_available_members = leader_member_mapping.get(q_selected_leader, [])
+                if q_available_members:
+                    q_selected_member = st.selectbox("🎯 選擇回報同仁姓名：", q_available_members, key="game_query_member_select_v2")
+                else:
+                    q_selected_member = None
+                    st.warning("⚠️ 此組長無成員")
             
-            if st.button("💗 確認修改屬性", use_container_width=True, key=f"rpg_edit_confirm_{p_name}"):
-                if pwd_edit == "0000":
-                    tot_p = ed_str + ed_vit + ed_agi + ed_cha + ed_pts
-                    new_lvl = get_auto_title(tot_p)
-                    updated_dict = {
-                        "str": int(ed_str),
-                        "vit": int(ed_vit),
-                        "agi": int(ed_agi),
-                        "cha": int(ed_cha),
-                        "avail_pts": int(ed_pts),
-                        "level_name": new_lvl
-                    }
-                    requests.patch(f"{GAME_DB_URL}/{p_name}.json", data=json.dumps(updated_dict))
-                    st.success(f"✅ {p_name} 資料修改成功！")
-                    time.sleep(0.5)
-                    st.rerun()
-                else:
-                    st.error("❌ 驗證碼錯誤（正確為 0000）")
-
-        @st.dialog("🔒 刪除戰境人員確認 (驗證碼: 0000)")
-        def delete_rpg_user_dialog(p_name):
-            st.warning(f"⚠️ 確定要從資料庫中完整刪除戰境人員「{p_name}」的紀錄嗎？")
-            pwd_del = st.text_input("請輸入驗證碼 (預設 0000)", type="password", key=f"rpg_del_pwd_{p_name}")
-            if st.button("❌ 確定刪除此人員", use_container_width=True, key=f"rpg_del_confirm_{p_name}"):
-                if pwd_del == "0000":
-                    requests.delete(f"{GAME_DB_URL}/{p_name}.json")
-                    st.success(f"🗑️ 已成功刪除 {p_name}！")
-                    time.sleep(0.5)
-                    st.rerun()
-                else:
-                    st.error("❌ 驗證碼錯誤（正確為 0000）")
-
-        if all_players_data:
-            for p_name, p_val in sorted(all_players_data.items()):
-                p_str = int(p_val.get("str", 0))
-                p_vit = int(p_val.get("vit", 0))
-                p_agi = int(p_val.get("agi", 0))
-                p_cha = int(p_val.get("cha", 0))
-                p_pts = int(p_val.get("avail_pts", 0))
+            if q_selected_member:
+                p_info = all_players_data.get(q_selected_member, {"str": 0, "vit": 0, "agi": 0, "cha": 0, "avail_pts": 0})
+                p_str = int(p_info.get("str", 0))
+                p_vit = int(p_info.get("vit", 0))
+                p_agi = int(p_info.get("agi", 0))
+                p_cha = int(p_info.get("cha", 0))
+                p_pts = int(p_info.get("avail_pts", 0))
                 p_tot = p_str + p_vit + p_agi + p_cha + p_pts
                 p_lvl = get_auto_title(p_tot)
                 
-                # 按箭頭展開人員
-                with st.expander(f"🥷 員工姓名：{p_name}  |  稱號：{p_lvl}  |  總點數：{p_tot} 點"):
-                    col_p1, col_p2 = st.columns([7, 3])
-                    with col_p1:
-                        st.markdown(f"""
-                        - **稱號**：`{p_lvl}`
-                        - **力量 (STR)**：`{p_str}` | **體質 (VIT)**：`{p_vit}`
-                        - **敏捷 (AGI)**：`{p_agi}` | **魅力 (CHA)**：`{p_cha}`
-                        - **未分配自由點數**：`{p_pts}` 點
-                        - **總點數**：`{p_tot}` 點
-                        """)
-                    with col_p2:
-                        st.markdown("**⚙️ 快捷管理**")
-                        if st.button("✏️ 編輯屬性", key=f"btn_edit_rpg_{p_name}", use_container_width=True):
-                            edit_rpg_user_dialog(p_name, p_val)
-                        if st.button("🗑️ 刪除紀錄", key=f"btn_del_rpg_{p_name}", use_container_width=True):
-                            delete_rpg_user_dialog(p_name)
-        else:
-            st.info("💡 目前尚無人員戰力紀錄。")
+                st.info(f"👤 組別：【{q_selected_leader}】 | 同仁：【{q_selected_member}】\n當前稱號：**{p_lvl}** | 總點數：**{p_tot} 點** (已分配: {p_str+p_vit+p_agi+p_cha} | 未分配: {p_pts})")
+            else:
+                st.info("💡 請選擇所屬組長與回報同仁姓名進行查詢。")
 
 
         with st.expander("⚙️ 6S 戰境養成管理後台"):
