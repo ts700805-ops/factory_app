@@ -202,6 +202,7 @@ else:
     "________________",
     "📝每日6S任務回報", 
     "🎮6S戰境養成", 
+    "📉6S扣分查詢",
     "________________",
     "🔧 固資&手工具紀錄表",
     "⚙️ 資產編輯清單", 
@@ -869,6 +870,143 @@ else:
                 st.rerun()
       
 
+# ==========================================
+# 📉 導航6S扣分查詢
+# ==========================================
+    elif st.session_state.menu_selection == "📉6S扣分查詢":
+        import requests
+        from datetime import datetime, timedelta, timezone
+
+        st.markdown(
+            '''
+            <div style="text-align:center; margin-bottom:2rem;">
+                <h1 style="color: #F87171 !important; font-weight:900 !important; font-size: 3.5rem !important; display:inline-block;">
+                    📉 6S 扣分查詢與累計系統
+                </h1>
+                <p style="color:#9CA3AF;">查詢指定日期區間內未回報人員，一天未回報扣 1 分，自動計算扣分加總並製作一覽表！</p>
+            </div>
+            ''',
+            unsafe_allow_html=True
+        )
+
+        # 安全路徑自適應
+        if 'DB_URL' in globals() or 'DB_URL' in locals():
+            BASE_URL = DB_URL
+        elif 'DB_BASE_URL' in globals() or 'DB_BASE_URL' in locals():
+            BASE_URL = DB_BASE_URL
+        else:
+            BASE_URL = "https://your-firebase-url"
+
+        REPORT_LOG_URL = f"{BASE_URL}/daily_6s_report_logs"
+        tz_taiwan = timezone(timedelta(hours=8))
+        today_tw = datetime.now(tz_taiwan).date()
+
+        # 1. 讀取組長與組員對照表
+        raw_data_1 = requests.get(f"{BASE_URL}/leader_members.json").json() or ""
+        raw_data_2 = requests.get(f"{BASE_URL}/leader_members_2.json").json() or "" 
+        
+        combined_lines = []
+        if isinstance(raw_data_1, str):
+            combined_lines.extend(raw_data_1.splitlines())
+        if isinstance(raw_data_2, str):
+            combined_lines.extend(raw_data_2.splitlines())
+
+        leader_member_mapping = {}
+        for line in combined_lines:
+            line = line.strip()
+            if not line: continue
+            line_fixed = line.replace("：", ":")
+            if ":" in line_fixed:
+                parts = line_fixed.split(":")
+                l_name = parts[0].strip()
+                m_list = [m.strip() for m in parts[1].split(",") if m.strip()]
+                if l_name and m_list:
+                    leader_member_mapping[l_name] = m_list
+
+        if not leader_member_mapping:
+            leader_member_mapping = {
+                "陳德文": ["徐梓翔", "牟育玄", "林建安", "魏瑄毅", "羅立昕", "江金福", "呂是儒", "邱信維", "張瑀榛", "陳宛廷", "戴鎰祥", "鍾明志", "黃瑞翎", "羅文發", "羅章淳", "蕭桓惟", "周棟榮", "李偉誠", "潘信成", "張瑀榛", "周政龍", "傑米", "達文", "吉爾"],
+                "劉志偉": ["劉定澤", "胡瑄芸", "蕭詩瓊", "劉秀鳳", "龍才華", "龍斯愷", "姜治銘", "彭毓萱", "邱珍娜", "陳建勳", "黃建堃", "麥可", "費南"],
+                "吳政昌": ["吳政昌", "劉韋廷", "張佳銓", "陳長彥", "李守益", "林昶志"],
+                "蘇萬紘": ["梁志宏", "謝宛庭", "潘威傑", "徐兆生", "鄭智鍵", "王添應", "徐聖淇", "黃承淮", "溫翠茹", "張瑀榛", "張瑀榛", "周政龍", "保羅", "羅丹"],
+                "陳文山": ["蘇雍盛", "張文品", "趙健浩", "洪敏強", "姚奕舟", "彭鈺麟"],
+                "李俊霖": ["陳育信", "陳凱彥", "111", "222"]
+            }
+
+        all_leaders_keys = list(leader_member_mapping.keys())
+
+        # 2. 選擇日期查詢區間表格
+        st.markdown("### 📅 步驟一：選擇扣分查詢日期區間")
+        col_d1, col_d2 = st.columns(2)
+        with col_d1:
+            start_date = st.date_input("開始日期：", value=today_tw - timedelta(days=7), key="deduct_start_date")
+        with col_d2:
+            end_date = st.date_input("結束日期：", value=today_tw, key="deduct_end_date")
+
+        if start_date > end_date:
+            st.error("❌ 錯誤：開始日期不能大於結束日期！")
+        else:
+            # 產生日期清單
+            date_list = []
+            cur = start_date
+            while cur <= end_date:
+                date_list.append(cur.strftime("%Y-%m-%d"))
+                cur += timedelta(days=1)
+
+            st.info(f"📊 統計區間：**{start_date}** 至 **{end_date}** (共計 {len(date_list)} 天)")
+
+            if st.button("🔍 開始計算未回報扣分總表", use_container_width=True, type="primary"):
+                # 統計字典：{成員名稱: {"組別": 組長, "未回報天數": 0, "扣分": 0}}
+                deduct_summary = {}
+                for l_name, members in leader_member_mapping.items():
+                    for m in members:
+                        deduct_summary[m] = {
+                            "組別": l_name,
+                            "姓名": m,
+                            "未回報天數": 0,
+                            "扣分": 0
+                        }
+
+                # 逐日檢查各成員回報狀況
+                for d_str in date_list:
+                    try:
+                        day_res = requests.get(f"{REPORT_LOG_URL}/{d_str}.json").json() or {}
+                    except:
+                        day_res = {}
+                    
+                    reported_on_day = set()
+                    if isinstance(day_res, dict):
+                        reported_on_day = set(day_res.keys())
+
+                    for m_name, info in deduct_summary.items():
+                        # 若該日不在已回報名單中，則記為未回報，扣 1 分
+                        if m_name not in reported_on_day:
+                            info["未回報天數"] += 1
+                            info["扣分"] += 1
+
+                # 轉換為 DataFrame 呈現
+                result_rows = list(deduct_summary.values())
+                df_deduct = pd.DataFrame(result_rows)
+
+                if not df_deduct.empty:
+                    # 依照扣分由高到低排序
+                    df_deduct = df_deduct.sort_values(by="扣分", ascending=False).reset_index(drop=True)
+
+                    st.markdown("---")
+                    st.markdown("### 📋 6S 未回報扣分加總一覽表")
+                    st.dataframe(df_deduct, use_container_width=True)
+
+                    # 提供 CSV 下載
+                    csv_bytes = df_deduct.to_csv(index=False).encode("utf-8-sig")
+                    st.download_button(
+                        label="📄 匯出 6S 扣分總表 CSV",
+                        data=csv_bytes,
+                        file_name=f"6S_Deduct_Summary_{start_date}_to_{end_date}.csv",
+                        mime="text/csv",
+                        use_container_width=True
+                    )
+                else:
+                    st.warning("⚠️ 查無人員資料可供計算。")
 
 
 
