@@ -944,7 +944,7 @@ else:
         # ==========================================
         # 新增功能區塊：手動扣分登記（密碼 12345）
         # ==========================================
-        with st.expander("📝 新增手動扣分 (需輸入密碼 12345)"):
+        with st.expander("📝 新增手動扣分 (需輸入密碼 )"):
             with st.form("manual_deduct_form"):
                 m_date = st.date_input("選擇扣分日期：", value=today_tw, key="manual_deduct_date")
                 m_person = st.selectbox("選擇被扣分人員：", all_staff_flat, key="manual_deduct_person")
@@ -961,7 +961,7 @@ else:
                 
                 if submitted_manual:
                     if m_pwd != "12345":
-                        st.error("❌ 密碼錯誤！必須輸入密碼 12345 才能執行手動扣分。")
+                        st.error("❌ 密碼錯誤！必須輸入密碼才能執行手動扣分。")
                     else:
                         final_reason = m_reason_custom.strip() if m_reason_custom.strip() else m_reason
                         date_str = m_date.strftime("%Y-%m-%d")
