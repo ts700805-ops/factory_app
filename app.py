@@ -883,7 +883,7 @@ else:
                 <h1 style="color: #F87171 !important; font-weight:900 !important; font-size: 3.5rem !important; display:inline-block;">
                     📉 6S 扣分查詢與累計系統
                 </h1>
-                <p style="color:#9CA3AF;">查詢指定日期區間內未回報人員，一天未回報扣 1 分，自動計算扣分加總並製作一覽表！</p>
+                <p style="color:#9CA3AF;">查詢指定日期區間內未回報人員，一天未回報扣 1 分，手動扣分，並自動計算扣分加總製作一覽表！</p>
             </div>
             ''',
             unsafe_allow_html=True
@@ -898,6 +898,8 @@ else:
             BASE_URL = "https://your-firebase-url"
 
         REPORT_LOG_URL = f"{BASE_URL}/daily_6s_report_logs"
+        MANUAL_DEDUCT_URL = f"{BASE_URL}/manual_6s_deductions"
+
         tz_taiwan = timezone(timedelta(hours=8))
         today_tw = datetime.now(tz_taiwan).date()
 
@@ -933,7 +935,53 @@ else:
                 "李俊霖": ["陳育信", "陳凱彥", "111", "222"]
             }
 
-        all_leaders_keys = list(leader_member_mapping.keys())
+        # 建立所有人員清單
+        all_staff_flat = []
+        for members in leader_member_mapping.values():
+            all_staff_flat.extend(members)
+        all_staff_flat = sorted(list(set(all_staff_flat)))
+
+        # ==========================================
+        # 新增功能區塊：手動扣分登記（密碼 12345）
+        # ==========================================
+        with st.expander("📝 新增手動扣分 (需輸入密碼 12345)"):
+            with st.form("manual_deduct_form"):
+                m_date = st.date_input("選擇扣分日期：", value=today_tw, key="manual_deduct_date")
+                m_person = st.selectbox("選擇被扣分人員：", all_staff_flat, key="manual_deduct_person")
+                m_score = st.number_input("手動扣分分數：", min_value=1, value=1, step=1, key="manual_deduct_score")
+                
+                # 選填或預設「有回報未確實打掃」作為扣分原因
+                reason_options = ["有回報未確實打掃", "其他違規", "未依規定配戴防護具", "現場整潔不合格"]
+                m_reason = st.selectbox("扣分原因：", reason_options, key="manual_deduct_reason_sel")
+                m_reason_custom = st.text_input("或自訂扣分原因備註（選填）：", value="", key="manual_deduct_reason_custom")
+                
+                m_pwd = st.text_input("請輸入密碼 (12345)：", type="password", key="manual_deduct_pwd")
+                
+                submitted_manual = st.form_submit_button("💾 確認送出手動扣分", use_container_width=True)
+                
+                if submitted_manual:
+                    if m_pwd != "12345":
+                        st.error("❌ 密碼錯誤！必須輸入密碼 12345 才能執行手動扣分。")
+                    else:
+                        final_reason = m_reason_custom.strip() if m_reason_custom.strip() else m_reason
+                        date_str = m_date.strftime("%Y-%m-%d")
+                        
+                        payload = {
+                            "人员": m_person,
+                            "扣分": int(m_score),
+                            "原因": final_reason,
+                            "登記時間": datetime.now(tz_taiwan).strftime("%Y-%m-%d %H:%M:%S"),
+                            "登記人": st.session_state.get("user", "未知")
+                        }
+                        
+                        # 儲存到 Firebase 獨立路徑下 (以日期分類或唯一 ID 分類)
+                        uniq_id = f"manual_{int(time.time() * 1000)}"
+                        requests.put(f"{MANUAL_DEDUCT_URL}/{date_str}/{uniq_id}.json", data=json.dumps(payload))
+                        st.success(f"✅ 成功對【{m_person}】在 {date_str} 執行手動扣分 {m_score} 分！原因：{final_reason}")
+                        time.sleep(1)
+                        st.rerun()
+
+        st.divider()
 
         # 2. 選擇日期查詢區間表格
         st.markdown("### 📅 步驟一：選擇扣分查詢日期區間")
@@ -955,8 +1003,8 @@ else:
 
             st.info(f"📊 統計區間：**{start_date}** 至 **{end_date}** (共計 {len(date_list)} 天)")
 
-            if st.button("🔍 開始計算未回報扣分總表", use_container_width=True, type="primary"):
-                # 統計字典：{成員名稱: {"組別": 組長, "未回報天數": 0, "扣分": 0}}
+            if st.button("🔍 開始計算未回報扣分與手動扣分總表", use_container_width=True, type="primary"):
+                # 統計字典：{成員名稱: {"組別": 組長, "未回報天數": 0, "手動扣分": 0, "扣分總計": 0}}
                 deduct_summary = {}
                 for l_name, members in leader_member_mapping.items():
                     for m in members:
@@ -964,11 +1012,13 @@ else:
                             "組別": l_name,
                             "姓名": m,
                             "未回報天數": 0,
-                            "扣分": 0
+                            "手動扣分": 0,
+                            "扣分總計": 0
                         }
 
-                # 逐日檢查各成員回報狀況
+                # 逐日檢查各成員回報狀況與手動扣分
                 for d_str in date_list:
+                    # 1. 檢查未回報 (一天未回報扣 1 分)
                     try:
                         day_res = requests.get(f"{REPORT_LOG_URL}/{d_str}.json").json() or {}
                     except:
@@ -979,21 +1029,37 @@ else:
                         reported_on_day = set(day_res.keys())
 
                     for m_name, info in deduct_summary.items():
-                        # 若該日不在已回報名單中，則記為未回報，扣 1 分
                         if m_name not in reported_on_day:
                             info["未回報天數"] += 1
-                            info["扣分"] += 1
+
+                    # 2. 檢查手動扣分紀錄
+                    try:
+                        manual_res = requests.get(f"{MANUAL_DEDUCT_URL}/{d_str}.json").json() or {}
+                    except:
+                        manual_res = {}
+
+                    if isinstance(manual_res, dict):
+                        for m_id, m_data in manual_res.items():
+                            if isinstance(m_data, dict):
+                                p_name = m_data.get("人员") or m_data.get("人員")
+                                p_score = int(m_data.get("扣分", 0))
+                                if p_name in deduct_summary:
+                                    deduct_summary[p_name]["手動扣分"] += p_score
+
+                # 計算總扣分
+                for m_name, info in deduct_summary.items():
+                    info["扣分總計"] = info["未回報天數"] + info["手動扣分"]
 
                 # 轉換為 DataFrame 呈現
                 result_rows = list(deduct_summary.values())
                 df_deduct = pd.DataFrame(result_rows)
 
                 if not df_deduct.empty:
-                    # 依照扣分由高到低排序
-                    df_deduct = df_deduct.sort_values(by="扣分", ascending=False).reset_index(drop=True)
+                    # 依照扣分總計由高到低排序
+                    df_deduct = df_deduct.sort_values(by="扣分總計", ascending=False).reset_index(drop=True)
 
                     st.markdown("---")
-                    st.markdown("### 📋 6S 未回報扣分加總一覽表")
+                    st.markdown("### 📋 6S 扣分與未回報加總一覽表")
                     st.dataframe(df_deduct, use_container_width=True)
 
                     # 提供 CSV 下載
