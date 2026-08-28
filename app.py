@@ -197,7 +197,7 @@ else:
     # 側邊欄導航 (新增手工具相關選項)
     st.sidebar.markdown(f"### 👤 當前人員：**{st.session_state.user}**")
     nav = st.sidebar.radio("功能導航", [
-    "📊 製造部派工專區",
+   
     "🧾組長待辦事項",
     "________________",
     "📝每日6S任務回報", 
@@ -248,7 +248,7 @@ else:
 # ==========================================
 # 📝 頁面一：每日 6S 任務回報中心 (後台優先同步版)
 # ==========================================
-    if st.session_state.menu_selection == "📝每日6S任務回報":
+    elif st.session_state.menu_selection == "📝每日6S任務回報":
         import requests
         import json
         from datetime import datetime, timedelta, timezone
@@ -506,7 +506,7 @@ else:
     # 🎮 6S 戰境養成功能區塊
     # ==========================================
   # 更改為獨立 if 判定，徹底解決 elif 造成的 SyntaxError 語法錯誤
-    elif st.session_state.get("menu_selection") and "6S戰境養成" in str(st.session_state.menu_selection):
+    if st.session_state.get("menu_selection") and "6S戰境養成" in str(st.session_state.menu_selection):
         import random
         import time
         import json # 確保有載入 json 模組
@@ -936,12 +936,6 @@ else:
 
         all_leaders_keys = list(leader_member_mapping.keys())
 
-        # 建立 all_staff_flat 清單以防 NameError
-        all_staff_flat = []
-        for members_list in leader_member_mapping.values():
-            all_staff_flat.extend(members_list)
-        all_staff_flat = sorted(list(set(all_staff_flat)))
-
         # ==========================================
         # 區塊一：新增當日手動扣分 (密碼 12345，介面不直接顯示密碼提示)
         # ==========================================
@@ -1081,7 +1075,7 @@ else:
 
 
 # --- 📊 製造部派工專區 ---
-    elif st.session_state.menu_selection == "📊 製造部派工專區":
+    if st.session_state.menu_selection == "📊 製造部派工專區":
         st.markdown('<h1 style="text-align:center; color:#34d399; font-weight:900;">📋 製造部派工進度看板</h1>', unsafe_allow_html=True)
 
         @st.dialog("👥 編輯施工人員", width="medium")
