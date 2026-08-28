@@ -955,7 +955,7 @@ else:
                 m_reason = st.selectbox("扣分原因：", reason_options, key="manual_deduct_reason_sel")
                 m_reason_custom = st.text_input("或自訂扣分原因備註（選填）：", value="", key="manual_deduct_reason_custom")
                 
-                m_pwd = st.text_input("請輸入密碼 (12345)：", type="password", key="manual_deduct_pwd")
+                m_pwd = st.text_input("請輸入密碼：", type="password", key="manual_deduct_pwd")
                 
                 submitted_manual = st.form_submit_button("💾 確認送出手動扣分", use_container_width=True)
                 
