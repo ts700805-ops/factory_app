@@ -1072,7 +1072,7 @@ else:
                         label="📄 匯出扣分明細表 CSV",
                         data=csv_bytes,
                         file_name=f"Manual_Deduction_Details_{q_start_date}_to_{q_end_date}.csv",
-                        mime="text/csv",
+                        mime="text/css" if False else "text/csv",
                         use_container_width=True
                     )
                 else:
@@ -2027,12 +2027,12 @@ else:
     elif st.session_state.menu_selection == "⚙️ 設定管理":
         st.title("⚙️ 系統核心設定")
         with st.form("config_form"):
-            so = st.text_area("製令清單 (以逗號隔開)", ",".join(order_list))
-            sl = st.text_area("組長清單 (以逗號隔開)", ",".join(all_leaders))
-            ss = st.text_area("人員清單 (以逗號隔開)", ",".join(all_staff))
-            sp = st.text_area("工序清單 (以逗號隔開)", ",".join(process_list))
-            sm = st.text_area("組長對應工序 (組長:工序1,工序2)", "\n".join([f"{k}:{','.join(v)}" for k, v in process_map.items()]))
-            staff_in = st.text_area("組長屬下人員 (組長:人員1,人員2)", "\n".join([f"{k}:{','.join(v)}" for k, v in staff_map.items()]))
+            so = st.text_area("製令清單 (以逗號隔開)", ",".join(order_list) if isinstance(order_list, list) else str(order_list))
+            sl = st.text_area("組長清單 (以逗號隔開)", ",".join(all_leaders) if isinstance(all_leaders, list) else str(all_leaders))
+            ss = st.text_area("人員清單 (以逗號隔開)", ",".join(all_staff) if isinstance(all_staff, list) else str(all_staff))
+            sp = st.text_area("工序清單 (以逗號隔開)", ",".join(process_list) if isinstance(process_list, list) else str(process_list))
+            sm = st.text_area("組長對應工序 (組長:工序1,工序2)", "\n".join([f"{k}:{','.join(v)}" for k, v in process_map.items()]) if isinstance(process_map, dict) else str(process_map))
+            staff_in = st.text_area("組長屬下人員 (組長:人員1,人員2)", "\n".join([f"{k}:{','.join(v)}" for k, v in staff_map.items()]) if isinstance(staff_map, dict) else str(staff_map))
             if st.form_submit_button("💾 儲存所有設定"):
                 def split_s(s): return [x.strip() for x in s.split(",") if x.strip()]
                 new_proc_map = {line.split(":")[0].strip(): split_s(line.split(":")[1]) for line in sm.split("\n") if ":" in line}
